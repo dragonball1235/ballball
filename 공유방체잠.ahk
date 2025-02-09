@@ -2707,6 +2707,7 @@ LV_ModifyCol(2, 200) ; 두 번째 열(기록) 너비 조정
 LV_Add("", "25.02.09/PM09:58", "배포용 업데이트 시작됨")
 LV_Add("", "25.02.09/PM09:58", "업데이터 로그 제작")
 LV_Add("", "25.02.09/PM10:40", "'엘의축복포션'없이 사냥 시 알람")
+LV_Add("", "25.02.09/PM11:39", "실행 상태로 설정 저장 시 이름모를창 자동끄기")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -8999,6 +9000,8 @@ if(Step = 7 and gui_Startmap = 1)
 {
 GuiControl, , Gui_NowState, 마을로 이동.
 SB_SetText("마을로 라깃이동")
+PostRClick(420,330)
+sleep,10
 gosub, 차원체크
 if( 현재차원 = CountPortal )
 {
