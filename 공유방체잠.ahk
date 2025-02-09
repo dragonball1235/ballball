@@ -1,4 +1,4 @@
-﻿#SingleInstance ignore
+#SingleInstance ignore
 #NoEnv
 #Persistent
 #KeyHistory 0
@@ -1982,7 +1982,7 @@ SysGet,monitor,16
 Gui, Font
 Gui, Font, s8 ,Arial
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
-Gui, Add, Tab, x0 y4 w750 h660, 기본설정|Utility|Grade+|개굴개굴|
+Gui, Add, Tab, x0 y4 w750 h660, 기본설정|Utility|Grade+|NPC|
 Gui, Font
 Gui, Font, s8 ,
 Gui, Add, StatusBar, , 시작대기중
@@ -2660,7 +2660,7 @@ Gui, Add, Checkbox, x347 y570 w15 h15 gCheckM6 vGui_MagicCheck6
 Gui, Add, Checkbox, x445 y570 w15 h15 gCheckM7 vGui_MagicCheck7
 Gui, Add, Checkbox, x543 y570 w15 h15 gCheckM8 vGui_MagicCheck8
 
-gui, tab, 개굴개굴
+gui, tab, NPC
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
 Gui, Add, GroupBox, x10 y30 w300 h355 , NPCOID설정
@@ -2698,7 +2698,14 @@ Gui, Font, s8 cGreen Bold
 Gui, Add, GroupBox, x10 y390 w300 h50 , NPC감응 상태
 Gui, Add, Text, x30 y410 +Left , 감응 NPC   :
 Gui, Add, edit, x100 y407 w180 v감응쿨타임 , NPC없음
-
+Gui, Add, GroupBox, x10 y445 w300 h105, 업데이트 기록  ; 높이를 80으로 조정
+Gui, Font
+Gui, Font, s8
+Gui, Add, ListView, x15 y465 w290 h70 vUpdateLogGrid, 날짜|기록  ; 리스트뷰 추가
+LV_ModifyCol(1, 85)  ; 첫 번째 열(날짜) 너비 조정
+LV_ModifyCol(2, 200) ; 두 번째 열(기록) 너비 조정
+LV_Add("", "25.02.09/09:58", "배포용 업데이트 시작됨")
+LV_Add("", "25.02.09/09:58", "업데이터 로그 제작")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
