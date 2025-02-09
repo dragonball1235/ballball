@@ -17,7 +17,6 @@ SetMouseDelay, -1
 SetDefaultMouseSpeed, 0
 SetTitleMatchMode, 3
 PROCESS,Priority,,High
-FileEncoding, UTF-8
 DllCall("SetProcessWorkingSetSize", "UInt", DllCall("GetCurrentProcess"), "Int", -1, "Int", -1)
 Global WinVersion := GetOSVersion()
 
@@ -9321,6 +9320,17 @@ Sleep, 100
 Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
+If ( 아이템갯수["엘의축복포션(30일)"] <= 0 )
+{
+If ( 아이템갯수["엘의축복포션(7일)"] <= 0 )
+{
+If ( 아이템갯수["엘의축복포션(1일)"] <= 0 )
+{
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없이 체잠중입니다. 엘의축복포션을 사먹여주세요"
+        텔레그램메시지보내기(TMessage)
+}
+}
+}
 Step = 8
 }
 if(Step = 8)
@@ -35761,4 +35771,3 @@ try {
         gosub, RL
     }
 }
-
