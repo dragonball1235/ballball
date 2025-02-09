@@ -4,7 +4,7 @@
 #KeyHistory 0
 #NoTrayIcon
 #Warn All, Off
-ListLines, off
+ListLines, OFF
 SetBatchLines, -1
 SetWinDelay, 0
 SetControlDelay, 0
