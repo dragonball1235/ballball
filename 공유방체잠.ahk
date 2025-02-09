@@ -17,6 +17,7 @@ SetMouseDelay, -1
 SetDefaultMouseSpeed, 0
 SetTitleMatchMode, 3
 PROCESS,Priority,,High
+FileEncoding, UTF-8
 DllCall("SetProcessWorkingSetSize", "UInt", DllCall("GetCurrentProcess"), "Int", -1, "Int", -1)
 Global WinVersion := GetOSVersion()
 
