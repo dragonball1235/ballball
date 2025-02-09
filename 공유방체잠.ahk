@@ -2704,8 +2704,9 @@ Gui, Font, s8
 Gui, Add, ListView, x15 y465 w290 h70 vUpdateLogGrid, 날짜|기록  ; 리스트뷰 추가
 LV_ModifyCol(1, 85)  ; 첫 번째 열(날짜) 너비 조정
 LV_ModifyCol(2, 200) ; 두 번째 열(기록) 너비 조정
-LV_Add("", "25.02.09/09:58", "배포용 업데이트 시작됨")
-LV_Add("", "25.02.09/09:58", "업데이터 로그 제작")
+LV_Add("", "25.02.09/PM09:58", "배포용 업데이트 시작됨")
+LV_Add("", "25.02.09/PM09:58", "업데이터 로그 제작")
+LV_Add("", "25.02.09/PM10:40", "'엘의축복포션'없이 사냥 시 알람")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
