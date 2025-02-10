@@ -6612,7 +6612,7 @@ if(CheckPB = 1)
 {
 nowtime = %A_Now%
 FormatTime, nowtime1, %nowtime%, yyyyMMddHHmm
-if(nowtime1 > newTime1)
+if(nowtime1 > newTime1 && (Step != 1026 || Step != 300))
 {
 MobNumber = 1
 SplashImage, 1: off
@@ -9325,20 +9325,14 @@ Sleep, 100
 Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
-If ( 아이템갯수["엘의축복포션(30일)"] <= 0 )
-{
-If ( 아이템갯수["엘의축복포션(7일)"] <= 0 )
-{
-If ( 아이템갯수["엘의축복포션(1일)"] <= 0 )
+If (InStr(아이템갯수, "엘의축복포션") = 0)
 {
 TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없이 체잠중입니다. 엘의축복포션을 사먹여주세요"
         텔레그램메시지보내기(TMessage)
 }
-}
-}
 Step = 8
 }
-if(Step = 8)
+if(Step = 8)`
 {
 GuiControl, , Gui_NowState, 인식한 어빌에 맞춰 체잠 초기 장소 세팅 중...
 SB_SetText("체작장소 세팅")
@@ -12594,7 +12588,7 @@ if(Step = 27) ;포남 무바 파트
 GUICONTROL, , Gui_NowState, [포남] 무바 중
 SB_SetText("포남 메모리 무바 중", 1)
 AttackMissCount ++
-if(AttackMissCount >= 800 and 한번만 = 1)
+if(AttackMissCount >= 300 and 한번만 = 1)
 {
     keyclick("AltR")
     AttackMissCount := 0
@@ -12738,13 +12732,17 @@ RepairWeaponCount := 0
 if (무바여부 != 사용할무기수량)
 {
 RepairWeaponCount += 1
+sleep,100
 }
 else
 {
   RepairWeaponCount := 0
 }
-if (RepairWeaponCount >= 800)
+if (RepairWeaponCount >= 400)
 {
+CheckPN := 0
+keyclick("tab")
+sleep,100
 RepairWeaponCount = 0
 MapNumber = 1
 step = 300
@@ -19339,8 +19337,9 @@ if(Step = 1026) ;무바파트
 GUICONTROL, , Gui_NowState, [포북] 무바 중
 SB_SetText("포북 메모리 무바", 1)
 AttackMissCount ++
-if(AttackMissCount >= 800 and 한번만 = 1)
+if(AttackMissCount >= 300 and 한번만 = 1)
 {
+    sleep,100
     keyclick("AltR")
     AttackMissCount := 0
     한번만 :=0
@@ -19483,12 +19482,13 @@ RepairWeaponCount := 0
 if (무바여부 != 사용할무기수량)
 {
 RepairWeaponCount += 1
+sleep,100
 }
 else
 {
   RepairWeaponCount := 0
 }
-if (RepairWeaponCount >= 800)
+if (RepairWeaponCount >= 300)
 {
 RepairWeaponCount = 0
 MapNumber = 1
