@@ -9050,9 +9050,7 @@ if(Ras = 0)
 {
 GuiControl, , Gui_NowState, 라깃 사용. . .
 WriteExecutableMemory("퀵슬롯사용")
-sleep,100
 KeyClick(0)
-sleep,300
 }
 if(Ras = 1 and SelectRas = 0)
 {
