@@ -9001,8 +9001,6 @@ if(Step = 7 and gui_Startmap = 1)
 {
 GuiControl, , Gui_NowState, 마을로 이동.
 SB_SetText("마을로 라깃이동")
-PostRClick(420,330)
-sleep,10
 gosub, 차원체크
 if( 현재차원 = CountPortal )
 {
