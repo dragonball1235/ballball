@@ -5407,8 +5407,8 @@ SetTimer, Hunt, 10
 SetTimer, AttackCheck, 10
 SetTimer, AttackMGB, 1000
 SetTimer, 타겟팅, 100
-SetTimer, GetMemory, off
-SetTimer, ClearMem, off
+SetTimer, GetMemory, 1500000
+SetTimer, ClearMem, 1500100
 SetTimer, RL, 15000000
 시작탭사이즈 := 1
 return
@@ -6612,7 +6612,7 @@ if(CheckPB = 1)
 {
 nowtime = %A_Now%
 FormatTime, nowtime1, %nowtime%, yyyyMMddHHmm
-if(nowtime1 > newTime1 && (Step != 1026 || Step != 300))
+if(nowtime1 > newTime1 && (Step != 300))
 {
 MobNumber = 1
 SplashImage, 1: off
