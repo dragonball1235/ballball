@@ -9050,8 +9050,9 @@ if(Ras = 0)
 {
 GuiControl, , Gui_NowState, 라깃 사용. . .
 WriteExecutableMemory("퀵슬롯사용")
-sleep,1
+sleep,100
 KeyClick(0)
+sleep,300
 }
 if(Ras = 1 and SelectRas = 0)
 {
@@ -9332,7 +9333,7 @@ TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없이 체잠
 }
 Step = 8
 }
-if(Step = 8)`
+if(Step = 8)
 {
 GuiControl, , Gui_NowState, 인식한 어빌에 맞춰 체잠 초기 장소 세팅 중...
 SB_SetText("체작장소 세팅")
