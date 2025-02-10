@@ -9322,13 +9322,13 @@ Sleep, 100
 Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
-for key in 아이템갯수
-    if (InStr(key, "엘의축복포션")=0)
-    {
-            TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없습니다. 채워주세요."
-        텔레그램메시지보내기(TMessage)
-        sleep,100
-    }
+
+if (아이템갯수["엘의축복포션(30일)"] = 0 && 아이템갯수["엘의축복포션(7일)"] = 0 && 아이템갯수["엘의축복포션(1일)"] = 0)
+{
+    TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없습니다. 채워주세요."
+    텔레그램메시지보내기(TMessage)
+}
+
 Step = 8
 }
 if(Step = 8)
@@ -35774,4 +35774,3 @@ try {
         gosub, RL
     }
 }
-
