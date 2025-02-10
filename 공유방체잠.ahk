@@ -2708,6 +2708,7 @@ LV_Add("", "25.02.09/PM09:58", "배포용 업데이트 시작됨")
 LV_Add("", "25.02.09/PM09:58", "업데이터 로그 제작")
 LV_Add("", "25.02.09/PM10:40", "'엘의축복포션'없이 사냥 시 알람")
 LV_Add("", "25.02.09/PM11:39", "실행 상태로 설정 저장 시 이름모를창 자동끄기")
+LV_Add("", "25.02.10/PM02:20", "무기수리시 메모리오류 1차 수정")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -5406,8 +5407,8 @@ SetTimer, Hunt, 10
 SetTimer, AttackCheck, 10
 SetTimer, AttackMGB, 1000
 SetTimer, 타겟팅, 100
-SetTimer, GetMemory, 9000000
-SetTimer, ClearMem, 9000000
+SetTimer, GetMemory, off
+SetTimer, ClearMem, off
 SetTimer, RL, 15000000
 시작탭사이즈 := 1
 return
@@ -12744,7 +12745,6 @@ else
 }
 if (RepairWeaponCount >= 800)
 {
-CheckPN := 0
 RepairWeaponCount = 0
 MapNumber = 1
 step = 300
@@ -19490,10 +19490,10 @@ else
 }
 if (RepairWeaponCount >= 800)
 {
-CheckPB = 0
 RepairWeaponCount = 0
 MapNumber = 1
 step = 300
+return
 }
 }
 if(Step = 1030)
