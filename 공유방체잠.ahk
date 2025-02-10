@@ -7305,18 +7305,18 @@ RunningTime := FormatSeconds((A_TickCount-ProgramStartTime)/1000)
 GuiControl,,시작체력,%CheckFirstHP%
 GuiControl,,상승체력,%CheckUPHP% (%상승체력평균값%)
 GuiControl,,경과시간,%RunningTime%
-if ((A_TickCount - LastMessageTime) >= 3600000)  ; 1시간(3600초 = 3600000밀리초)
-{
-    상승체력_1시간 := CheckUPHP - LastCheckUPHP
-    상승체력평균값_1시간 := (상승체력_1시간 * 60) / 60  ; 1시간 동안의 평균 상승 체력 계산
+;if ((A_TickCount - LastMessageTime) >= 3600000)  ; 1시간(3600초 = 3600000밀리초)
+;{
+;    상승체력_1시간 := CheckUPHP - LastCheckUPHP
+;    상승체력평균값_1시간 := (상승체력_1시간 * 60) / 60  ; 1시간 동안의 평균 상승 체력 계산
 
-    TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 시작 체력 : " . CheckFirstHP . " / 1시간 상승 체력 : " . 상승체력_1시간 . " ( " . 상승체력평균값_1시간 . " ) " . " / 경과 시간 :  " . RunningTime . " 한시간동안 오른 체력 입니다."
-    텔레그램메시지보내기(TMessage)
+;    TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 시작 체력 : " . CheckFirstHP . " / 1시간 상승 체력 : " . 상승체력_1시간 . " ( " . 상승체력평균값_1시간 . " ) " . " / 경과 시간 :  " . RunningTime . " 한시간동안 오른 체력 입니다."
+;    텔레그램메시지보내기(TMessage)
 
     ; 1시간 단위 상승 체력 업데이트 및 LastMessageTime 리셋
-    LastCheckUPHP := CheckUPHP
-    LastMessageTime := A_TickCount
-}
+;    LastCheckUPHP := CheckUPHP
+;    LastMessageTime := A_TickCount
+;}
 CheckUPHP := MaxHP - CheckFirstHP
 SB_SetText(" 시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 :  " . RunningTime ,3 )
 }
@@ -9322,11 +9322,17 @@ Sleep, 100
 Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
-If (InStr(아이템갯수, "엘의축복포션") = 0)
-{
-TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없이 체잠중입니다. 엘의축복포션을 사먹여주세요"
+for key in 아이템갯수
+    if (InStr(key, "엘의축복포션"))
+    {
+    sleep,1
+    }
+    else
+    {
+        TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없습니다. 채워주세요."
         텔레그램메시지보내기(TMessage)
-}
+        sleep,100
+    }
 Step = 8
 }
 if(Step = 8)
