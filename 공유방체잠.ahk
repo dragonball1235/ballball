@@ -9323,13 +9323,9 @@ Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
 for key in 아이템갯수
-    if (InStr(key, "엘의축복포션"))
+    if (InStr(key, "엘의축복포션")=0)
     {
-    sleep,1
-    }
-    else
-    {
-        TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없습니다. 채워주세요."
+            TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없습니다. 채워주세요."
         텔레그램메시지보내기(TMessage)
         sleep,100
     }
