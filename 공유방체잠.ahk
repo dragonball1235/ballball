@@ -2712,7 +2712,6 @@ LV_Add("", "25.02.09/PM11:39", "실행 상태로 설정 저장 시 이름모를�
 LV_Add("", "25.02.10/PM02:20", "무기수리시 메모리오류 1차 수정")
 LV_Add("", "25.02.12/AM07:10", "레이블 정리")
 LV_Add("", "25.02.12/AM07:13", "메모리 정리 부분 일부 수정")
-LV_Add("", "25.02.12/AM02:29", "로그인 확인중입니다 팝업시 확인")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -8373,6 +8372,7 @@ CDP := ChromeInst.CDP
 CDP.Call("Page.enable")  ; Page 이벤트 활성화
 CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
 WinWait, ahk_exe jElancia.exe, , 15
+sleep,4000
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 PageInst.Evaluate(removeCookiesScript)
 ; 테스트 종료: 크롬 브라우저 닫기
@@ -8506,7 +8506,7 @@ PageInst.Evaluate("document.querySelector('.game_start').click();") ; 넥슨 로
 CDP := ChromeInst.CDP
 CDP.Call("Page.enable")  ; Page 이벤트 활성화
 CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
-sleep,3000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게임실행하고 진행
+sleep,4000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게임실행하고 진행
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
 PageInst.Evaluate(removeCookiesScript)
@@ -8578,9 +8578,9 @@ IfnotInString,Patch,최신 버전입니다. 게임을 시작하세요.
 SetTitleMatchMode, 1 ; 부분 일치 모드 활성화
 WinClose, Elancia
 WinKill, ahk_exe MRMsph.exe
-TMessage :="[ Helancia_Log ] 패치 이상 재설정. [추정오류 : 서버 점검 및 인터넷이상]"
+TMessage :="[ Helancia_Log ] 패치 이상 재설정. [추정오류 : 젤랜시아 재접속]"
 텔레그램메시지보내기(TMessage)
-Sleep, 200
+Sleep, 2000
 Step = 10000
 return
 }
