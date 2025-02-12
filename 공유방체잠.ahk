@@ -35365,4 +35365,3 @@ GetPrivateWorkingSet(PID)
         return 0  ; 예외 발생 시 0 반환
     }
 }
-
