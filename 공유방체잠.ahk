@@ -18928,6 +18928,7 @@ WriteExecutableMemory("NPC호출용2")
 차원 := "알파"
 jelan.write(0x00527b54, A길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
+sleep, 100
 RunMemory("NPC호출")
 }
 IfInString,Location,[베타차원]
@@ -18937,6 +18938,7 @@ WriteExecutableMemory("NPC호출용2")
 차원 := "베타"
 jelan.write(0x00527b54, B길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
+sleep, 100
 RunMemory("NPC호출")
 }
 IfInString,Location,[감마차원]
@@ -18946,6 +18948,7 @@ WriteExecutableMemory("NPC호출용2")
 차원 := "감마"
 jelan.write(0x00527b54, G길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대", 2)
+sleep, 100
 RunMemory("NPC호출")
 }
 ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
