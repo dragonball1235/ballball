@@ -11373,7 +11373,7 @@ Sleep, 500
 }
 if(Gui_KON = 1)
 {
-if(ipmak > 3)
+if(ipmak >= 5)
 {
 GUICONTROL, , Gui_NowState, 리노아 호출오류 감응 OFF
 SLEEP, 500
