@@ -8372,7 +8372,6 @@ CDP := ChromeInst.CDP
 CDP.Call("Page.enable")  ; Page 이벤트 활성화
 CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
 WinWait, ahk_exe jElancia.exe, , 15
-sleep,4000
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 PageInst.Evaluate(removeCookiesScript)
 ; 테스트 종료: 크롬 브라우저 닫기
@@ -8506,7 +8505,7 @@ PageInst.Evaluate("document.querySelector('.game_start').click();") ; 넥슨 로
 CDP := ChromeInst.CDP
 CDP.Call("Page.enable")  ; Page 이벤트 활성화
 CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
-sleep,4000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게임실행하고 진행
+sleep,3000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게임실행하고 진행
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
 PageInst.Evaluate(removeCookiesScript)
@@ -18978,7 +18977,7 @@ sleep,100
 break
 }
 포북대화경과 := A_TickCount - 포북대화시도
-if(포북대화경과 >= 10000)
+if(포북대화경과 >= 15000)
 {
 AltR()
 Sleep, 1000
