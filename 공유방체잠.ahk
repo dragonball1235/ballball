@@ -1908,7 +1908,7 @@ removeCookiesScript := "
 global HourlyIncrease := 0
 global PrevCheckUPHP := 0
 global LastCheckTime := ProgramStartTime  ; 마지막 1시간 체크 시간
-global Myloute
+global Myloute,CDP,PageInst,Evt
 Global 상승어빌주소, randKey, 중복어빌카운트, countsignal
 Global 9번사용 = 1, FPcount := 0, Aloute, Bloute,Cloute, 랜덤감응 = 0
 Global WantedItemlength := 0
@@ -2712,6 +2712,7 @@ LV_Add("", "25.02.09/PM11:39", "실행 상태로 설정 저장 시 이름모를�
 LV_Add("", "25.02.10/PM02:20", "무기수리시 메모리오류 1차 수정")
 LV_Add("", "25.02.12/AM07:10", "레이블 정리")
 LV_Add("", "25.02.12/AM07:13", "메모리 정리 부분 일부 수정")
+LV_Add("", "25.02.12/AM02:29", "로그인 확인중입니다 팝업시 확인")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -8364,10 +8365,13 @@ return
 }
 while !PageInst.Evaluate("document.querySelector('.game_start')")
 {
-    Sleep, 100  ; 0.5초 대기
+    Sleep, 300  ; 0.5초 대기
 }
-sleep,1000
+sleep,2000
 PageInst.Evaluate("document.querySelector('.game_start').click();") ; 로그인 버튼 클릭
+CDP := ChromeInst.CDP
+CDP.Call("Page.enable")  ; Page 이벤트 활성화
+CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
 WinWait, ahk_exe jElancia.exe, , 15
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 PageInst.Evaluate(removeCookiesScript)
@@ -8499,6 +8503,9 @@ if (InStr(LoginURL, "https://elancia.nexon.com/")) ;만약 일랜시아로 바�
 {
 SB_SetText("일랜시아 확인4")
 PageInst.Evaluate("document.querySelector('.game_start').click();") ; 넥슨 로그인 창이면 구글 로그인 버튼 클릭
+CDP := ChromeInst.CDP
+CDP.Call("Page.enable")  ; Page 이벤트 활성화
+CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
 sleep,3000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게임실행하고 진행
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
@@ -8532,6 +8539,9 @@ else if (InStr(LoginURL, "https://elancia.nexon.com/"))
 SB_SetText("구글 로그인 완료")
 sleep,4000
 PageInst.Evaluate("document.querySelector('.game_start').click();") ; 넥슨 로그인 창이면 구글 로그인 버튼 클릭
+CDP := ChromeInst.CDP
+CDP.Call("Page.enable")  ; Page 이벤트 활성화
+CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
 sleep, 6000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게임실행하고 진행
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
@@ -35364,4 +35374,11 @@ GetPrivateWorkingSet(PID)
     } catch e {
         return 0  ; 예외 발생 시 0 반환
     }
+}
+
+HandleDialog(evt) {
+    ;ToolTip, 팝업 감지됨: % evt.message  ; 팝업 메시지 확인 (디버깅용)
+    CDP.Call("Page.handleJavaScriptDialog", { "accept": true })  ; 확인 버튼 클릭
+    sleep,500
+    PageInst.Evaluate("document.querySelector('.game_start').click();") ; 넥슨 로그인
 }
