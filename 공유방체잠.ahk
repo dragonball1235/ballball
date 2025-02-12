@@ -8558,7 +8558,7 @@ Step = 2
 }
 if(Step = 2)
 {
-Sleep, 2000
+Sleep, 4000
 SB_SetText("로그인 상태 체크")
 GuiControl, , 로그인상태정보, [로그인] - 실행중
 WinKill, ahk_exe MRMsph.exe
