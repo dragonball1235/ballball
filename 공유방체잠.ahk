@@ -1953,7 +1953,8 @@ Global PT_Delays := A_TickCount
 Global NSK_Counts := A_TickCount
 Global NPC_TALK_DELAYCOUNT := A_TickCount
 Global Read_Memory_Count := A_TickCount
-Global 서버상태,CountPortal,차원
+Global 서버상태,CountPortal,차원, 랜덤차원, 알파차원, 베타차원, 감마차원,Gui_PartyON,차원,Gui_CheckUseParty,Gui_KON = 0,Gui_KOFF = 0,적용날짜, 포남입장시간
+    global 업데이트체크, 적용날짜
 Global 차원체크
 Global 빵,몸찌방지,식빵갯수,절반FP,몸찌이동인식 = 0
 global 실행창위치 = 0 , 시작탭사이즈 = 0
@@ -2709,6 +2710,8 @@ LV_Add("", "25.02.09/PM09:58", "업데이터 로그 제작")
 LV_Add("", "25.02.09/PM10:40", "'엘의축복포션'없이 사냥 시 알람")
 LV_Add("", "25.02.09/PM11:39", "실행 상태로 설정 저장 시 이름모를창 자동끄기")
 LV_Add("", "25.02.10/PM02:20", "무기수리시 메모리오류 1차 수정")
+LV_Add("", "25.02.12/AM07:10", "레이블 정리")
+LV_Add("", "25.02.12/AM07:13", "메모리 정리 부분 일부 수정")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -3012,7 +3015,7 @@ RegRead, Reg퀵슬롯8번,HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯
 RegRead, Reg포북생콩, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 포북생콩
 RegRead, Reg포남생콩, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 포남생콩
 RegRead, Reg가방, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 가방
-gosub, OID읽기
+OID읽기()
 if(RegVMRE = 1)
 {
 VMRESET := 1
@@ -5403,12 +5406,10 @@ ProgramStartTime := RPST
 }
 GuiControl, Choose, Gui_Tab, 상태창
 loady = 1
-SetTimer, Hunt, 10
-SetTimer, AttackCheck, 10
-SetTimer, AttackMGB, 1000
+SetTimer, Hunt, 50
+SetTimer, AttackCheck, 50
+SetTimer, AttackMGB, 5000
 SetTimer, 타겟팅, 100
-SetTimer, GetMemory, 1500000
-SetTimer, ClearMem, 1500100
 SetTimer, RL, 15000000
 시작탭사이즈 := 1
 return
@@ -6475,6 +6476,7 @@ IfWinExist,ahk_pid %jPID%
 {
 TMessage := "[ Helancia_Log ]>>" jTitle "<<: 인벤칸 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
 텔레그램메시지보내기(TMessage)
+sleep,10
 WINKILL, ahk_pid %jPID%
 WINKILL, ahk_exe MRMsph.exe
 }
@@ -6490,13 +6492,12 @@ SetTimer, incineration, off
 SetTimer, GetMemory, OFF
 SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
-SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
 랜덤감응 = 0
 invenError = 0
-return
+Pause
 }
 Hunt:
 GUI, Submit, Nohide
@@ -6537,23 +6538,27 @@ try {
                 Server := result
                 TMessage :="추출된 데이터: " result Server
                 텔레그램메시지보내기(TMessage)
+                sleep,10
             }
             else
             {
         TMessage :="추출된 텍스트 내에서 단어 '" result "'을 찾을 수 없습니다."
         텔레그램메시지보내기(TMessage)
+        sleep,10
             }
         }
         else
         {
         TMessage :="추출된 텍스트 내에서 단어 '" target2 "'을 찾을 수 없습니다."
         텔레그램메시지보내기(TMessage)
+        sleep,10
         }
     }
     else
     {
         TMessage :="HTML에서 단어 '" target1 "'을 찾을 수 없습니다."
         텔레그램메시지보내기(TMessage)
+        sleep,10
     }
 
     ; IE 객체 종료
@@ -6563,6 +6568,7 @@ catch e
 {
 TMessage :="예외 발생! 상세 정보:" . e.Message . "Line: " . e.Line
 텔레그램메시지보내기(TMessage)
+sleep,10
 GROUPADD, ie_gruop, ahk_exe iexplore.exe
 WINKILL, ahk_exe iexplore.exe
 WINKILL, ahk_group ie_gruop
@@ -6686,6 +6692,7 @@ IfWinExist,ahk_pid %jPID%
 GuiControl, , jTitle, %jTitle%
 TMessage := "[ Helancia_Log ]>>" jTitle "<<: 캐릭터 템 일부 벗겨짐. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
 텔레그램메시지보내기(TMessage)
+sleep,10
 WINKILL, ahk_pid %jPID%
 WINKILL, ahk_exe MRMsph.exe
 }
@@ -6697,14 +6704,13 @@ SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
 SetTimer, AttackMGB, off
 SetTimer, incineration, off
-SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
 랜덤감응 = 0
 invenError = 0
 MsgBox,48, 캐릭터사망방지, 템이 벗겨졌습니다.
-return
+Pause
 }
 }
 }
@@ -6762,6 +6768,7 @@ FormNumber := jelan.read(0x0058DAD0, "UInt", 0xC, 0x10, 0x8, 0xA0)
 NPCMsg := jelan.readString(NPC_MSG_ADR, 52, "UTF-16", aOffsets*)
 TMessage := "[ Helancia_Log ]>>" jTitle FormNumber "<<: 애미뒤진 인연버그 발생. " Location "/" "발생 메시지 전문 : " NPCMsg
 텔레그램메시지보내기(TMessage)
+sleep,10
 keyclick("프로세스종료")
 이전스텝 := step
 step = 0
@@ -6780,6 +6787,7 @@ NPCMsg := jelan.readString(NPC_MSG_ADR, 52, "UTF-16", aOffsets*)
 GuiControl, , jTitle, %jTitle%
 TMessage := "[ Helancia_Log ]>>" jTitle FormNumber "<<: 애미뒤진 길드버그 발생. " Location "/" "발생 메시지 전문 : " NPCMsg
 텔레그램메시지보내기(TMessage)
+sleep,10
 keyclick("프로세스종료")
 이전스텝 := step
 step = 0
@@ -7343,6 +7351,7 @@ WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 TMessage := "[ Helancia_Log ]>>" jTitle  "<< : 체력이" . NowHP . "가 되어 종료 확인 필요. 위치보고: " Location . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ") 시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) / 경과 시간 : " RunningTime
 텔레그램메시지보내기(TMessage)
+sleep,10
 }
 GuiControl, , Gui_NowState, 체력이 %NowHP%가 되어 강제 종료 합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -7360,7 +7369,7 @@ CheckPB = 0
 CheckPN := 0
 countsignal := 0
 랜덤감응 = 0
-return
+Pause
 }
 }
 internet := ConnectedToInternet()
@@ -7375,6 +7384,7 @@ WinKill, ahk_exe MRMsph.exe
 Step = 10000
 return
 }
+WinGet, pid, PID, ahk_pid %jPID%
 ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
 IfInString,ServerMsg,오랜 시간 아무것도 하지 않으면
 {
@@ -7382,6 +7392,7 @@ IfWinExist,ahk_pid %jPID%
 {
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<:로그인 시 오랜시간 아무것도 하지 않음."
 텔레그램메시지보내기(TMessage)
+sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 SplashImage, 1: off
@@ -7435,6 +7446,7 @@ GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.2
 ParasCount = 3
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 포북으로 잠시 이동."
 텔레그램메시지보내기(TMessage)
+sleep,10
 파라스방해감지 := 1
 GuiControl,,Gui_huntpobuk,1
 파라스감지++
@@ -7451,7 +7463,8 @@ if(Entrance > 2)
 MsgBox, , 비정상종료감지, OID리셋, 3
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 초기 입구 감응 실패. OID 리셋."
 텔레그램메시지보내기(TMessage)
-gosub,OID리셋
+sleep,10
+OID리셋()
 step := 8
 sleep,1000
 return
@@ -7483,6 +7496,7 @@ IfWinExist,ahk_pid %jPID%
 GuiControl, , jTitle, %jTitle%
 TMessage := "[ Helancia_Log ]>>" jTitle " <<: 캐릭터 설정된 체력에 도달. 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
 텔레그램메시지보내기(TMessage)
+sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
@@ -7501,7 +7515,7 @@ CheckPB = 0
 CheckPN := 0
 countsignal := 0
 랜덤감응 = 0
-return
+Pause
 }
 }
 }
@@ -7539,6 +7553,7 @@ SB_SetText("거래창 방해감지")
 GuiControl, , jTitle, %jTitle%
 TMessage :="[ Helancia_Log ]>>" jTitle "<<: [거래방지] 이 시벌놈이 거래겁니다 거래건놈 :" name
 텔레그램메시지보내기(TMessage)
+sleep,100
 AltR()
 Sleep,100
 AltR()
@@ -7914,6 +7929,7 @@ GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.
 ParasCount = 3
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 파라스로 잠시 포북 이동 "
 텔레그램메시지보내기(TMessage)
+sleep,10
 파라스방해감지 := 1
 Settimer, 파라스대기, %파라스대기값%
 파라스타이머시작 := A_TickCount
@@ -7956,6 +7972,7 @@ GUICONTROL, , Gui_NowState, [포남] 헉 만드다. . . !
 GuiControl, , jTitle, %jTitle%
 TMessage :="[ Helancia_Log ]>>" jTitle "<<: X:" .  MandX . "와 Y : " . MandY . "에"  . "만드발견. 튑니다. "
 텔레그램메시지보내기(TMessage)
+sleep,10
 AttackLoopCount = 0
 AttackCount = 0
 Step = 19
@@ -8375,6 +8392,7 @@ GuiControl, , 로그인상태정보, [로그인] - 시작실패 ( 넥슨플러�
 Gui_Enable()
 TMessage :="[ Helancia_Log ] [플러그]로그인 실패, 확인 필요." Location
 텔레그램메시지보내기(TMessage)
+sleep,100
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
 SetTimer, AttackMGB, off
@@ -8552,7 +8570,7 @@ WinClose, Elancia
 WinKill, ahk_exe MRMsph.exe
 TMessage :="[ Helancia_Log ] 패치 이상 재설정. [추정오류 : 서버 점검 및 인터넷이상]"
 텔레그램메시지보내기(TMessage)
-Sleep, 2000
+Sleep, 200
 Step = 10000
 return
 }
@@ -8937,6 +8955,7 @@ IfWinExist,ahk_pid %jPID%
 {
 TMessage :="[ Helancia_Log ]>>" jTitle "<<: 접속 오류로 인한 재시작 및 기존 젤랜시아 종료"
 텔레그램메시지보내기(TMessage)
+sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe CTEXE.exe
 WinKill, ahk_exe Jelancia.exe
@@ -8952,6 +8971,7 @@ IfInString,ServerMsg,일랜시아 서버에
 {
 TMessage := "[ Helancia_Log ]" ServerMsg
 텔레그램메시지보내기(TMessage)
+sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 Step = 10000
@@ -8965,6 +8985,7 @@ IfWinExist,ahk_pid %jPID%
 {
 TMessage := "[ Helancia_Log ]" ServerMsg
 텔레그램메시지보내기(TMessage)
+sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
@@ -8978,6 +8999,7 @@ IfWinExist,ahk_pid %jPID%
 {
 TMessage := "[ Helancia_Log ]" ServerMsg
 텔레그램메시지보내기(TMessage)
+sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
@@ -9001,7 +9023,7 @@ if(Step = 7 and gui_Startmap = 1)
 {
 GuiControl, , Gui_NowState, 마을로 이동.
 SB_SetText("마을로 라깃이동")
-gosub, 차원체크
+차원체크()
 if( 현재차원 = CountPortal )
 {
 if(Gui_huntMummy = 1)
@@ -9194,7 +9216,7 @@ SendInput, {F19}
 sleep, 100
 if(Gui_KON = 1)
 {
-gosub, OID읽기
+OID읽기()
 Sleep,1
 }
 gosub, 어빌리티탭확인
@@ -9327,6 +9349,7 @@ if (아이템갯수["엘의축복포션(30일)"] = 0 && 아이템갯수["엘의�
 {
     TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없습니다. 채워주세요."
     텔레그램메시지보내기(TMessage)
+    sleep,10
 }
 
 Step = 8
@@ -9630,7 +9653,7 @@ CheckPN := 0
 countsignal := 0
 CheckPB = 0
 MapNumber := 1
-gosub, 차원체크
+차원체크()
 Check_Dimension()
 if(차원체크 = "알파")
 {
@@ -10815,7 +10838,7 @@ Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
 Send, {F16 Up}
-gosub, 차원체크
+차원체크()
 Check_Map()
 sleep,500
 if(Map = 1)
@@ -11181,7 +11204,7 @@ A서파 := 0x0
 A길잃파 := 0x0
 차원이동감응 := 1
 GuiControl, ,Gui_KOFF, 1
-gosub,OID저장
+OID저장()
 return
 }
 호출대상 := "알파 - 리노아"
@@ -11215,7 +11238,7 @@ B서파 := 0x0
 B길잃파 := 0x0
 차원이동감응 := 1
 GuiControl, ,Gui_KOFF, 1
-gosub,OID저장
+OID저장()
 return
 }
 }
@@ -11248,14 +11271,14 @@ G서파 := 0x0
 G길잃파 := 0x0
 차원이동감응 := 1
 GuiControl, ,Gui_KOFF, 1
-gosub,OID저장
+OID저장()
 return
 }
 }
 ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
 IfInString,ServerMsg,서버와의 연결이
 {
-gosub,OID리셋
+OID리셋()
 GuiControl, ,Gui_KOFF, 1
 }
 }
@@ -11401,7 +11424,7 @@ if InStr(ServerMsg, "서버와의 연결이")
  || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
  || InStr(ServerMsg, "인증시간이")
 {
-gosub,OID리셋
+OID리셋()
 차원이동감응 := 1
 GuiControl, ,Gui_KOFF, 1
 }
@@ -11574,6 +11597,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
                 SetFormat, integer, D
                 WriteExecutableMemory("NPC호출용1")
                 WriteExecutableMemory("NPC호출용2")
+                Sleep, 10
                 jelan.write(0x00527b54, NPCOID2, "UInt", aOffset*)
                 Sleep, 200
                 RunMemory("NPC호출")
@@ -11754,6 +11778,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
                 SetFormat, integer, D
                 WriteExecutableMemory("NPC호출용1")
                 WriteExecutableMemory("NPC호출용2")
+                Sleep, 10
                 jelan.write(0x00527b54, NPCOID3, "UInt", aOffset*)
                 Sleep, 100
                 RunMemory("NPC호출")
@@ -11870,7 +11895,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
             }
             step = 20
             CheckPN := 1
-            gosub,OID저장
+            OID저장()
             }
             else
             {
@@ -11884,7 +11909,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
             {
             WPD()
             }
-            gosub,OID저장
+            OID저장()
             return
             }
             ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16",aOffsets*)
@@ -12799,7 +12824,7 @@ if(Step = 32) ;포남 무바 중 감응 파트
     {
     WINACTIVATE, ahk_pid %jPID%
     }
-    gosub, 감응
+    감응()
     sleep,500
     TMessage := "[ Helancia_Log ]>>" jTitle "<<: [원격] 감응 성공.[" 호출대상 ":" countsignal "]"  Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
     텔레그램메시지보내기(TMessage)
@@ -12985,7 +13010,7 @@ SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-return
+Pause
 }
 GuiControl, , jTitle, %jTitle%
 TMessage := "[ Helancia_Log ]>>" jTitle  "<<: 체력이" . NowHP . "가 되어 병원 회복"
@@ -13547,7 +13572,7 @@ SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-return
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -13722,11 +13747,13 @@ Loop,27
 {
 PostMessage, 0x100, 40, 22020097, , ahk_pid %jPID%
 PostMessage, 0x101, 40, 22020097, , ahk_pid %jPID%
+Sleep, 1
 }
 Loop,100
 {
 POSTMESSAGE,0x100,39,21823489,,ahk_pid %jPID%
 POSTMESSAGE,0x101,39,21823489,,ahk_pid %jPID%
+Sleep, 1
 }
 PostClick(424,323)
 KeyClick("Enter")
@@ -13752,11 +13779,13 @@ Loop,27
 {
 PostMessage, 0x100, 40, 22020097, , ahk_pid %jPID%
 PostMessage, 0x101, 40, 22020097, , ahk_pid %jPID%
+Sleep, 1
 }
 Loop,100
 {
 POSTMESSAGE,0x100,39,21823489,,ahk_pid %jPID%
 POSTMESSAGE,0x101,39,21823489,,ahk_pid %jPID%
+Sleep, 1
 }
 Loop,
 {
@@ -14112,11 +14141,10 @@ SetTimer, incineration, off
 SetTimer, GetMemory, OFF
 SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
-SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-return
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -14677,7 +14705,7 @@ SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-return
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -14984,11 +15012,10 @@ SetTimer, incineration, off
 SetTimer, GetMemory, OFF
 SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
-SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-return
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -15294,11 +15321,10 @@ SetTimer, incineration, off
 SetTimer, GetMemory, OFF
 SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
-SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-return
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -15607,11 +15633,10 @@ SetTimer, incineration, off
 SetTimer, GetMemory, OFF
 SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
-SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-return
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -15710,11 +15735,10 @@ SetTimer, incineration, off
 SetTimer, GetMemory, OFF
 SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
-SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-return
+Pause
 }
 }
 if(Gold >= 1000000)
@@ -17431,11 +17455,10 @@ SetTimer, incineration, off
 SetTimer, GetMemory, OFF
 SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
-SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-return
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -17532,7 +17555,6 @@ SetTimer, incineration, off
 SetTimer, GetMemory, OFF
 SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
-SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
@@ -17952,11 +17974,10 @@ SetTimer, incineration, off
 SetTimer, GetMemory, OFF
 SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
-SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-return
+Pause
 }
 Get_Location()
 IfInString,Location,포프레스네 마을
@@ -18177,21 +18198,33 @@ Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
 Send, {F16 Up}
-gosub, 차원체크
-if( 현재차원 = CountPortal )
+if( 랜덤차원 = 1 )
 {
+if(Gui_CheckUseParty = 0)
+{
+Random, CountPortal, 0, 2
+}
+}
+if ( 알파차원 = 1 )
+{
+CountPortal = 0
+}
+if ( 베타차원 = 1 )
+{
+CountPortal = 1
+}
+if ( 감마차원 = 1 )
+{
+CountPortal = 2
+}
+if( 현재차원 = %CountPortal% )
+{
+포북시작 := 1
 MapNumber := 5
 현재차원 := CountPortal
-Get_Location()
-if InStr(Location, "포프레스네 북쪽")
+}else
 {
-Step = 1002
-MapNumber := 10
-return
-}
-}
-else
-{
+포북시작 := 0
 MapNumber := 1
 현재차원 := CountPortal
 }
@@ -18204,7 +18237,10 @@ Sleep, 100
 Check_Ras()
 if(Ras = 0)
 {
-Sleep, 500
+Sleep, 250
+PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
+PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
+Sleep, 250
 PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
 PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
 Sleep, 500
@@ -18222,8 +18258,8 @@ if(Ras = 1 and SelectRas = 1)
 if(CountPortal = 0)
 {
 PostClick(630,345)
-RasCount := RasCount-1
-GuiControl, , Gui_RasCount, %RasCount%
+라깃카운트 := 라깃카운트-1
+GuiControl, , Gui_RasCount, %라깃카운트%
 Step = 1001
 Sleep,5000
 return
@@ -18231,8 +18267,8 @@ return
 if(CountPortal = 1)
 {
 PostClick(645,345)
-RasCount := RasCount-1
-GuiControl, , Gui_RasCount, %RasCount%
+라깃카운트 := 라깃카운트-1
+GuiControl, , Gui_RasCount, %라깃카운트%
 Step = 1001
 Sleep,5000
 return
@@ -18240,8 +18276,8 @@ return
 if(CountPortal = 2)
 {
 PostClick(660,345)
-RasCount := RasCount-1
-GuiControl, , Gui_RasCount, %RasCount%
+라깃카운트 := 라깃카운트-1
+GuiControl, , Gui_RasCount, %라깃카운트%
 Step = 1001
 Sleep,5000
 return
@@ -18552,7 +18588,6 @@ if(Step = 1006)
 {
 GuiControl, , Gui_NowState, [포북] 사냥터노?
 SB_SetText("북쪽 필드인지 확인 중")
-Get_Location()
 IfInString,Location,북쪽 필드
 {
 RCC = 0
@@ -18641,7 +18676,7 @@ pbtalkcheck1 := A_TickCount
 Step = 1010
 TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 파수꾼 위치 도착. |" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 :  " . RunningTime
 텔레그램메시지보내기(TMessage)
-sleep,1000
+sleep,100
 }
 if(!((PosX >= MovePosX-2 and PosX <= MovePosX+2) and (PosY >= MovePosY-2 and PosY <= MovePosY+2)))
 {
@@ -18688,12 +18723,13 @@ if(ErrorLevel = 1)
 {
 AltR()
 Sleep,500
-PixelSearch, MobX, MobY,  0, 0, 775, 460, 0xEF8AFF, 1, Fast
+PixelSearch, MobX, MobY, 410, 100, 580, 235, 0xEF8AFF, 1, Fast
 }
 if(ErrorLevel = 0)
 {
 PostClick(MobX,MobY)
 Get_Location()
+sleep,100
 Loop, 10
 {
 IfInString,Location,[알파차원]
@@ -18708,7 +18744,7 @@ Sleep, 100
 if (A길잃파 != 0x0000)
 {
     SB_SETTEXT(차원 . A길잃파 . FormNumber "-길잃은 수색대 완료", 2)
-    gosub,OID저장
+    OID저장()
     sleep,100
     break  ; 루프를 멈추고 정상적으로 진행
 }
@@ -18725,7 +18761,7 @@ Sleep, 100
 if (B길잃파 != 0x0000)
 {
     SB_SETTEXT(차원 . B길잃파 . FormNumber "-길잃은 수색대 완료", 2)
-    gosub,OID저장
+    OID저장()
     sleep,100
     break  ; 0x로 시작하고 0이 아닌 값일 때 루프 멈춤
 }
@@ -18742,7 +18778,7 @@ Sleep, 100
 if (G길잃파 != 0x0000)
 {
     SB_SETTEXT(차원 . G길잃파 . FormNumber "-길잃은 수색대 완료", 2)
-    gosub,OID저장
+    OID저장()
     sleep,100
     break  ; 0x로 시작하고 0이 아닌 값일 때 루프 멈춤
 }
@@ -18892,7 +18928,6 @@ WriteExecutableMemory("NPC호출용2")
 차원 := "알파"
 jelan.write(0x00527b54, A길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
-sleep, 500
 RunMemory("NPC호출")
 }
 IfInString,Location,[베타차원]
@@ -18902,7 +18937,6 @@ WriteExecutableMemory("NPC호출용2")
 차원 := "베타"
 jelan.write(0x00527b54, B길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
-sleep, 500
 RunMemory("NPC호출")
 }
 IfInString,Location,[감마차원]
@@ -18912,15 +18946,15 @@ WriteExecutableMemory("NPC호출용2")
 차원 := "감마"
 jelan.write(0x00527b54, G길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대", 2)
-sleep, 500
 RunMemory("NPC호출")
 }
 ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
 IfInString,ServerMsg,서버와의 연결이
 {
-    gosub, OID리셋
+    OID리셋()
    TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 맞지않는 OID로 리셋 |" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
 텔레그램메시지보내기(TMessage)
+sleep,10
 return
 }
 Check_FormNumber()
@@ -18940,7 +18974,7 @@ IfInString,Location,[알파차원]
 A길잃파 := 0x0
 GuiControl,, A길잃파, %A길잃파%
 SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대만 리셋", 2)
-gosub, OID저장
+OID저장()
 }
 IfInString,Location,[베타차원]
 {
@@ -18948,7 +18982,7 @@ IfInString,Location,[베타차원]
 B길잃파 := 0x0
 GuiControl,, B길잃파, %B길잃파%
 SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대만 리셋", 2)
-gosub, OID저장
+OID저장()
 }
 IfInString,Location,[감마차원]
 {
@@ -18956,7 +18990,7 @@ IfInString,Location,[감마차원]
 G길잃파 := 0x0
 GuiControl,, G길잃파, %G길잃파%
 SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대만 리셋", 2)
-gosub, OID저장
+OID저장()
 }
    TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 대화 실패, 다른방식으로 감응 재시도.|" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
 텔레그램메시지보내기(TMessage)
@@ -19694,6 +19728,7 @@ Sleep, 50
 step = 1016
 TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 [원격] 시간별 정상작동.|" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
 텔레그램메시지보내기(TMessage)
+sleep,100
 }
 }
 if(Step = 10000)
@@ -19745,18 +19780,21 @@ try {
             {
         TMessage :="일랜시아 홈페이지 점검 중"
         텔레그램메시지보내기(TMessage)
+        sleep,100
             }
         }
         else
         {
         TMessage :="추출된 텍스트 내에서 단어 '" target2 "'을 찾을 수 없습니다."
         텔레그램메시지보내기(TMessage)
+        sleep,100
         }
     }
     else
     {
         TMessage :="HTML에서 단어 '" target1 "'을 찾을 수 없습니다."
         텔레그램메시지보내기(TMessage)
+        sleep,100
     }
 
     ; IE 객체 종료
@@ -19766,6 +19804,7 @@ catch e
 {
 TMessage :="예외 발생! 상세 정보:" . e.Message . "Line: " . e.Line
 텔레그램메시지보내기(TMessage)
+sleep,100
 GROUPADD, ie_gruop, ahk_exe iexplore.exe
 WINKILL, ahk_exe iexplore.exe
 WINKILL, ahk_group ie_gruop
@@ -20784,7 +20823,7 @@ AttackCount = 0
 if(Step = 27)
 {
 Attacking := A_TickCount - AttackingCount
-if(Attacking >= 50000)
+if(Attacking >= 20000)
 {
 keyclick("AltR")
 AttackingCount := A_TickCount
@@ -20793,7 +20832,7 @@ AttackingCount := A_TickCount
 if(Step = 1026)
 {
 Attacking := A_TickCount - AttackingCount
-if(Attacking >= 50000)
+if(Attacking >= 20000)
 {
 keyclick("AltR")
 AttackingCount := A_TickCount
@@ -20802,7 +20841,7 @@ AttackingCount := A_TickCount
 if(Step = 3030)
 {
 Attacking := A_TickCount - AttackingCount
-if(Attacking >= 10000)
+if(Attacking >= 20000)
 {
 AttackingCount := A_TickCount
 keyclick("AltR")
@@ -29851,107 +29890,104 @@ VarSetCapacity(Var, Len, 0)
 Return, StrPut(Str, &Var, Enc)
 }
 return
-감응:
-Gui, Submit, Nohide
-if(Gui_KON = 1)
-{
-IfInString,Location,[알파차원] 포프레스네 마을
-{
-Sleep, 100
-포남입장시간 := A_TickCount
-countsignal := 0
+감응() {
+    ; 전역 변수 사용 선언
+    Gui, Submit, Nohide
+
+    if (Gui_KON = 1) {
+        if InStr(Location, "[알파차원] 포프레스네 마을") {
+            Sleep, 100
+            포남입장시간 := A_TickCount
+            countsignal := 0
+            return
+        }
+
+        if InStr(Location, "[알파차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, A동파, "UInt")
+                jelan.write(0x00527B1C, A동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal := 1
+                호출대상 := "알파 - 동쪽파수꾼"
+                return
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, A서파, "UInt")
+                jelan.write(0x00527B1C, A서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "알파 - 서쪽파수꾼"
+                return
+            }
+        }
+
+        if InStr(Location, "[베타차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, B동파, "UInt")
+                jelan.write(0x00527B1C, B동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal := 1
+                호출대상 := "베타 - 동쪽파수꾼"
+                return
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, B서파, "UInt")
+                jelan.write(0x00527B1C, B서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "베타 - 서쪽파수꾼"
+                return
+            }
+        }
+
+        if InStr(Location, "[감마차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, G동파, "UInt")
+                jelan.write(0x00527B1C, G동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal := 1
+                호출대상 := "감마 - 동쪽파수꾼"
+                return
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, G서파, "UInt")
+                jelan.write(0x00527B1C, G서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "감마 - 서쪽파수꾼"
+                return
+            }
+        }
+    }
 }
-IfInString,Location,[알파차원] 포프레스네 남쪽
-{
-if (countsignal = 0)
-{
-value := jelan.write(0x00527B1C, A동파, "UInt")
-value := jelan.write(0x00527B1C, A동파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-countsignal += 1
-호출대상 := "알파 - 동쪽파수꾼"
-return
-}
-if (countsignal = 1)
-{
-value := jelan.write(0x00527B1C, A서파, "UInt")
-value := jelan.write(0x00527B1C, A서파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-포남입장시간 := A_TickCount
-countsignal := 0
-호출대상 := "알파 - 서쪽파수꾼"
-return
-}
-}
-IfInString,Location,[베타차원] 포프레스네 남쪽
-{
-if (countsignal = 0)
-{
-value := jelan.write(0x00527B1C, B동파, "UInt")
-value := jelan.write(0x00527B1C, B동파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-countsignal += 1
-호출대상 := "베타 - 동쪽파수꾼"
-return
-}
-if (countsignal = 1)
-{
-value := jelan.write(0x00527B1C, B서파, "UInt")
-value := jelan.write(0x00527B1C, B서파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-포남입장시간 := A_TickCount
-countsignal := 0
-호출대상 := "베타 - 서쪽파수꾼"
-return
-}
-}
-IfInString,Location,[감마차원] 포프레스네 남쪽
-{
-if (countsignal = 0)
-{
-value := jelan.write(0x00527B1C, G동파, "UInt")
-value := jelan.write(0x00527B1C, G동파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-countsignal := 1
-호출대상 := "감마 - 동쪽파수꾼"
-return
-}
-if (countsignal = 1)
-{
-value := jelan.write(0x00527B1C, G서파, "UInt")
-value := jelan.write(0x00527B1C, G서파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-포남입장시간 := A_TickCount
-countsignal := 0
-호출대상 := "감마 - 서쪽파수꾼"
-return
-}
-}
-}
+
 return
 checktxt()
 {
@@ -29966,6 +30002,7 @@ WINKILL, ahk_exe iexplore.exe
 WINKILL, ahk_group ie_gruop
         TMessage := "[ Helancia_Log ]>>" jTitle "<<: 인터넷 오류. 리로드, 위치보고: " . "(" . 현재차원  . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
         텔레그램메시지보내기(TMessage)
+        sleep,10
 GOSUB, RL
 }
 }
@@ -29982,6 +30019,7 @@ WINKILL, ahk_exe iexplore.exe
 WINKILL, ahk_group ie_gruop
         TMessage := "[ Helancia_Log ]>>" jTitle "<<: 인터넷 오류 2. 리로드, 위치보고: " . "(" . 현재차원  . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
         텔레그램메시지보내기(TMessage)
+        sleep,10
 GOSUB, RL
 }
 }
@@ -31049,7 +31087,8 @@ GuiControl +Range0-%TPM%, PUMemory
 GuiControl,, PUMemory, % UPM
 GuiControl, % ((UPP < 70)? "+c5BB75E" : ((UPP < 80) ? "+cFFC266" : "+cDA4F49")), PUMemory
 return
-ClearMem:
+ClearMem()
+{
 GMSC := GlobalMemoryStatusEx()
 GMSCA := Round(GMSC[3] / 1024**2, 2)
 ClearMemory()
@@ -31057,6 +31096,7 @@ FreeMemory()
 GMSC := GlobalMemoryStatusEx()
 GMSCB := Round(GMSC[3] / 1024**2, 2)
 GuiControl,, CMMemory, % Round(GMSCB - GMSCA, 2) . " MB 확보"
+}
 return
 GlobalMemoryStatusEx()
 {
@@ -31861,7 +31901,8 @@ Entrance = 0
 MsgBox, , 비정상종료감지, OID리셋, 3
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 점검요일. OID 리셋."
 텔레그램메시지보내기(TMessage)
-gosub, OID리셋
+sleep,10
+OID리셋()
 if(Gui_KON = 1)
 {
 MsgBox, , 자동감응설정, 감응 OFF로 변경, 1
@@ -32292,37 +32333,32 @@ FoodADD := FoodADD + 0x120 + 0xCC24
 value := jelan.write(FoodADD, 100, "UInt")
 }
 return
-차원체크:
-Gui, Submit, Nohide
-if( 랜덤차원 = 1 )
-{
-if(Gui_CheckUseParty = 0)
-{
-Random, CountPortal, 0, 2
+차원체크() {
+    Gui, Submit, Nohide
+    if (랜덤차원 = 1) {
+        if (Gui_CheckUseParty = 0) {
+            Random, CountPortal, 0, 2
+        }
+        현재차원 := CountPortal
+    }
+    if (알파차원 = 1) {
+        CountPortal := 0
+        현재차원 := CountPortal
+    }
+    if (베타차원 = 1) {
+        CountPortal := 1
+        현재차원 := CountPortal
+    }
+    if (감마차원 = 1) {
+        CountPortal := 2
+        현재차원 := CountPortal
+    }
+    if (Gui_PartyON = 1 && 차원 = 1) {
+        RandomRadio()
+        MsgBox, 48, 차원설정, 파티를 사용하기 위해 따악 좋은 위치 추천해준다., 1
+    }
 }
-현재차원 := CountPortal
-}
-if ( 알파차원 = 1 )
-{
-CountPortal = 0
-현재차원 := CountPortal
-}
-if ( 베타차원 = 1 )
-{
-CountPortal = 1
-현재차원 := CountPortal
-}
-if ( 감마차원 = 1 )
-{
-CountPortal = 2
-현재차원 := CountPortal
-}
-if( Gui_PartyON = 1 && 차원 = 1 )
-{
-RandomRadio()
-MsgBox,48, 차원설정,파티를 사용하기 위해 따악 좋은 위치 추천해준다.,1
-}
-return
+
 원격파티사용:
 Gui, Submit, Nohide
 if( Gui_PartyOff = 1 && Gui_CheckUseParty = 1)
@@ -32365,6 +32401,7 @@ Gui, Submit, Nohide
 GuiControl, , jTitle, %jTitle%
 TMessage := "[ Helancia_Log ]>>" . jTitle "<< : [테스트성공] 테스트 메세지 발송."
 텔레그램메시지보내기(TMessage)
+sleep,100
 MsgBox,576, 원격파티,
 (
 	<텔레그램 사용법>`n`n
@@ -32863,49 +32900,49 @@ CheatEngine_GameSpeedTo(배속)
     return RegExMatch(value, "^\d+$") > 0
 	}
 
-OID리셋:
-{
-SetFormat, integer, H
-A리노아 := 0x0
-A동파 := 0x0
-A서파 := 0x0
-B리노아 := 0x0
-B동파 := 0x0
-B서파 := 0x0
-G리노아 := 0x0
-G동파 := 0x0
-G서파 := 0x0
-A길잃파 := 0x0
-B길잃파 := 0x0
-G길잃파 := 0x0
-SetFormat, integer, D
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA리노아, %A리노아%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA동파, %A동파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA서파, %A서파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB리노아, %B리노아%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB동파, %B동파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB서파, %B서파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG리노아, %G리노아%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG동파, %G동파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG서파, %G서파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA길잃파, %A길잃파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB길잃파, %B길잃파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG길잃파, %G길잃파%
-GuiControl,, A리노아, %A리노아%
-GuiControl,, A동파, %A동파%
-GuiControl,, A서파, %A서파%
-GuiControl,, B리노아, %B리노아%
-GuiControl,, B동파, %B동파%
-GuiControl,, B서파, %B서파%
-GuiControl,, G리노아, %G리노아%
-GuiControl,, G동파, %G동파%
-GuiControl,, G서파, %G서파%
-GuiControl,, A길잃파, %A길잃파%
-GuiControl,, B길잃파, %B길잃파%
-GuiControl,, G길잃파, %G길잃파%
-GuiControl, , Gui_KOFF, 1
+OID리셋() {
+    SetFormat, integer, H
+    A리노아 := 0x0
+    A동파 := 0x0
+    A서파 := 0x0
+    B리노아 := 0x0
+    B동파 := 0x0
+    B서파 := 0x0
+    G리노아 := 0x0
+    G동파 := 0x0
+    G서파 := 0x0
+    A길잃파 := 0x0
+    B길잃파 := 0x0
+    G길잃파 := 0x0
+    SetFormat, integer, D
+
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA리노아, %A리노아%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA동파, %A동파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA서파, %A서파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB리노아, %B리노아%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB동파, %B동파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB서파, %B서파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG리노아, %G리노아%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG동파, %G동파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG서파, %G서파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA길잃파, %A길잃파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB길잃파, %B길잃파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG길잃파, %G길잃파%
+
+    GuiControl,, A리노아, %A리노아%
+    GuiControl,, A동파, %A동파%
+    GuiControl,, A서파, %A서파%
+    GuiControl,, B리노아, %B리노아%
+    GuiControl,, B동파, %B동파%
+    GuiControl,, B서파, %B서파%
+    GuiControl,, G리노아, %G리노아%
+    GuiControl,, G동파, %G동파%
+    GuiControl,, G서파, %G서파%
+    GuiControl,, A길잃파, %A길잃파%
+    GuiControl,, B길잃파, %B길잃파%
+    GuiControl,, G길잃파, %G길잃파%
+    GuiControl,, Gui_KOFF, 1
 }
-return
 
 Check_Chat()
 {
@@ -32967,85 +33004,85 @@ px(color) {
 }
 return
 
-OID저장:
-{
-SetFormat, integer, H
-Get_Location()
-IfInString,Location,[알파차원]
-{
-GuiControl,, A리노아, %A리노아%
-GuiControl,, A동파, %A동파%
-GuiControl,, A서파, %A서파%
-GuiControl,, A길잃파, %A길잃파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA리노아, %A리노아%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA동파, %A동파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA서파, %A서파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA길잃파, %A길잃파%
-}
-IfInString,Location,[베타차원]
-{
-GuiControl,, B리노아, %B리노아%
-GuiControl,, B동파, %B동파%
-GuiControl,, B서파, %B서파%
-GuiControl,, B길잃파, %B길잃파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB리노아, %B리노아%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB동파, %B동파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB서파, %B서파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB길잃파, %B길잃파%
-}
-IfInString,Location,[감마차원]
-{
-GuiControl,, G리노아, %G리노아%
-GuiControl,, G동파, %G동파%
-GuiControl,, G서파, %G서파%
-GuiControl,, G길잃파, %G길잃파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG리노아, %G리노아%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG동파, %G동파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG서파, %G서파%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG길잃파, %G길잃파%
-}
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, S업데이트체크, %업데이트체크%
-FormatTime, 적용날짜,, yyyy-MM-dd HH:mm:ss
-GuiControl,, TextControl, OID : %적용날짜%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, S적용날짜, %적용날짜%
-}
-SetFormat, integer, D
-return
+OID저장() {
+    SetFormat, integer, H
+    Get_Location()
 
-OID읽기:
-{
-SetFormat, integer, H
-RegRead, 업데이트체크, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, S업데이트체크
-RegRead, A리노아, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA리노아
-RegRead, A동파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA동파
-RegRead, A서파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA서파
-RegRead, B리노아, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB리노아
-RegRead, B동파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB동파
-RegRead, B서파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB서파
-RegRead, G리노아, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG리노아
-RegRead, G동파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG동파
-RegRead, G서파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG서파
-RegRead, A길잃파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA길잃파
-RegRead, B길잃파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB길잃파
-RegRead, G길잃파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG길잃파
-RegRead, 적용날짜, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, S적용날짜
-FormatTime, 적용날짜,, yyyy-MM-dd HH:mm:ss
-GuiControl,, TextControl, OID : %적용날짜%
-GuiControl,, A리노아, %A리노아%
-GuiControl,, A동파, %A동파%
-GuiControl,, A서파, %A서파%
-GuiControl,, B리노아, %B리노아%
-GuiControl,, B동파, %B동파%
-GuiControl,, B서파, %B서파%
-GuiControl,, G리노아, %G리노아%
-GuiControl,, G동파, %G동파%
-GuiControl,, G서파, %G서파%
-GuiControl,, A길잃파, %A길잃파%
-GuiControl,, B길잃파, %B길잃파%
-GuiControl,, G길잃파, %G길잃파%
-SetFormat, integer, D
+    if InStr(Location, "[알파차원]") {
+        GuiControl,, A리노아, %A리노아%
+        GuiControl,, A동파, %A동파%
+        GuiControl,, A서파, %A서파%
+        GuiControl,, A길잃파, %A길잃파%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA리노아, %A리노아%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA동파, %A동파%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA서파, %A서파%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA길잃파, %A길잃파%
+    }
+
+    if InStr(Location, "[베타차원]") {
+        GuiControl,, B리노아, %B리노아%
+        GuiControl,, B동파, %B동파%
+        GuiControl,, B서파, %B서파%
+        GuiControl,, B길잃파, %B길잃파%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB리노아, %B리노아%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB동파, %B동파%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB서파, %B서파%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB길잃파, %B길잃파%
+    }
+
+    if InStr(Location, "[감마차원]") {
+        GuiControl,, G리노아, %G리노아%
+        GuiControl,, G동파, %G동파%
+        GuiControl,, G서파, %G서파%
+        GuiControl,, G길잃파, %G길잃파%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG리노아, %G리노아%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG동파, %G동파%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG서파, %G서파%
+        RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG길잃파, %G길잃파%
+    }
+
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, S업데이트체크, %업데이트체크%
+    FormatTime, 적용날짜,, yyyy-MM-dd HH:mm:ss
+    GuiControl,, TextControl, OID : %적용날짜%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, S적용날짜, %적용날짜%
+
+    SetFormat, integer, D
 }
-return
+
+
+OID읽기() {
+    SetFormat, integer, H
+    RegRead, 업데이트체크, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, S업데이트체크
+    RegRead, A리노아, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA리노아
+    RegRead, A동파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA동파
+    RegRead, A서파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA서파
+    RegRead, B리노아, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB리노아
+    RegRead, B동파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB동파
+    RegRead, B서파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB서파
+    RegRead, G리노아, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG리노아
+    RegRead, G동파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG동파
+    RegRead, G서파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG서파
+    RegRead, A길잃파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA길잃파
+    RegRead, B길잃파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB길잃파
+    RegRead, G길잃파, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG길잃파
+    RegRead, 적용날짜, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, S적용날짜
+    FormatTime, 적용날짜,, yyyy-MM-dd HH:mm:ss
+    GuiControl,, TextControl, OID : %적용날짜%
+    GuiControl,, A리노아, %A리노아%
+    GuiControl,, A동파, %A동파%
+    GuiControl,, A서파, %A서파%
+    GuiControl,, B리노아, %B리노아%
+    GuiControl,, B동파, %B동파%
+    GuiControl,, B서파, %B서파%
+    GuiControl,, G리노아, %G리노아%
+    GuiControl,, G동파, %G동파%
+    GuiControl,, G서파, %G서파%
+    GuiControl,, A길잃파, %A길잃파%
+    GuiControl,, B길잃파, %B길잃파%
+    GuiControl,, G길잃파, %G길잃파%
+    SetFormat, integer, D
+}
+
 캐릭제거()
 {
 jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
@@ -33131,456 +33168,6 @@ jelan.write(0x0045DA96, 0x90, "Char", aOffsets*)
 	jelan.write(0x004CBE91, 0x00, "char", aOffsets*)
 	jelan.write(0x004CBE92, 0x00, "char", aOffsets*)
 }
-
-
-포남몬스터서치()
-{
-    if(Gui_Ent = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-}
-if(Gui_Rockey = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-}
-if(Gui_EntRockey = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-}
-}
-if(Gui_Mand = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-if(Gui_AllMobAND = 1)
-{
-if(Gui_1Muba = 1)
-{
-if(BWValue1 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue1 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_2Muba = 1)
-{
-if(BWValue1 < Gui_AllMobLimit or BWValue2 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue1 >= Gui_AllMobLimit and BWValue2 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_3Muba = 1)
-{
-if(BWValue1 < Gui_AllMobLimit or BWValue2 < Gui_AllMobLimit or BWValue3 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue1 >= Gui_AllMobLimit and BWValue2 >= Gui_AllMobLimit and BWValue3 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_2ButMuba = 1)
-{
-if(BWValue0 < Gui_AllMobLimit or BWValue1 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue0 >= Gui_AllMobLimit and BWValue1 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_3ButMuba = 1)
-{
-if(BWValue0 < Gui_AllMobLimit or BWValue1 < Gui_AllMobLimit or BWValue2 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue0 >= Gui_AllMobLimit and BWValue1 >= Gui_AllMobLimit and BWValue2 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_4ButMuba = 1)
-{
-if(BWValue0 < Gui_AllMobLimit or BWValue1 < Gui_AllMobLimit or BWValue2 < Gui_AllMobLimit or BWValue3 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue0 >= Gui_AllMobLimit and BWValue1 >= Gui_AllMobLimit and BWValue2 >= Gui_AllMobLimit and BWValue3 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(Gui_AllMobOR = 1)
-{
-if(Gui_1Muba = 1)
-{
-if(BWValue1 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue1 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_2Muba = 1)
-{
-if(BWValue1 < Gui_AllMobLimit and BWValue2 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue1 >= Gui_AllMobLimit or BWValue2 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_3Muba = 1)
-{
-if(BWValue1 < Gui_AllMobLimit and BWValue2 < Gui_AllMobLimit and BWValue3 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue1 >= Gui_AllMobLimit or BWValue2 >= Gui_AllMobLimit or BWValue3 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_2ButMuba = 1)
-{
-if(BWValue0 < Gui_AllMobLimit and BWValue1 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue0 >= Gui_AllMobLimit or BWValue1 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_3ButMuba = 1)
-{
-if(BWValue0 < Gui_AllMobLimit and BWValue1 < Gui_AllMobLimit and BWValue2 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue0 >= Gui_AllMobLimit or BWValue1 >= Gui_AllMobLimit or BWValue2 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_4ButMuba = 1)
-{
-if(BWValue0 < Gui_AllMobLimit and BWValue1 < Gui_AllMobLimit and BWValue2 < Gui_AllMobLimit and BWValue3 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue0 >= Gui_AllMobLimit or BWValue1 >= Gui_AllMobLimit or BWValue2 >= Gui_AllMobLimit or BWValue3 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(Gui_MobMagic = 1)
-{
-if(Gui_1Muba = 1)
-{
-if(MagicAbility3 < MLimit and MagicAbility4 < MLimit and MagicAbility5 < MLimit and MagicAbility6 < MLimit and MagicAbility7 < MLimit and MagicAbility8 < MLimit)
-{
-if(BWValue1 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue1 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(MagicAbility3 >= MLimit or MagicAbility4 >= MLimit or MagicAbility5 >= MLimit or MagicAbility6 >= MLimit or MagicAbility7 >= MLimit or MagicAbility8 >= MLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_2Muba = 1)
-{
-if(MagicAbility3 < MLimit and MagicAbility4 < MLimit and MagicAbility5 < MLimit and MagicAbility6 < MLimit and MagicAbility7 < MLimit and MagicAbility8 < MLimit)
-{
-if(BWValue1 < Gui_AllMobLimit and BWValue2 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue1 >= Gui_AllMobLimit or BWValue2 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(MagicAbility3 >= MLimit or MagicAbility4 >= MLimit or MagicAbility5 >= MLimit or MagicAbility6 >= MLimit or MagicAbility7 >= MLimit or MagicAbility8 >= MLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_3Muba = 1)
-{
-if(MagicAbility3 < MLimit and MagicAbility4 < MLimit and MagicAbility5 < MLimit and MagicAbility6 < MLimit and MagicAbility7 < MLimit and MagicAbility8 < MLimit)
-{
-if(BWValue1 < Gui_AllMobLimit and BWValue2 < Gui_AllMobLimit and BWValue3 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue1 >= Gui_AllMobLimit or BWValue2 >= Gui_AllMobLimit or BWValue3 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(MagicAbility3 >= MLimit or MagicAbility4 >= MLimit or MagicAbility5 >= MLimit or MagicAbility6 >= MLimit or MagicAbility7 >= MLimit or MagicAbility8 >= MLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_2ButMuba = 1)
-{
-if(MagicAbility3 < MLimit and MagicAbility4 < MLimit and MagicAbility5 < MLimit and MagicAbility6 < MLimit and MagicAbility7 < MLimit and MagicAbility8 < MLimit)
-{
-if(BWValue0 < Gui_AllMobLimit and BWValue1 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue0 >= Gui_AllMobLimit or BWValue1 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(MagicAbility3 >= MLimit or MagicAbility4 >= MLimit or MagicAbility5 >= MLimit or MagicAbility6 >= MLimit or MagicAbility7 >= MLimit or MagicAbility8 >= MLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_3ButMuba = 1)
-{
-if(MagicAbility3 < MLimit and MagicAbility4 < MLimit and MagicAbility5 < MLimit and MagicAbility6 < MLimit and MagicAbility7 < MLimit and MagicAbility8 < MLimit)
-{
-if(BWValue0 < Gui_AllMobLimit and BWValue1 < Gui_AllMobLimit and BWValue2 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue0 >= Gui_AllMobLimit or BWValue1 >= Gui_AllMobLimit or BWValue2 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(MagicAbility3 >= MLimit or MagicAbility4 >= MLimit or MagicAbility5 >= MLimit or MagicAbility6 >= MLimit or MagicAbility7 >= MLimit or MagicAbility8 >= MLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(Gui_4ButMuba = 1)
-{
-if(MagicAbility3 < MLimit and MagicAbility4 < MLimit and MagicAbility5 < MLimit and MagicAbility6 < MLimit and MagicAbility7 < MLimit and MagicAbility8 < MLimit)
-{
-if(BWValue0 < Gui_AllMobLimit and BWValue1 < Gui_AllMobLimit and BWValue2 < Gui_AllMobLimit and BWValue3 < Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xFFB68C, 10, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 760, 450, 0xE7E7E7, 5, *fast
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(BWValue0 >= Gui_AllMobLimit or BWValue1 >= Gui_AllMobLimit or BWValue2 >= Gui_AllMobLimit or BWValue3 >= Gui_AllMobLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-if(MagicAbility3 >= MLimit or MagicAbility4 >= MLimit or MagicAbility5 >= MLimit or MagicAbility6 >= MLimit or MagicAbility7 >= MLimit or MagicAbility8 >= MLimit)
-{
-PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
-}
-}
-}
-if(ErrorLevel = 0)
-{
-PostClick(MobX,MobY)
-Monster_OID()
-WinGetPos, ElanciaClientX, ElanciaClientY, Width, Height, ahk_pid %jPID%
-SplashX := MobX + ElanciaClientX - 30
-SplashY := MobY + ElanciaClientY - 20
-if (MobNumber <= 10) {
-    SplashImage, %MobNumber%:, b X%SplashX% Y%SplashY% W80 H80 CW000000
-    MobNumber += 1
-}
-if(MobNumber >= 11)
-{
-MobNumber = 1
-SplashImage, 1: off
-SplashImage, 2: off
-SplashImage, 3: off
-SplashImage, 4: off
-SplashImage, 5: off
-SplashImage, 6: off
-SplashImage, 7: off
-SplashImage, 8: off
-SplashImage, 9: off
-SplashImage, 10: off
-Step = 19
-return
-}
-AttackLoopCount = 0
-AttackCount = 0
-Step = 25
-}
-}
-return
 
 TrackWeaponChange(newWeapon)
 {
@@ -35756,21 +35343,19 @@ RandomSendCtrlKey() {
 		return NPCMsg_address
 	}
 
-    GetPrivateWorkingSet(PID)
+GetPrivateWorkingSet(PID)
 {
-try {
+    try {
         wbem := ComObjGet("winmgmts:")
-        query := wbem.ExecQuery("SELECT * FROM Win32_PerfFormattedData_PerfProc_Process WHERE IDProcess=" . Pid)
-        if query.Count = 0
-            throw, "프로세스를 찾을 수 없습니다."
+        query := wbem.ExecQuery("SELECT * FROM Win32_PerfFormattedData_PerfProc_Process WHERE IDProcess=" . PID)
 
-        item := query.ItemIndex(0)
-        bytes := item.WorkingSetPrivate
-        return bytes / 1024  ; 바이트를 KB로 변환하여 반환
-    } catch e
-    {
-        TMessage := "[ Helancia_Log ]>>" jTitle "<<: 메모리 부족. 리로드"
-        텔레그램메시지보내기(TMessage)
-        gosub, RL
+        if query.Count = 0  ; 프로세스가 없으면 0 반환
+            return 0
+
+        bytes := query.ItemIndex(0).WorkingSetPrivate  ; 메모리 점유율 가져오기
+        return bytes / 1024  ; KB 단위로 변환 후 반환
+    } catch e {
+        return 0  ; 예외 발생 시 0 반환
     }
 }
+
