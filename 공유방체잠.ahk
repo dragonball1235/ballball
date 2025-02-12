@@ -2713,6 +2713,7 @@ LV_Add("", "25.02.10/PM02:20", "무기수리시 메모리오류 1차 수정")
 LV_Add("", "25.02.12/AM07:10", "레이블 정리")
 LV_Add("", "25.02.12/AM07:13", "메모리 정리 부분 일부 수정")
 LV_Add("", "25.02.12/AM07:13", "크롬 팝업창 뜰 경우 확인누름")
+LV_Add("", "25.02.12/AM07:13", "캐릭터 선택 시 인증시간 초과 부분 수정1")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -6536,8 +6537,8 @@ try {
 
             if (ddStart > 0 and ddEnd > ddStart) {
                 result := SubStr(extractedText, ddStart + 4, ddEnd - ddStart - 4) ; <dd> 태그 이후 텍스트 추출
-                Server := result
-                TMessage :="추출된 데이터: " result Server
+                Server1 := result
+                TMessage :="추출된 데이터: " result Server1
                 텔레그램메시지보내기(TMessage)
                 sleep,10
             }
@@ -6575,7 +6576,7 @@ WINKILL, ahk_exe iexplore.exe
 WINKILL, ahk_group ie_gruop
 GOSUB, RL
 }
-if ((Trim(Server) = "정상") && 서버쳌쳌 = 1 )
+if ((Trim(Server1) = "정상") && 서버쳌쳌 = 1 )
 {
 GuiControl, , Gui_NowState, 일랜시아 게임 서버 정상.
 Sleep, 1000
@@ -6583,7 +6584,7 @@ Step = 0
 서버쳌쳌 = 0
 return
 }
-if(Trim(Server) != "정상")
+if(Trim(Server1) != "정상")
 {
 서버쳌쳌 = 1
 GUICONTROL, , Gui_NowState, 일랜시아 홈페이지 서버 점검 중. 5분 대기2
@@ -8558,7 +8559,7 @@ Step = 2
 }
 if(Step = 2)
 {
-Sleep, 4000
+Sleep, 2000
 SB_SetText("로그인 상태 체크")
 GuiControl, , 로그인상태정보, [로그인] - 실행중
 WinKill, ahk_exe MRMsph.exe
@@ -8967,8 +8968,7 @@ TMessage :="[ Helancia_Log ]>>" jTitle "<<: 접속 오류로 인한 재시작 �
 텔레그램메시지보내기(TMessage)
 sleep,10
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe CTEXE.exe
-WinKill, ahk_exe Jelancia.exe
+WinKill, ahk_exe MRMSPH.exe
 }
 GuiControl, , 로그인상태정보, 접속 오류로 대기 후 재시작 합니다.
 Sleep, 60000
@@ -19791,7 +19791,7 @@ try {
 
             if (ddStart > 0 and ddEnd > ddStart) {
                 result := SubStr(extractedText, ddStart + 4, ddEnd - ddStart - 4) ; <dd> 태그 이후 텍스트 추출
-                Server := result
+                Server1 := result
             }
             else
             {
@@ -19827,7 +19827,7 @@ WINKILL, ahk_exe iexplore.exe
 WINKILL, ahk_group ie_gruop
 GOSUB, RL
 }
-if((Trim(Server) = "정상"))
+if((Trim(Server1) = "정상"))
 {
 GuiControl, , 로그인상태정보, 일랜시아 서버 정상. 재접속 중
 SB_SetText("재접속 시도 중")
