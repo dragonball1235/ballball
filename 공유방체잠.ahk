@@ -18928,7 +18928,7 @@ WriteExecutableMemory("NPC호출용2")
 차원 := "알파"
 jelan.write(0x00527b54, A길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
-sleep, 100
+Sleep, 500
 RunMemory("NPC호출")
 }
 IfInString,Location,[베타차원]
@@ -18938,7 +18938,7 @@ WriteExecutableMemory("NPC호출용2")
 차원 := "베타"
 jelan.write(0x00527b54, B길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
-sleep, 100
+Sleep, 500
 RunMemory("NPC호출")
 }
 IfInString,Location,[감마차원]
@@ -18948,7 +18948,7 @@ WriteExecutableMemory("NPC호출용2")
 차원 := "감마"
 jelan.write(0x00527b54, G길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대", 2)
-sleep, 100
+Sleep, 500
 RunMemory("NPC호출")
 }
 ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
@@ -18961,9 +18961,10 @@ sleep,10
 return
 }
 Check_FormNumber()
-if( FormNumber != 0 )
+if(FormNumber = 117)
 {
 Step = 1011
+sleep,100
 break
 }
 포북대화경과 := A_TickCount - 포북대화시도
@@ -18978,6 +18979,7 @@ A길잃파 := 0x0
 GuiControl,, A길잃파, %A길잃파%
 SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대만 리셋", 2)
 OID저장()
+Sleep, 500
 }
 IfInString,Location,[베타차원]
 {
@@ -18986,6 +18988,7 @@ B길잃파 := 0x0
 GuiControl,, B길잃파, %B길잃파%
 SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대만 리셋", 2)
 OID저장()
+Sleep, 500
 }
 IfInString,Location,[감마차원]
 {
@@ -18994,6 +18997,7 @@ G길잃파 := 0x0
 GuiControl,, G길잃파, %G길잃파%
 SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대만 리셋", 2)
 OID저장()
+sleep,100
 }
    TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 대화 실패, 다른방식으로 감응 재시도.|" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
 텔레그램메시지보내기(TMessage)
