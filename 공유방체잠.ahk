@@ -8270,7 +8270,7 @@ ProfilePath := A_ScriptDir . "\ChromeProfile" ; 사용자 프로파일 경로 �
     ChromeInst := new Chrome(ProfilePath, , , , , False) ; Headless 모드를 끔(False)
     ; 새로운 페이지 탭 가져오기
     PageInst := ChromeInst.GetPage()
-    sleep,300
+    PageInst.Call("Page.enable")  ; 페이지 로드 기능 활성화
     PageInst.Call("Page.navigate", {"url": "https://elancia.nexon.com/"})
     SB_SetText("홈페이지 접속중")
     while (PageInst.Evaluate("document.readyState").value != "complete")
@@ -8447,11 +8447,13 @@ ProfilePath := A_ScriptDir . "\ChromeProfile" ; 사용자 프로파일 경로 �
 ChromeInst := new Chrome(ProfilePath, , , , , False) ; Headless 모드를 끔(False)
     ; 새로운 페이지 탭 가져오기
 PageInst := ChromeInst.GetPage()
+PageInst.Call("Page.enable")  ; 페이지 로드 기능 활성화
 PageInst.Call("Page.navigate", {"url": "https://elancia.nexon.com/"})
 while (PageInst.Evaluate("document.readyState").value != "complete")
 {
     sleep, 100  ; 0.5초 대기 후 다시 확인
 }
+sleep,1000
 PageInst.Evaluate("PS.game.startGame({ gameCode:74276 });")
 SB_SetText("크롬 실행")
 while (PageInst.Evaluate("document.readyState").value != "complete")
