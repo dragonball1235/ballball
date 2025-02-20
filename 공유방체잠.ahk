@@ -9200,6 +9200,7 @@ if (Gui_4butMuba = 1)
 ;WriteExecutableMemory("4벗무바")
 ;무바활성화()
 ;sleep,100
+sleep,100
 SendInput, {F21}
 sleep,100
 }
@@ -18943,6 +18944,7 @@ if (GUI_KON = 1) {
                 SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
                 sleep, 500
                 RunMemory("NPC호출")
+
             } else if InStr(Location, "베타") {
                 차원 := "베타"
                 WriteExecutableMemory("NPC호출용1")
@@ -18951,6 +18953,8 @@ if (GUI_KON = 1) {
                 SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
                 sleep, 500
                 RunMemory("NPC호출")
+                break
+
             } else if InStr(Location, "감마") {
                 차원 := "감마"
                 WriteExecutableMemory("NPC호출용1")
@@ -18977,7 +18981,6 @@ if (GUI_KON = 1) {
                 Step = 1011
                 break
             }
-
             포북대화경과 := A_TickCount - 포북대화시도
             if (포북대화경과 >= 15000) {
                 AltR()
@@ -19181,7 +19184,6 @@ for index, area in SearchAreas
         }
         AttackLoopCount := 0
         AttackCount := 0
-        keyclick("AltR")
         movmob := A_TickCount
         Step := 1019
         return
@@ -19243,7 +19245,7 @@ if(Step = 1026)
     GUICONTROL, , Gui_NowState, [포북] 무바 중
     SB_SetText("포북 메모리 무바", 1)
     AttackMissCount++
-    if(AttackMissCount >= 300 && 한번만 = 1)
+    if(AttackMissCount >= 600 && 한번만 = 1)
     {
         keyclick("AltR")
         AttackMissCount := 0
