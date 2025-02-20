@@ -18953,7 +18953,6 @@ if (GUI_KON = 1) {
                 SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
                 sleep, 500
                 RunMemory("NPC호출")
-                break
 
             } else if InStr(Location, "감마") {
                 차원 := "감마"
