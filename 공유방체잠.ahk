@@ -19269,7 +19269,7 @@ if(Step = 1026)
     사용할무기수량 := Gui_1Muba || Gui_2butMuba ? 1 : Gui_2Muba || Gui_3butMuba ? 2 : 3
     UpdateRepairCount(현재무기, 사용할무기수량)
 
-    if(RepairWeaponCount >= 300)
+    if(RepairWeaponCount >= 600)
     {
         RepairWeaponCount := 0
         MapNumber := 1
