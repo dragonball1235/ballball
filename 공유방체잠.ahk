@@ -19183,6 +19183,7 @@ for index, area in SearchAreas
         }
         AttackLoopCount := 0
         AttackCount := 0
+        keyclick("AltR")
         movmob := A_TickCount
         Step := 1019
         return
