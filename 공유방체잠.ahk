@@ -21774,7 +21774,7 @@ Set_MoveSpeed()
 {
 ;jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x9C)
 ;jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x98)
-jelan.write(0x0058FFE0,43,"UInt", aOffsets*)
+jelan.write(0x0058FFE0,45,"UInt", aOffsets*)
 jelan.write(0x0058DAD4, 2350, "UInt", 0x178, 0x9C)
 jelan.write(0x0058DAD4, 2350, "UInt", 0x178, 0x98)
 }
