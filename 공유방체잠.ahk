@@ -2714,6 +2714,7 @@ LV_Add("", "25.02.12/AM07:10", "레이블 정리")
 LV_Add("", "25.02.12/AM07:13", "메모리 정리 부분 일부 수정")
 LV_Add("", "25.02.12/AM07:13", "크롬 팝업창 뜰 경우 확인누름")
 LV_Add("", "25.02.12/AM07:13", "캐릭터 선택 시 인증시간 초과 부분 수정1")
+LV_Add("", "25.02.12/AM07:13", "1차 코드 정리, 메모리 서치 준비, 사용감 정리")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -2821,7 +2822,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2024 [공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025.02 [공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -8570,11 +8571,22 @@ Step = 3
 }
 if(Step = 3)
 {
+WinActivate, ahk_exe Jelancia.exe
 WINWAIT, ahk_exe jElancia.exe, , 15
-Sleep, 1000
+Sleep, 100
 ControlGetText, Patch, Static2, Elancia
-Sleep, 3000
+Sleep, 1000
 SB_SetText("일랜실행중", 1)
+if(Patch = "")
+{
+    SB_SetText("일랜재확인중", 1)
+    WinActivate, ahk_exe Jelancia.exe
+    WINWAIT, ahk_exe jElancia.exe, , 15
+    Sleep, 100
+    ControlGetText, Patch, Static2, Elancia
+    Sleep, 3000
+    return
+}
 sb_settext("서버메시지 - " Patch "젤랜:" ,2)
 IfnotInString,Patch,최신 버전입니다. 게임을 시작하세요.
 {
@@ -8844,6 +8856,7 @@ if(Step = 4)
 Sleep, 1000
 GuiControl, , 로그인상태정보, [로그인] - 서버 선택 중
 WinGetTitle, jTitle, ahk_pid %jPID%
+SB_SetText("서버 선택 중", 1)
 if(jTitle = "일랜시아")
 {
 WinMove, ahk_pid %jPID%, , 0,0
@@ -8875,6 +8888,11 @@ Step = 5
 if(jTitle = "Elancia")
 {
 ControlClick, Button1, ahk_pid %jPID%
+Sleep, 100
+}
+if( jTitle = "일랜시아 - 엘" || jTitle = "일랜시아 - 테스" )
+{
+step = 5
 Sleep, 100
 }
 }
@@ -18581,297 +18599,443 @@ SetFormat, Float, 0
 }
 Step = 1005
 }
-if(Step = 1005)
+if (Step = 1005)
 {
-GuiControl, , Gui_NowState, [포북] 사냥터 이동 중
-SB_SetText("움직임 체크 중")
-Check_Moving()
-if(Moving = 0)
-{
-Sleep, 1000
-Check_Moving()
-if(Moving = 0)
-{
-Step = 1006
+    GuiControl, , Gui_NowState, "[포북] 사냥터 이동 중"
+    SB_SetText("움직임 체크 중")
+
+    Check_Moving()
+    if (Moving = 0)
+    {
+        Sleep, 1000
+        Check_Moving()
+
+        if (Moving = 0)
+            Step := 1006
+    }
 }
-}
-}
-if(Step = 1006)
+if (Step = 1006)
 {
-GuiControl, , Gui_NowState, [포북] 사냥터노?
-SB_SetText("북쪽 필드인지 확인 중")
-IfInString,Location,북쪽 필드
-{
-RCC = 0
-Step = 1007
+    GuiControl, , Gui_NowState, "[포북] 사냥터인지 확인중"
+    SB_SetText("북쪽 필드인지 확인 중")
+
+    if (InStr(Location, "북쪽 필드"))
+    {
+        RCC := 0
+        Step := 1007
+    }
+    else
+    {
+        AltR()
+        Step := 1004
+    }
 }
-IfNotInString,Location,북쪽 필드
+if (GUI_KON = 0)
 {
-AltR()
-Step = 1004
+    if (Step = 1007)
+    {
+        GuiControl, , Gui_NowState, "[포북] 사냥터 도착."
+        SB_SetText("파수꾼으로 이동 중")
+
+        if (Gui_jjOn = 1)
+        {
+            Loop, 2
+            {
+                Send, {F18 Down}
+                Sleep, 40
+                Send, {F18 Up}
+                Sleep, 10
+            }
+            PickUp_itemsetPN()
+        }
+
+        Check_Map()
+        if (Map = 1)
+        {
+            OpenMap()
+            Sleep, 100
+        }
+
+        Move_Map()
+        Sleep, 100
+        OpenMap()
+
+        PostClick(480, 205)
+        PostClick(520, 330)
+
+        OpenMap()
+        Sleep, 500
+        Check_Map()
+
+        if (Map = 1)
+        {
+            OpenMap()
+            Sleep, 100
+        }
+
+        Step := 1008
+    }
+
+    if (Step = 1008)
+    {
+        Get_Location()
+
+        if (!InStr(Location, "북쪽 필드"))
+        {
+            AltR()
+            Step := 1000
+            return
+        }
+
+        Check_Moving()
+
+        if (Moving = 0)
+        {
+            Sleep, 500
+            Check_Moving()
+
+            if (Moving = 0)
+            {
+                Step := 1009
+            }
+        }
+    }
 }
+if (Step = 1009)
+{
+    SB_SetText("현재 위치 체크 중")
+    Get_Location()
+
+    if (!InStr(Location, "북쪽 필드"))
+    {
+        AltR()
+        Step := 1000
+        return
+    }
+
+    Check_Moving()
+    Get_Pos()
+    Get_MovePos()
+
+    if (Abs(PosX - MovePosX) <= 2 && Abs(PosY - MovePosY) <= 2)
+    {
+        MoveWaitCount := 0
+        pbtalkcheck += 1
+        pbtalkcheck1 := A_TickCount
+        Step := 1010
+        TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 파수꾼 위치 도착. |" Location
+        TMessage .= " 시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP
+        TMessage .= " ( " . 상승체력평균값 . " ) / 경과 시간 : " . RunningTime
+        텔레그램메시지보내기(TMessage)
+        Sleep, 100
+    }
+    else
+    {
+        if (MoveWaitCount >= 3)
+        {
+            MoveWaitCount := 0
+            AltR()
+            Step := 1000
+        }
+        else
+        {
+            AltR()
+            Step := 1007
+            MoveWaitCount += 1
+        }
+    }
 }
-if( GUI_KON = 0 )
-{
-if(Step = 1007)
-{
-GuiControl, , Gui_NowState, [포북] 사냥터 도착.
-SB_SetText("파수꾼으로 이동 중")
-if(Gui_jjOn = 1)
-{
-Send, {F18 Down}
-Sleep, 40
-Send, {F18 Up}
-Sleep, 10
-Send, {F18 Down}
-Sleep, 40
-Send, {F18 Up}
-PickUp_itemsetPN()
+if (Step = 1010) {
+    정수체크()
+    Get_Location()
+
+    if InStr(Location, "알파") {
+        호출대상 := "알파 - 길잃은수색대"
+    } else if InStr(Location, "베타") {
+        호출대상 := "베타 - 길잃은수색대"
+    } else if InStr(Location, "감마") {
+        호출대상 := "감마 - 길잃은수색대"
+    }
+
+    SB_SetText("파수꾼과 직접 대화 중")
+
+    if !WinActive("ahk_pid " jPID) {
+        WinActivate, ahk_pid %jPID%
+    }
+
+    Move_NPCTalkForm()
+    callid := 1
+    Sleep, 500
+
+    PixelSearch, MobX, MobY, 410, 100, 580, 235, 0xEF8AFF, 1, Fast
+    if (ErrorLevel = 1) {
+        AltR()
+        Sleep, 500
+        PixelSearch, MobX, MobY, 410, 100, 580, 235, 0xEF8AFF, 1, Fast
+    }
+
+    if (ErrorLevel = 0) {
+        PostClick(MobX, MobY)
+        Get_Location()
+        Sleep, 100
+
+        Loop, 15 {
+            if InStr(Location, "알파") {
+                차원 := "알파"
+                SetFormat, integer, H
+                A길잃파 := jelan.read(0x00584C2C, "UInt", aOffsets*)
+                GuiControl,, A길잃파, %A길잃파%
+                SetFormat, integer, D
+                SB_SetText(차원 . A길잃파 "-길잃은 수색대", 2)
+            } else if InStr(Location, "베타") {
+                차원 := "베타"
+                SetFormat, integer, H
+                B길잃파 := jelan.read(0x00584C2C, "UInt", aOffsets*)
+                GuiControl,, B길잃파, %B길잃파%
+                SetFormat, integer, D
+                SB_SetText(차원 . B길잃파 "-길잃은 수색대", 2)
+            } else if InStr(Location, "감마") {
+                차원 := "감마"
+                SetFormat, integer, H
+                G길잃파 := jelan.read(0x00584C2C, "UInt", aOffsets*)
+                GuiControl,, G길잃파, %G길잃파%
+                SetFormat, integer, D
+                SB_SetText(차원 . G길잃파 "-길잃은 수색대", 2)
+            }
+
+            Sleep, 100
+
+            if (A길잃파 != 0x0000 || B길잃파 != 0x0000 || G길잃파 != 0x0000) {
+                SB_SetText(차원 . (A길잃파 ? A길잃파 : (B길잃파 ? B길잃파 : G길잃파)) . "-길잃은 수색대 완료", 2)
+                OID저장()
+                Sleep, 100
+                break
+            }
+        }
+
+        Check_FormNumber()
+        if (FormNumber = 117) {
+            Step := 1011
+            Sleep, 100
+        }
+    }
 }
-Check_Map()
-if(Map = 1)
-{
-OpenMap()
-Sleep, 100
+
+if (Step = 1011) {
+    SB_SetText("피부 버프 받는 중")
+    Sleep, 100
+    Check_FormNumber()
+    Sleep, 100
+
+    if (FormNumber = 117) {
+        Sleep, 200
+        PostClick(110, 85)
+    } else if (FormNumber = 93) {
+        Sleep, 200
+        PostClick(130, 90)
+    } else if (FormNumber = 81) {
+        Sleep, 200
+        PostClick(120, 80)
+        Step = 10334
+    }
+    Sleep, 200
 }
-Move_Map()
-Sleep, 100
-OpenMap()
-PostClick(480,205)
-PostClick(520,330)
-OpenMap()
-Sleep, 500
-Check_Map()
-if(Map = 1)
-{
-OpenMap()
-Sleep, 100
+
+if (Step = 10334) {
+    if (결정갯수 >= 2) {
+        결정갯수 -= 1
+        Loop, %결정갯수% {
+            SB_SetText("결정 > 정수로 교환 중")
+            Sleep, 200
+            PostClick(121, 104)
+            Sleep, 200
+            PostClick(90, 90)
+        }
+    }
+
+    if (나무갯수 >= 2) {
+        나무갯수 -= 1
+        Loop, %나무갯수% {
+            SB_SetText("나무 > 결정으로 교환 중")
+            Sleep, 200
+            PostClick(121, 104)
+            Sleep, 200
+            PostClick(90, 78)
+        }
+    }
+
+    if (가루갯수 >= 3) {
+        가루갯수 -= 2
+        Loop, %가루갯수% {
+            SB_SetText("가루 > 결정으로 교환 중")
+            Sleep, 200
+            PostClick(121, 104)
+            Sleep, 200
+            PostClick(90, 65)
+        }
+    }
+    Step = 1012
 }
-Step = 1008
+
+if (Step = 1012) {
+    Check_FormNumber()
+    Sleep, 200
+
+    if (FormNumber = 117) {
+        Sleep, 200
+        PostClick(85, 113)
+        Sleep, 200
+
+        newTime := A_Now
+        EnvAdd, newTime, 27, Minutes
+        FormatTime, newTime1, %newTime%, yyyyMMddHHmm
+
+        CheckPB = 1
+        pbtalkcheck = 0
+        Step = 1013
+        GuiControl, , Gui_KON, 1
+        MapNumber = 1
+
+        TMessage := "[ Helancia_Log ]>>" jTitle "<<: 길잃은 파수꾼 감응 정상 적용 완료.|" Location
+        TMessage .= " 시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) "
+        TMessage .= " / 경과 시간 :  " . RunningTime
+
+        텔레그램메시지보내기(TMessage)
+        Sleep, 200
+        return
+    }
 }
-if(Step = 1008)
-{
-Get_Location()
-IfNotInString,Location,북쪽 필드
-{
-AltR()
-Step = 1000
+
+if (GUI_KON = 1) {
+    if (Step = 1007) {
+        정수체크()
+        GuiControl, , Gui_NowState, "[포북] 사냥터 도착."
+        SB_SetText("파수꾼과 원격 대화 중")
+
+        Get_Location()
+        포북대화시도 := A_TickCount
+
+        if InStr(Location, "알파")
+            호출대상 := "알파 - 길잃은수색대"
+        else if InStr(Location, "베타")
+            호출대상 := "베타 - 길잃은수색대"
+        else if InStr(Location, "감마")
+            호출대상 := "감마 - 길잃은수색대"
+
+        if (Gui_jjOn = 1) {
+            Send, {F18 Down}
+            Sleep, 40
+            Send, {F18 Up}
+            Sleep, 10
+            Send, {F18 Down}
+            Sleep, 40
+            Send, {F18 Up}
+            PickUp_itemsetPN()
+        }
+
+        Get_Location()
+        Loop {
+            if InStr(Location, "알파") {
+                차원 := "알파"
+                WriteExecutableMemory("NPC호출용1")
+                WriteExecutableMemory("NPC호출용2")
+                jelan.write(0x00527b54, A길잃파, "UInt", aOffset*)
+                SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
+                sleep, 500
+                RunMemory("NPC호출")
+            } else if InStr(Location, "베타") {
+                차원 := "베타"
+                WriteExecutableMemory("NPC호출용1")
+                WriteExecutableMemory("NPC호출용2")
+                jelan.write(0x00527b54, B길잃파, "UInt", aOffset*)
+                SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
+                sleep, 500
+                RunMemory("NPC호출")
+            } else if InStr(Location, "감마") {
+                차원 := "감마"
+                WriteExecutableMemory("NPC호출용1")
+                WriteExecutableMemory("NPC호출용2")
+                jelan.write(0x00527b54, G길잃파, "UInt", aOffset*)
+                SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대", 2)
+                sleep, 500
+                RunMemory("NPC호출")
+            }
+
+            ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
+            if InStr(ServerMsg, "서버와의 연결이") {
+                OID리셋()
+                TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 맞지않는 OID로 리셋 | " Location
+                TMessage .= " 시작 체력: " . CheckFirstHP . " / 상승 체력: " . CheckUPHP . " ( " . 상승체력평균값 . " ) "
+                TMessage .= " / 경과 시간: " . RunningTime
+                텔레그램메시지보내기(TMessage)
+                Sleep, 10
+                return
+            }
+
+            Check_FormNumber()
+            if (FormNumber = 117) {
+                Step = 1011
+                break
+            }
+
+            포북대화경과 := A_TickCount - 포북대화시도
+            if (포북대화경과 >= 15000) {
+                AltR()
+                Sleep, 1000
+
+                if InStr(Location, "[알파차원]") {
+                    차원 := "알파"
+                    A길잃파 := 0x0
+                    GuiControl,, A길잃파, %A길잃파%
+                    SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대만 리셋", 2)
+                    OID저장()
+                } else if InStr(Location, "[베타차원]") {
+                    차원 := "베타"
+                    B길잃파 := 0x0
+                    GuiControl,, B길잃파, %B길잃파%
+                    SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대만 리셋", 2)
+                    OID저장()
+                } else if InStr(Location, "[감마차원]") {
+                    차원 := "감마"
+                    G길잃파 := 0x0
+                    GuiControl,, G길잃파, %G길잃파%
+                    SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대만 리셋", 2)
+                    OID저장()
+                    Sleep, 100
+                }
+
+                TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 대화 실패, 다른 방식으로 감응 재시도. | " Location
+                TMessage .= " 시작 체력: " . CheckFirstHP . " / 상승 체력: " . CheckUPHP . " ( " . 상승체력평균값 . " ) "
+                TMessage .= " / 경과 시간: " . RunningTime
+                텔레그램메시지보내기(TMessage)
+
+                GuiControl, , Gui_KOFF, 1
+                Step = 1006
+                break
+            }
+        }
+    }
+if (Step = 1011) {
+    SB_SetText("피부 버프 받는 중")
+    Sleep, 200
+    Check_FormNumber()
+    Sleep, 100
+    ApplyBuff(FormNumber)
 }
-Check_Moving()
-if(Moving = 0)
-{
-Sleep, 500
-Check_Moving()
-if(Moving = 0)
-{
-Step = 1009
-}
-}
-}
-if(Step = 1009)
-{
-SB_SetText("현재 위치 체크 중")
-Get_Location()
-IfNotInString,Location,북쪽 필드
-{
-AltR()
-Step = 1000
-}
-Check_Moving()
-Get_Pos()
-Get_MovePos()
-if((PosX >= MovePosX-2 and PosX <= MovePosX+2) and (PosY >= MovePosY-2 and PosY <= MovePosY+2))
-{
-MoveWaitCount = 0
-pbtalkcheck += 1
-pbtalkcheck1 := A_TickCount
-Step = 1010
-TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 파수꾼 위치 도착. |" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 :  " . RunningTime
-텔레그램메시지보내기(TMessage)
-sleep,100
-}
-if(!((PosX >= MovePosX-2 and PosX <= MovePosX+2) and (PosY >= MovePosY-2 and PosY <= MovePosY+2)))
-{
-if(MoveWaitCount >= 3)
-{
-MoveWaitCount = 0
-AltR()
-Step = 1000
-}
-else
-{
-AltR()
-Step = 1007
-MoveWaitCount += 1
-}
-}
-}
-if(Step = 1010)
-{
-정수체크()
-Get_Location()
-IfInString,Location,[알파차원]
-{
-호출대상 := "알파 - 길잃은수색대"
-}
-IfInString,Location,[베타차원]
-{
-호출대상 := "베타 - 길잃은수색대"
-}
-IfInString,Location,[감마차원]
-{
-호출대상 := "감마 - 길잃은수색대"
-}
-SB_SetText("파수꾼과 직접 대화 중")
-IfWinNotActive, ahk_pid %jPID%
-{
-WINACTIVATE, ahk_pid %jPID%
-}
-Move_NPCTalkForm()
-callid = 1
-Sleep, 500
-PixelSearch, MobX, MobY, 410, 100, 580, 235, 0xEF8AFF, 1, Fast
-if(ErrorLevel = 1)
-{
-AltR()
-Sleep,500
-PixelSearch, MobX, MobY, 410, 100, 580, 235, 0xEF8AFF, 1, Fast
-}
-if(ErrorLevel = 0)
-{
-PostClick(MobX,MobY)
-Get_Location()
-sleep,100
-Loop, 10
-{
-IfInString,Location,[알파차원]
-{
-차원 := "알파"
-SetFormat, integer, H
-A길잃파 := jelan.read(0x00584C2C, "UInt", aOffsets*)
-SetFormat, integer, D
-GuiControl,, A길잃파, %A길잃파%
-SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
-Sleep, 100
-if (A길잃파 != 0x0000)
-{
-    SB_SETTEXT(차원 . A길잃파 . FormNumber "-길잃은 수색대 완료", 2)
-    OID저장()
-    sleep,100
-    break  ; 루프를 멈추고 정상적으로 진행
-}
-}
-IfInString,Location,[베타차원]
-{
-차원 := "베타"
-SetFormat, integer, H
-B길잃파 := jelan.read(0x00584C2C, "UInt", aOffsets*)
-SetFormat, integer, D
-GuiControl,, B길잃파, %B길잃파%
-SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
-Sleep, 100
-if (B길잃파 != 0x0000)
-{
-    SB_SETTEXT(차원 . B길잃파 . FormNumber "-길잃은 수색대 완료", 2)
-    OID저장()
-    sleep,100
-    break  ; 0x로 시작하고 0이 아닌 값일 때 루프 멈춤
-}
-}
-IfInString,Location,[감마차원]
-{
-차원 := "감마"
-SetFormat, integer, H
-G길잃파 := jelan.read(0x00584C2C, "UInt", aOffsets*)
-SetFormat, integer, D
-GuiControl,, G길잃파, %G길잃파%
-SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대", 2)
-Sleep, 100
-if (G길잃파 != 0x0000)
-{
-    SB_SETTEXT(차원 . G길잃파 . FormNumber "-길잃은 수색대 완료", 2)
-    OID저장()
-    sleep,100
-    break  ; 0x로 시작하고 0이 아닌 값일 때 루프 멈춤
-}
-}
-}
-Check_FormNumber()
-if(FormNumber = 117)
-{
-Step = 1011
-sleep,100
-}
-}
-}
-if(Step = 1011)
-{
-SB_SetText("피부 버프 받는 중")
-Sleep, 100
-Check_FormNumber()
-Sleep, 100
-if(FormNumber = 117)
-{
-Sleep, 200
-PostClick(110,85)
-Sleep, 200
-}
-if(FormNumber = 93)
-{
-Sleep, 200
-PostClick(130,90)
-Sleep, 200
-}
-if(FormNumber = 81)
-{
-Sleep, 200
-PostClick(120,80)
-Sleep, 200
-step = 10334
-}
-}
-if(Step = 10334)
-{
-if(결정갯수 >= 2)
-{
-결정갯수 := 결정갯수-1
-Loop, %결정갯수%
-{
-SB_SetText("결정 > 정수로 교환 중")
-Sleep, 200
-PostClick(121,104)
-Sleep, 200
-PostClick(90,90)
-Sleep, 200
-}
-}
-if(나무갯수 >= 2)
-{
-나무갯수 := 나무갯수-1
-Loop, %나무갯수%
-{
-SB_SetText("나무 > 결정으로 교환 중")
-Sleep, 200
-PostClick(121,104)
-Sleep, 200
-PostClick(90,78)
-Sleep, 200
-}
-}
-if(가루갯수 >= 3)
-{
-가루갯수 := 가루갯수-2
-Loop, %가루갯수%
-{
-SB_SetText("가루 > 결정으로 교환 중")
-Sleep, 200
-PostClick(121,104)
-Sleep, 200
-PostClick(90,65)
-Sleep, 200
-}
-}
-Step = 1012
+if (Step = 10334) {
+    if (결정갯수 >= 2) {
+        결정갯수 -= 1
+        ExchangeResource(결정갯수, "결정 > 정수로 교환 중", 90, 90)
+    }
+    if (나무갯수 >= 2) {
+        나무갯수 -= 1
+        ExchangeResource(나무갯수, "나무 > 결정으로 교환 중", 90, 78)
+    }
+    if (가루갯수 >= 3) {
+        가루갯수 -= 2
+        ExchangeResource(가루갯수, "가루 > 결정으로 교환 중", 90, 65)
+    }
+    Step := 1012
 }
 if(Step = 1012)
 {
@@ -18879,674 +19043,237 @@ Check_FormNumber()
 Sleep, 200
 if(FormNumber = 117)
 {
-Sleep, 200
 PostClick(85,113)
 Sleep, 200
 newTime = %A_Now%
 EnvAdd, newTime, 27, Minutes
 FormatTime, newTime1, %newTime%, yyyyMMddHHmm
-CheckPB = 1
-pbtalkcheck = 0
-Sleep, 50
-step = 1013
-GuiControl, , Gui_KON, 1
-MapNumber = 1
-TMessage := "[ Helancia_Log ]>>" jTitle "<<: 길잃은 파수꾼 감응 정상 적용 완료.|" Location " 시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 :  " . RunningTime
-텔레그램메시지보내기(TMessage)
-Sleep,200
-return
-}
-}
-}
-if( GUI_KON = 1 )
-{
-if(Step = 1007)
-{
-정수체크()
-GuiControl, , Gui_NowState, [포북] 사냥터 도착.
-SB_SetText("파수꾼과 원격 대화 중")
-Get_Location()
-포북대화시도 := A_TickCount
-IfInString,Location,[알파차원]
-{
-호출대상 := "알파 - 길잃은수색대"
-}
-IfInString,Location,[베타차원]
-{
-호출대상 := "베타 - 길잃은수색대"
-}
-IfInString,Location,[감마차원]
-{
-호출대상 := "감마 - 길잃은수색대"
-}
-if(Gui_jjOn = 1)
-{
-Send, {F18 Down}
-Sleep, 40
-Send, {F18 Up}
-Sleep, 10
-Send, {F18 Down}
-Sleep, 40
-Send, {F18 Up}
-PickUp_itemsetPN()
-}
-Get_Location()
-Loop,
-{
-IfInString,Location,[알파차원]
-{
-WriteExecutableMemory("NPC호출용1")
-WriteExecutableMemory("NPC호출용2")
-차원 := "알파"
-jelan.write(0x00527b54, A길잃파, "UInt", aOffset*)
-SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
-Sleep, 500
-RunMemory("NPC호출")
-}
-IfInString,Location,[베타차원]
-{
-WriteExecutableMemory("NPC호출용1")
-WriteExecutableMemory("NPC호출용2")
-차원 := "베타"
-jelan.write(0x00527b54, B길잃파, "UInt", aOffset*)
-SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
-Sleep, 500
-RunMemory("NPC호출")
-}
-IfInString,Location,[감마차원]
-{
-WriteExecutableMemory("NPC호출용1")
-WriteExecutableMemory("NPC호출용2")
-차원 := "감마"
-jelan.write(0x00527b54, G길잃파, "UInt", aOffset*)
-SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대", 2)
-Sleep, 500
-RunMemory("NPC호출")
-}
-ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
-IfInString,ServerMsg,서버와의 연결이
-{
-    OID리셋()
-   TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 맞지않는 OID로 리셋 |" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
-텔레그램메시지보내기(TMessage)
-sleep,10
-return
-}
-Check_FormNumber()
-if(FormNumber = 117)
-{
-Step = 1011
-sleep,100
-break
-}
-포북대화경과 := A_TickCount - 포북대화시도
-if(포북대화경과 >= 15000)
-{
-AltR()
-Sleep, 1000
-IfInString,Location,[알파차원]
-{
-차원 := "알파"
-A길잃파 := 0x0
-GuiControl,, A길잃파, %A길잃파%
-SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대만 리셋", 2)
-OID저장()
-Sleep, 500
-}
-IfInString,Location,[베타차원]
-{
-차원 := "베타"
-B길잃파 := 0x0
-GuiControl,, B길잃파, %B길잃파%
-SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대만 리셋", 2)
-OID저장()
-Sleep, 500
-}
-IfInString,Location,[감마차원]
-{
-차원 := "감마"
-G길잃파 := 0x0
-GuiControl,, G길잃파, %G길잃파%
-SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대만 리셋", 2)
-OID저장()
-sleep,100
-}
-   TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 대화 실패, 다른방식으로 감응 재시도.|" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
-텔레그램메시지보내기(TMessage)
-GuiControl, , Gui_KOFF, 1
-Step = 1006
-break
-}
-}
-}
-if(Step = 1011)
-{
-SB_SetText("피부 버프 받는 중")
-Sleep, 200
-Check_FormNumber()
-Sleep, 100
-if(FormNumber = 117)
-{
-Sleep, 200
-PostClick(110,85)
-Sleep, 200
-}
-if(FormNumber = 93)
-{
-Sleep, 200
-PostClick(130,90)
-Sleep, 200
-}
-if(FormNumber = 81)
-{
-Sleep, 200
-PostClick(120,80)
-Sleep, 200
-step = 10334
-}
-}
-if(Step = 10334)
-{
-if(결정갯수 >= 2)
-{
-결정갯수 := 결정갯수-1
-Loop, %결정갯수%
-{
-SB_SetText("결정 > 정수로 교환 중")
-Sleep, 200
-PostClick(121,104)
-Sleep, 200
-PostClick(90,90)
-Sleep, 200
-}
-}
-if(나무갯수 >= 2)
-{
-나무갯수 := 나무갯수-1
-Loop, %나무갯수%
-{
-SB_SetText("나무 > 결정으로 교환 중")
-Sleep, 200
-PostClick(121,104)
-Sleep, 200
-PostClick(90,78)
-Sleep, 200
-}
-}
-if(가루갯수 >= 3)
-{
-가루갯수 := 가루갯수-2
-Loop, %가루갯수%
-{
-SB_SetText("가루 > 결정으로 교환 중")
-Sleep, 200
-PostClick(121,104)
-Sleep, 200
-PostClick(90,65)
-Sleep, 200
-}
-}
-Step = 1012
-}
-if(Step = 1012)
-{
-Check_FormNumber()
-Sleep, 200
-if(FormNumber = 117)
-{
-Sleep, 200
-PostClick(85,113)
-Sleep, 200
-newTime = %A_Now%
-EnvAdd, newTime, 27, Minutes
-FormatTime, newTime1, %newTime%, yyyyMMddHHmm
-CheckPB = 1
-pbtalkcheck = 0
-Sleep, 50
-step = 1013
+CheckPB := 1
+pbtalkcheck := 0
+step := 1013
 차원이동감응 := 0
 MapNumber := 5
-TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 [원격] 시작.|" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
-텔레그램메시지보내기(TMessage)
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 [원격] 시작.|" Location
+            . "시작 체력 : " . CheckFirstHP
+            . " / 상승 체력 : " . CheckUPHP
+            . " ( " . 상승체력평균값 . " ) "
+            . " / 경과 시간 : " . RunningTime
+        텔레그램메시지보내기(TMessage)
 Sleep,200
 return
 }
 }
 }
-if(Step = 1013)
+if (Step = 1013)
 {
-GuiControl, , Gui_NowState, [포북] 체잠 시작.
-SB_SetText("맵 이동 중")
-if(Gui_CheckWPDMagic = 1)
-{
-WPD()
+    GuiControl, , Gui_NowState, [포북] 체잠 시작.
+    SB_SetText("맵 이동 중")
+    Get_Location()
+    if (!InStr(Location, "북쪽 필드"))
+    {
+        AltR()
+        Step := 1000
+        return
+    }
+    if (Gui_CheckWPDMagic = 1)
+        WPD()
+
+    if (Aloute = 1 && MapNumber >= 121) || (Bloute = 1 && MapNumber >= 347) || (Cloute = 1 && MapNumber >= 185)
+    {
+        MapNumber := 1
+        Step := 1000
+        return
+    }
+
+    CharMovePobuk()
+    Step := 1014
 }
-if(Aloute = 1)
+if (Step = 1014)
 {
-if(MapNumber >= 121)
-{
-MapNumber = 1
-Step = 1000
-return
-}
-}
-if(Bloute = 1)
-{
-if(MapNumber >= 347)
-{
-MapNumber = 1
-Step = 1000
-return
-}
-}
-if(Cloute = 1)
-{
-if(MapNumber >= 185)
-{
-MapNumber = 1
-Step = 1000
-return
-}
-}
-CharMovePobuk()
-Step = 1014
-}
-if(Step = 1014)
-{
-SB_SetText("움직임 체크 중")
-IfWinNotActive, ahk_pid %jPID%
-{
-WinActivate, ahk_pid %jPID%
-}
-Check_Moving()
-Get_Pos()
-Get_MovePos()
-if(Moving = 0)
-{
-sleep,200
-Check_Moving()
-if(Moving = 0)
-{
-Step = 1015
-}
-}
-거리범위 := 3
-if (Abs(PosX - MovePosX) <= 거리범위 && Abs(PosY - MovePosY) <= 거리범위)
-{
-    MoveWaitCount := 0
-    Step := 1016
-    한번만 := 1
-}
+    SB_SetText("움직임 체크 중")
+    Check_Moving()
+    Get_Pos()
+    Get_MovePos()
+
+    if (Moving = 0)
+    {
+        Sleep, 200
+        Check_Moving()
+        if (Moving = 0)
+            Step := 1015
+    }
+
+    거리범위 := 3
+    if (Abs(PosX - MovePosX) <= 거리범위 && Abs(PosY - MovePosY) <= 거리범위)
+    {
+        MoveWaitCount := 0
+        Step := 1016
+        한번만 := 1
+    }
 }
 if(Step = 1015)
 {
-Get_Pos()
-Get_MovePos()
-if((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY))
-{
-MoveWaitCount = 0
-Step = 1016
-}
-if(!((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY)))
-{
-if(MoveWaitCount >= 2)
-{
-MoveWaitCount = 0
-Step = 1000
-}
-else
-{
-Step = 1016
-}
-}
+    Get_Pos()
+    Get_MovePos()
+    if((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY))
+    {
+        MoveWaitCount = 0
+        Step = 1016
+    }
+    if(!((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY)))
+    {
+        if(MoveWaitCount >= 2)
+        {
+            MoveWaitCount = 0
+            Step = 1000
+        }
+    else
+    {
+    Step = 1016
+    }
+    }
 return
+}
+if (Step = 1016)
+{
+    SB_SetText("몬스터 찾는 중")
 
-}
-if(Step = 1016)
+    IfWinNotActive, ahk_pid %jPID%
+        WinActivate, ahk_pid %jPID%
+
+    포북몹 := 0xB5F5F7
+
+SearchAreas := Object()
+SearchAreas.Insert([350, 160, 410, 260, "*ScanBR"])
+SearchAreas.Insert([360, 209, 437, 260, "*ScanLB"])
+SearchAreas.Insert([362, 186, 432, 255, "*ScanLT"])
+SearchAreas.Insert([333, 161, 460, 281, "*ScanRT"])
+SearchAreas.Insert([315, 138, 483, 305, "*ScanLT"])
+SearchAreas.Insert([260, 92, 533, 352, "*ScanRT"])
+SearchAreas.Insert([214, 44, 580, 400, "*ScanLT"])
+FoundMob := false  ; 몬스터를 찾았는지 여부 초기화
+for index, area in SearchAreas
 {
-SB_SetText("몬스터 찾는 중")
-IfWinNotActive, ahk_pid %jPID%
-{
-WinActivate, ahk_pid %jPID%
+    PixelSearch, MobX, MobY, area[1], area[2], area[3], area[4], 포북몹, 10, % area[5] " *Fast *RGB"
+    if (ErrorLevel = 0)
+    {
+        FoundMob := true
+        break
+    }
 }
-AttackingCount3 := 0
-포북몹 := 0xB5F5F7
-PixelSearch, MobX, MobY, 350, 160, 410, 260, 포북몹, 10, *ScanBR *Fast  *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 350, 160, 410, 260, 포북몹, 10, *ScanBR *Fast  *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 360, 209, 437, 260, 포북몹, 10, *ScanLB *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 360, 209, 437, 260, 포북몹, 10, *ScanLB *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 362, 186, 432, 255, 포북몹, 10, *ScanLT *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 362, 186, 432, 255, 포북몹, 10, *ScanLT *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 333, 161, 460, 281, 포북몹, 10, *ScanRT *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 333, 161, 460, 281, 포북몹, 10, *ScanRT *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 315, 138, 483, 305, 포북몹, 10, *ScanLT *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 315, 138, 483, 305, 포북몹, 10, *ScanLT *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 260, 92, 533, 352, 포북몹, 10, *ScanRT *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 260, 92, 533, 352, 포북몹, 10, *ScanRT *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 214, 44, 580, 400, 포북몹, 10, *ScanLT *Fast *RGB
-if(ErrorLevel = 1)
-{
-PixelSearch, MobX, MobY, 214, 44, 580, 400, 포북몹, 10, *ScanLT *Fast *RGB
+    if (FoundMob)
+    {
+        PostClick(MobX, MobY)
+        Monster_OID()
+        WinGetPos, ElanciaClientX, ElanciaClientY, Width, Height, ahk_pid %jPID%
+
+        SplashX := MobX + ElanciaClientX - 13
+        SplashY := MobY + ElanciaClientY + 15
+        SplashImage, %MobNumber%:, b X%SplashX% Y%SplashY% W30 H60 CW000000
+        MobNumber += 1
+
+        if (MobNumber >= 11)
+        {
+            MobNumber := 1
+            DisableAllSplashImages()
+            Step := 1013
+            return
+        }
+        AttackLoopCount := 0
+        AttackCount := 0
+        keyclick("AltR")
+        movmob := A_TickCount
+        Step := 1019
+        return
+    }
+    else  ; 몬스터를 찾지 못한 경우
+    {
+    ; 몬스터를 찾지 못한 경우
+    MobNumber := 1
+    DisableAllSplashImages()
+    Step := 1013
+    return
+    }
 }
-}
-}
-}
-}
-}
-}
-}
-}
-}
-}
-}
-}
-if(ErrorLevel = 0)
+if (Step = 1018)
 {
-PostClick(MobX,MobY)
-Monster_OID()
-WinGetPos, ElanciaClientX, ElanciaClientY, Width, Height, ahk_pid %jPID%
-SplashX := MobX + ElanciaClientX - 13
-SplashY := MobY + ElanciaClientY + 15
-SplashImage, %MobNumber%:, b X%SplashX% Y%SplashY% W30 H60 CW000000
-MobNumber += 1
-if(MobNumber >= 11)
-{
-MobNumber = 1
-SplashImage, 1: off
-SplashImage, 2: off
-SplashImage, 3: off
-SplashImage, 4: off
-SplashImage, 5: off
-SplashImage, 6: off
-SplashImage, 7: off
-SplashImage, 8: off
-SplashImage, 9: off
-SplashImage, 10: off
-Step = 1013
-return
-}
-AttackLoopCount = 0
-AttackCount = 0
-sleep,200
-keyclick("AltR")
-movmob := A_TickCount
-Step = 1019
-return
-}
-if(ErrorLevel = 1)
-{
-MobNumber = 1
-SplashImage, 1: off
-SplashImage, 2: off
-SplashImage, 3: off
-SplashImage, 4: off
-SplashImage, 5: off
-SplashImage, 6: off
-SplashImage, 7: off
-SplashImage, 8: off
-SplashImage, 9: off
-SplashImage, 10: off
-Step = 1013
-return
-}
-}
-if(Step = 1018)
-{
-SB_SetText("몹 공격 체크 중")
-AttackLoopCount += 1
-Check_Attack()
-if(Attack = 0)
-{
-AttackCount += 1
-}
-if(Attack = 1 or Attack = 2)
-{
-AttackCount = 0
-}
-if(AttackLoopCount >= 10)
-{
-if(AttackCount > 5)
-{
-AttackLoopCount = 0
-AttackCount = 0
-Step = 1016
-return
-}
-else
-{
-MobNumber = 1
-AttackLoopCount = 0
-AttackCount = 0
-SplashImage, 1: off
-SplashImage, 2: off
-SplashImage, 3: off
-SplashImage, 4: off
-SplashImage, 5: off
-SplashImage, 6: off
-SplashImage, 7: off
-SplashImage, 8: off
-SplashImage, 9: off
-SplashImage, 10: off
-Step = 1026
-AttackingCount := A_TickCount
-AttackingCount2 := A_TickCount
-return
-}
-}
+    SB_SetText("몹 공격 체크 중")
+    AttackLoopCount += 1
+    Check_Attack()
+    if (Attack = 0)
+        AttackCount += 1
+    if(Attack = 1 or Attack = 2)
+        AttackCount = 0
+    if (AttackLoopCount >= 10)
+    {
+        if (AttackCount > 5)
+        {
+            ResetAttackState()
+            Step := 1016
+        }
+        else
+        {
+            MobNumber := 1
+            ResetAttackState()
+            DisableAllSplashImages()
+            Step := 1026
+            AttackingCount := A_TickCount
+            AttackingCount2 := A_TickCount
+        }
+        return
+    }
 }
 if(Step = 1019)
 {
-SB_SetText("몬스터가 가까이 있는지 확인 중")
-;sleep,100
-keyclick("AltR")
-Check_Moving()
-if(Moving = 0)
-{
-Check_Moving()
-if(Moving = 0)
-{
-Step = 1018
-AttackMissCount := 0
-한번만 := 1
-}
-}
-movmob2 := A_TickCount - movmob
-if(movmob2 >= 2500)
-{
-SB_SetText("거리가 멉니다.")
-Sleep, 100
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 1016
-}
-}
-if(Step = 1026) ;무바파트
-{
-GUICONTROL, , Gui_NowState, [포북] 무바 중
-SB_SetText("포북 메모리 무바", 1)
-AttackMissCount ++
-if(AttackMissCount >= 300 and 한번만 = 1)
-{
-    sleep,100
+    SB_SetText("몬스터가 가까이 있는지 확인 중")
     keyclick("AltR")
-    AttackMissCount := 0
-    한번만 :=0
-}
-if(gui_1muba = 1)
-{
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-}
-if(gui_2muba = 1)
-{
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-}
-if(gui_3muba = 1)
-{
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-if(AbilityName = Gui_Weapon3)
-{
-BWValue3 := AbilityValue
-}
-}
-if(Gui_2butmuba = 1)
-{
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-}
-if(Gui_3butmuba = 1)
-{
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-}
-if(Gui_4butMuba = 1)
-{
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-if(AbilityName = Gui_Weapon3)
-{
-BWValue3 := AbilityValue
-}
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(BWValue0 = "격투" or Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프" || Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프" || Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
-{
-RemoteM()
-}
-}
-현재무기 := jelan.read(0x0058DAD4, "UInt", 0x121)
-if (현재무기 != 0) ;4벗무바무기수리로직
-{
-    if(Gui_2Muba = 1 || Gui_3butMuba = 1||Gui_3Muba = 1 || Gui_4butMuba = 1)
+    CheckAndSetStep(1018)
+    movmob2 := A_TickCount - movmob
+    if(movmob2 >= 2500)
     {
-    TrackWeaponChange(현재무기)
-    }
-    if(Gui_1Muba = 1 || Gui_2butMuba = 1)
-    {
-    RepairWeaponCount = 0
+        SB_SetText("거리가 멉니다.")
+        PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
+        PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
+        sleep,1
+        Step := 1016
     }
 }
-if (현재무기 = 0)
+if(Step = 1026)
 {
-    if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+    GUICONTROL, , Gui_NowState, [포북] 무바 중
+    SB_SetText("포북 메모리 무바", 1)
+    AttackMissCount++
+    if(AttackMissCount >= 300 && 한번만 = 1)
     {
-    RepairWeaponCount += 1
+        keyclick("AltR")
+        AttackMissCount := 0
+        한번만 := 0
     }
-    else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
+
+    BWValue1 := CheckWeaponAbility(Gui_Weapon1)
+    BWValue2 := (gui_2muba || gui_3muba) ? CheckWeaponAbility(Gui_Weapon2) : ""
+    BWValue3 := (gui_3muba) ? CheckWeaponAbility(Gui_Weapon3) : ""
+    BWValue0 := (Gui_2butmuba || Gui_3butmuba || Gui_4butMuba) ? CheckWeaponAbility("격투") : ""
+
+    if(Gui_CheckUseMagic = 1)
     {
-    RecentWeapons.RemoveAt(2)
+        if(BWValue0 = "격투" || Gui_Weapon1 = "현금" || Gui_Weapon1 = "스태프" || Gui_Weapon2 = "현금" || Gui_Weapon2 = "스태프" || Gui_Weapon3 = "현금" || Gui_Weapon3 = "스태프")
+        {
+            RemoteM()
+        }
     }
-    else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
+
+    현재무기 := jelan.read(0x0058DAD4, "UInt", 0x121)
+    사용할무기수량 := Gui_1Muba || Gui_2butMuba ? 1 : Gui_2Muba || Gui_3butMuba ? 2 : 3
+    UpdateRepairCount(현재무기, 사용할무기수량)
+
+    if(RepairWeaponCount >= 300)
     {
-    RecentWeapons.RemoveAt(3)
+        RepairWeaponCount := 0
+        MapNumber := 1
+        Step := 300
+        return
     }
-}
-무바여부 := CheckTrackedWeapons()
-if(Gui_1Muba = 1 || Gui_2butMuba = 1)
-{
-사용할무기수량 := 1
-}
-else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
-{
-사용할무기수량 := 2
-}
-else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
-{
-사용할무기수량 := 3
-}
-if (무바여부 = 사용할무기수량)
-{
-RepairWeaponCount := 0
-}
-if (무바여부 != 사용할무기수량)
-{
-RepairWeaponCount += 1
-sleep,100
-}
-else
-{
-  RepairWeaponCount := 0
-}
-if (RepairWeaponCount >= 300)
-{
-RepairWeaponCount = 0
-MapNumber = 1
-step = 300
-return
-}
 }
 if(Step = 1030)
 {
@@ -21878,18 +21605,6 @@ ConnectedToInternet(flag=0x40)
 {
 Return, DllCall("Wininet.dll\InternetGetConnectedState", "Str", flag,"Int",0)
 }
-Loading()
-{
-Sleep, 500
-Loop,
-{
-if(pwb.readyState() = 4)
-{
-Sleep, 500
-break
-}
-}
-}
 Gui_Enable()
 {
 GuiControlGet, Gui_CheckUseHPExit
@@ -21996,13 +21711,6 @@ GuiControl, Enable, Gui_StartButton
 GuiControl, Enable, Gui_WindowSettingButton
 GuiControl, Enable, Gui_Agree
 }
-PlugClick(x,y)
-{
-MousePos := x|y<<16
-PostMessage, 0x200, 0, %MousePos%, Chrome_WidgetWin_01, ahk_pid %플러그%
-PostMessage, 0x201, 1, %MousePos%, Chrome_WidgetWin_01, ahk_pid %플러그%
-PostMessage, 0x202, 0, %MousePos%, Chrome_WidgetWin_01, ahk_pid %플러그%
-}
 PostMove(MouseX,MouseY)
 {
 MousePos := MouseX | MouseY<< 16
@@ -22064,9 +21772,9 @@ Set_MoveSpeed()
 {
 ;jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x9C)
 ;jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x98)
-jelan.write(0x0058FFE0,45,"UInt", aOffsets*)
-jelan.write(0x0058DAD4, 2300, "UInt", 0x178, 0x9C)
-jelan.write(0x0058DAD4, 2300, "UInt", 0x178, 0x98)
+jelan.write(0x0058FFE0,43,"UInt", aOffsets*)
+jelan.write(0x0058DAD4, 2350, "UInt", 0x178, 0x9C)
+jelan.write(0x0058DAD4, 2350, "UInt", 0x178, 0x98)
 }
 return
 Check_Moving()
@@ -35304,38 +35012,6 @@ ClearChromeHistory()
     ; DNS 캐시 비우기
     RunWait, %ComSpec% /c "ipconfig /flushdns"
 }
-
-		CheatEngine_NoAttackMotion() ;게임핵: 공격모션 제거 - 빠른 공격
-		{
-			jelan.write(0x0047C1A9,0x6A,"char",aOffset*)
-			jelan.write(0x0047C1AA,0x00,"char",aOffset*)
-			jelan.write(0x0047C1AB,0x90,"char",aOffset*)
-			jelan.write(0x0047C1AC,0x90,"char",aOffset*)
-			jelan.write(0x0047C1AD,0x90,"char",aOffset*)
-		}
-
-        CheatEngine_NoShowRide() ; 게임핵: 탈것 안보이기 - 이동불가 체력회복용 탈것 장착상태로 이동 가능
-        {
-            jelan.write(0x0046035B, 0x90, "Char", aOffsets*)
-            jelan.write(0x0046035C, 0x90, "Char", aOffsets*)
-            jelan.write(0x0046035D, 0x90, "Char", aOffsets*)
-            jelan.write(0x0046035E, 0x90, "Char", aOffsets*)
-            jelan.write(0x0046035F, 0x90, "Char", aOffsets*)
-            jelan.write(0x00460360, 0x90, "Char", aOffsets*)
-        }
-        CheatEngine_AttackAlwaysMiss() ;게임핵: 항상 Miss 하기 - 0.5배의 데미지
-		{
-			jelan.write(0x004cfbc5,0xb2,"char",aOffset*)
-			jelan.write(0x004d05cd,0xb2,"char",aOffset*)
-		}
-        CheatEngine_ShowBack() ; 게임핵: 배경보기
-		{
-			jelan.write(0x0047A18D,0x75,"char",aOffset*)
-		}
-        CheatEngine_NoShowBlock() ; 게임핵: 환경이미지 제거
-		{
-			jelan.write(0x0047aa20,0xEB,"char",aOffset*)
-		}
 ; Ctrl+W, Ctrl+Q, Ctrl+E, Ctrl+R 중 하나를 랜덤으로 보내는 함수
 RandomSendCtrlKey() {
     Random, randKey, 1, 4  ; 1에서 4 사이의 랜덤 숫자를 생성
@@ -35349,7 +35025,6 @@ RandomSendCtrlKey() {
         Send, ^r  ; Ctrl+R
     }
 }
-
 	Check_NPCMsg_address()
 	{
 		SetFormat, Integer, H
@@ -35361,7 +35036,6 @@ RandomSendCtrlKey() {
 		SetFormat, Integer, D
 		return NPCMsg_address
 	}
-
 GetPrivateWorkingSet(PID)
 {
     try {
@@ -35383,4 +35057,83 @@ HandleDialog(evt) {
     CDP.Call("Page.handleJavaScriptDialog", { "accept": true })  ; 확인 버튼 클릭
     sleep,500
     PageInst.Evaluate("document.querySelector('.game_start').click();") ; 넥슨 로그인
+}
+CheckWeaponAbility(weapon)
+{
+    ReadAbilityNameValue()
+    return (AbilityName = weapon) ? AbilityValue : ""
+}
+UpdateRepairCount(현재무기, 사용할무기수량)
+{
+    global RepairWeaponCount, RecentWeapons
+    if (현재무기 != 0)
+    {
+        if(Gui_2Muba = 1 || Gui_3butMuba = 1 || Gui_3Muba = 1 || Gui_4butMuba = 1)
+            TrackWeaponChange(현재무기)
+        if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+            RepairWeaponCount := 0
+    }
+    else
+    {
+        if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+            RepairWeaponCount += 1
+        else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
+            RecentWeapons.RemoveAt(2)
+        else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
+            RecentWeapons.RemoveAt(3)
+    }
+
+    무바여부 := CheckTrackedWeapons()
+    RepairWeaponCount := (무바여부 = 사용할무기수량) ? 0 : RepairWeaponCount + 1
+}
+CheckAndSetStep(newStep)
+{
+    global Step, Moving, AttackMissCount, 한번만
+    Check_Moving()
+    if (Moving = 0)
+    {
+        Check_Moving()
+        if (Moving = 0)
+        {
+            Step := newStep
+            AttackMissCount := 0
+            한번만 := 1
+        }
+    }
+}
+resetAttackState()
+{
+    global AttackLoopCount, AttackCount
+    AttackLoopCount := 0
+    AttackCount := 0
+}
+
+; 모든 SplashImage 끄기
+DisableAllSplashImages()
+{
+    Loop, 10
+        SplashImage, %A_Index%: off
+}
+
+ExchangeResource(count, message, clickX, clickY) {
+    Loop, %count% {
+        SB_SetText(message)
+        Sleep, 200
+        PostClick(121, 104)
+        Sleep, 200
+        PostClick(clickX, clickY)
+        Sleep, 200
+    }
+}
+ApplyBuff(FormNumber) {
+    Global Step
+    buffMap := { 117: [110, 85], 93: [130, 90], 81: [120, 80] }
+
+    if (buffMap.HasKey(FormNumber)) {
+        Sleep, 200
+        PostClick(buffMap[FormNumber]*)
+        Sleep, 200
+        if (FormNumber = 81)
+            Step := 10334
+    }
 }
