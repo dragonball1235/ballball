@@ -19240,42 +19240,169 @@ if(Step = 1019)
         Step := 1016
     }
 }
-if(Step = 1026)
+if(Step = 1026) ;무바파트
 {
-    GUICONTROL, , Gui_NowState, [포북] 무바 중
-    SB_SetText("포북 메모리 무바", 1)
-    AttackMissCount++
-    if(AttackMissCount >= 600 && 한번만 = 1)
+GUICONTROL, , Gui_NowState, [포북] 무바 중
+SB_SetText("포북 메모리 무바", 1)
+AttackMissCount ++
+if(AttackMissCount >= 300 and 한번만 = 1)
+{
+    sleep,100
+    keyclick("AltR")
+    AttackMissCount := 0
+    한번만 :=0
+}
+if(gui_1muba = 1)
+{
+ReadAbilityNameValue()
+if(AbilityName = Gui_Weapon1)
+{
+BWValue1 := AbilityValue
+}
+}
+if(gui_2muba = 1)
+{
+ReadAbilityNameValue()
+if(AbilityName = Gui_Weapon1)
+{
+BWValue1 := AbilityValue
+}
+if(AbilityName = Gui_Weapon2)
+{
+BWValue2 := AbilityValue
+}
+}
+if(gui_3muba = 1)
+{
+ReadAbilityNameValue()
+if(AbilityName = Gui_Weapon1)
+{
+BWValue1 := AbilityValue
+}
+if(AbilityName = Gui_Weapon2)
+{
+BWValue2 := AbilityValue
+}
+if(AbilityName = Gui_Weapon3)
+{
+BWValue3 := AbilityValue
+}
+}
+if(Gui_2butmuba = 1)
+{
+ReadAbilityNameValue()
+if(AbilityName = "격투")
+{
+BWValue0 := AbilityValue
+}
+if(AbilityName = Gui_Weapon1)
+{
+BWValue1 := AbilityValue
+}
+}
+if(Gui_3butmuba = 1)
+{
+ReadAbilityNameValue()
+if(AbilityName = "격투")
+{
+BWValue0 := AbilityValue
+}
+if(AbilityName = Gui_Weapon1)
+{
+BWValue1 := AbilityValue
+}
+if(AbilityName = Gui_Weapon2)
+{
+BWValue2 := AbilityValue
+}
+}
+if(Gui_4butMuba = 1)
+{
+ReadAbilityNameValue()
+if(AbilityName = "격투")
+{
+BWValue0 := AbilityValue
+}
+if(AbilityName = Gui_Weapon1)
+{
+BWValue1 := AbilityValue
+}
+if(AbilityName = Gui_Weapon2)
+{
+BWValue2 := AbilityValue
+}
+if(AbilityName = Gui_Weapon3)
+{
+BWValue3 := AbilityValue
+}
+}
+if(Gui_CheckUseMagic = 1)
+{
+if(BWValue0 = "격투" or Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프" || Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프" || Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
+{
+RemoteM()
+}
+}
+현재무기 := jelan.read(0x0058DAD4, "UInt", 0x121)
+if (현재무기 != 0) ;4벗무바무기수리로직
+{
+    if(Gui_2Muba = 1 || Gui_3butMuba = 1||Gui_3Muba = 1 || Gui_4butMuba = 1)
     {
-        keyclick("AltR")
-        AttackMissCount := 0
-        한번만 := 0
+    TrackWeaponChange(현재무기)
     }
-
-    BWValue1 := CheckWeaponAbility(Gui_Weapon1)
-    BWValue2 := (gui_2muba || gui_3muba) ? CheckWeaponAbility(Gui_Weapon2) : ""
-    BWValue3 := (gui_3muba) ? CheckWeaponAbility(Gui_Weapon3) : ""
-    BWValue0 := (Gui_2butmuba || Gui_3butmuba || Gui_4butMuba) ? CheckWeaponAbility("격투") : ""
-
-    if(Gui_CheckUseMagic = 1)
+    if(Gui_1Muba = 1 || Gui_2butMuba = 1)
     {
-        if(BWValue0 = "격투" || Gui_Weapon1 = "현금" || Gui_Weapon1 = "스태프" || Gui_Weapon2 = "현금" || Gui_Weapon2 = "스태프" || Gui_Weapon3 = "현금" || Gui_Weapon3 = "스태프")
-        {
-            RemoteM()
-        }
+    RepairWeaponCount = 0
     }
-
-    현재무기 := jelan.read(0x0058DAD4, "UInt", 0x121)
-    사용할무기수량 := Gui_1Muba || Gui_2butMuba ? 1 : Gui_2Muba || Gui_3butMuba ? 2 : 3
-    UpdateRepairCount(현재무기, 사용할무기수량)
-
-    if(RepairWeaponCount >= 600)
+}
+if (현재무기 = 0)
+{
+    if(Gui_1Muba = 1 || Gui_2butMuba = 1)
     {
-        RepairWeaponCount := 0
-        MapNumber := 1
-        Step := 300
-        return
+    RepairWeaponCount += 1
     }
+    else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
+    {
+    RecentWeapons.RemoveAt(2)
+    }
+    else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
+    {
+    RecentWeapons.RemoveAt(3)
+    }
+}
+무바여부 := CheckTrackedWeapons()
+if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+{
+사용할무기수량 := 1
+}
+else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
+{
+사용할무기수량 := 2
+}
+else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
+{
+사용할무기수량 := 3
+}
+if (무바여부 = 사용할무기수량)
+{
+RepairWeaponCount := 0
+}
+if (무바여부 != 사용할무기수량)
+{
+RepairWeaponCount += 1
+sleep,100
+}
+else
+{
+  RepairWeaponCount := 0
+}
+if (RepairWeaponCount >= 300)
+{
+RepairWeaponCount = 0
+MapNumber = 1
+step = 300
+return
+}
 }
 if(Step = 1030)
 {
