@@ -2821,7 +2821,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.5 [공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.6 [공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -8577,9 +8577,13 @@ if(Step = 3)
     Sleep, 1000
 while (Patch = "")  ; Patch가 ""이면 반복
 {
+    WinActivate, ahk_exe Jelancia.exe
+    WINWAIT, ahk_exe jElancia.exe, , 15
     ControlGetText, Patch, Static2, Elancia
     sb_settext("patch 인식중" ,2)
     Sleep, 1000  ; 1초 대기
+    if (InStr(Patch, "최신 버전입니다."))  ; Patch에 "최신 버전입니다."가 포함되어 있으면
+        break
 }
     Sleep, 3000
     SB_SetText("일랜실행중", 1)
@@ -9035,6 +9039,7 @@ GuiControl, , Gui_CharName, %jTitle%
 GuiControl,Show,Gui_StopButton
 SB_SetText("접속 완료")
 Sleep, 100
+PostRClick(371,301)
 step =7
 gui_Startmap := 1
 Sleep, 300
