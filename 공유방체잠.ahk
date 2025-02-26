@@ -8269,8 +8269,10 @@ FileCreateDir, ChromeProfile
 ProfilePath := A_ScriptDir . "\ChromeProfile" ; 사용자 프로파일 경로 지정
     ChromeInst := new Chrome(ProfilePath, , , , , False) ; Headless 모드를 끔(False)
     ; 새로운 페이지 탭 가져오기
+    Sleep, 100
     PageInst := ChromeInst.GetPage()
     PageInst.Call("Page.enable")  ; 페이지 로드 기능 활성화
+    Sleep, 100
     PageInst.Call("Page.navigate", {"url": "https://elancia.nexon.com/"})
     SB_SetText("홈페이지 접속중")
     while (PageInst.Evaluate("document.readyState").value != "complete")
@@ -8570,23 +8572,30 @@ Step = 3
 }
 if(Step = 3)
 {
-WINWAIT, ahk_exe jElancia.exe, , 15
-Sleep, 1000
-ControlGetText, Patch, Static2, Elancia
-Sleep, 3000
-SB_SetText("일랜실행중", 1)
-sb_settext("서버메시지 - " Patch "젤랜:" ,2)
-IfnotInString,Patch,최신 버전입니다. 게임을 시작하세요.
+    WinActivate, ahk_exe Jelancia.exe
+    WINWAIT, ahk_exe jElancia.exe, , 15
+    Sleep, 1000
+while (Patch = "")  ; Patch가 ""이면 반복
 {
-SetTitleMatchMode, 1 ; 부분 일치 모드 활성화
-WinClose, Elancia
-WinKill, ahk_exe MRMsph.exe
-TMessage :="[ Helancia_Log ] 패치 이상 재설정. [추정오류 : 젤랜시아 재접속]"
-텔레그램메시지보내기(TMessage)
-Sleep, 2000
-Step = 10000
-return
+    ControlGetText, Patch, Static2, Elancia
+    sb_settext("patch 인식중" ,2)
+    Sleep, 1000  ; 1초 대기
 }
+    Sleep, 3000
+    SB_SetText("일랜실행중", 1)
+    sb_settext("서버메시지 - " Patch "젤랜:" ,2)
+
+    IfNotInString, Patch, 최신 버전입니다.
+    {
+        SetTitleMatchMode, 1 ; 부분 일치 모드 활성화
+        WinClose, Elancia
+        WinKill, ahk_exe MRMsph.exe
+        TMessage := "[ Helancia_Log ] 패치 이상 재설정. [추정오류 : 젤랜시아 재접속]"
+        텔레그램메시지보내기(TMessage)
+        Sleep, 2000
+        Step = 10000
+        return
+    }
 ControlGet, GameStartButton, Visible, , Button1, Elancia
 Sleep, 1000
 if(GameStartButton = 1)
