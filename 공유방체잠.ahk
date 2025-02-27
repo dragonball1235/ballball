@@ -2714,6 +2714,7 @@ LV_Add("", "25.02.12/AM07:10", "레이블 정리")
 LV_Add("", "25.02.12/AM07:13", "메모리 정리 부분 일부 수정")
 LV_Add("", "25.02.12/AM07:13", "크롬 팝업창 뜰 경우 확인누름")
 LV_Add("", "25.02.12/AM07:13", "캐릭터 선택 시 인증시간 초과 부분 수정1")
+LV_Add("", "25.02.28/AM08:07", "베이커리 이동중 시 멈추는 부분 수정")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -2821,7 +2822,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.6 [공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.7 [공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -13653,6 +13654,9 @@ Sleep, 1000
 Check_Moving()
 if(Moving = 0)
 {
+keyclick("UpArrow")
+sleep,10
+keyclick("UpArrow")
 Step = 204
 }
 }
