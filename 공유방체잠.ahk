@@ -1959,7 +1959,7 @@ Global 차원체크
 Global 빵,몸찌방지,식빵갯수,절반FP,몸찌이동인식 = 0
 global 실행창위치 = 0 , 시작탭사이즈 = 0
 global 무바중 = 0
-global Reserver,파라스감지,수호천사방지,파라스방해감지,인연방지
+global Reserver,파라스감지,수호천사방지,파라스방해감지,인연방지,이유
 global 몹찾기 = 0
 Global 현혹번호, 폭검번호, 독침번호, 무기공격번호, 타겟팅랜덤
 Global 대화번호, 명상번호, 더블어택번호, 체력향상번호, 집중번호, 회피번호, 몸통지르기번호, 리무브아머번호, 민첩향상번호, 활방어번호, 마력향상번호, 마력방어번호
@@ -6467,7 +6467,8 @@ if(invenstack > 150)
 SLEEP, 100
 이전스텝 := step
 invenError += 1
-step = 10000
+이유 := 인벤슬롯 가득참
+step := 10000
 return
 }
 }
@@ -7382,8 +7383,8 @@ IfWinExist,ahk_pid %jPID%
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
-이전스텝 := step
-Step = 10000
+이유 := 인터넷 연결 종료
+Step := 10000
 return
 }
 WinGet, pid, PID, ahk_pid %jPID%
@@ -7407,7 +7408,6 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
-Reserver++
 실행초기화 += 1
 step := 8
 sleep,10000
@@ -7454,7 +7454,7 @@ GuiControl,,Gui_huntpobuk,1
 파라스감지++
 }
 }
-Reserver++
+Reserver += 1
 실행초기화 += 1
 if(Step = 17 or step = 18)
 {
@@ -7472,8 +7472,8 @@ sleep,1000
 return
 }
 }
-이전스텝 := step
-Step = 10000
+이유 := 일랜시아 서버와 연결 종료
+Step := 10000
 return
 }
 if(Gui_CheckUseHPLimited = 1)
@@ -7528,8 +7528,8 @@ if(pbtalkcheck2 >= 120000)
 {
 Sleep, 100
 pbtalkcheck = 0
-이전스텝 := step
-step = 10000
+이유 := 포북 메세지 시간초과
+step := 10000
 Sleep, 100
 }
 }
@@ -8247,8 +8247,6 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
-TMessage :="[ Helancia_Log ]>>" jTitle "<<: 서버 연결 종료로 재시작 [ 이전스텝 : " 이전스텝 " / " 상태 "]"
-텔레그램메시지보내기(TMessage)
 Sleep, 5000
 실행초기화 := 0
 return
@@ -8597,7 +8595,8 @@ while (Patch = "")  ; Patch가 ""이면 반복
         TMessage := "[ Helancia_Log ] 패치 이상 재설정. [추정오류 : 젤랜시아 재접속]"
         텔레그램메시지보내기(TMessage)
         Sleep, 2000
-        Step = 10000
+        이유 := 패치 못읽어옴
+        Step := 10000
         return
     }
 ControlGet, GameStartButton, Visible, , Button1, Elancia
@@ -8987,8 +8986,8 @@ WinKill, ahk_exe MRMSPH.exe
 }
 GuiControl, , 로그인상태정보, 접속 오류로 대기 후 재시작 합니다.
 Sleep, 60000
-이전스텝 := step
-Step = 10000
+이유 := 서버 오류
+Step := 10000
 return
 }
 ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
@@ -8999,7 +8998,8 @@ TMessage := "[ Helancia_Log ]" ServerMsg
 sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
-Step = 10000
+이유 := 로그인 중간 서버 연결 오류
+Step := 10000
 sleep,50000
 return
 }
@@ -9014,8 +9014,8 @@ sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
-이전스텝 := step
-Step = 10000
+이유 := 로그인 중간 서버와의 연결이 끊어짐
+Step := 10000
 return
 }
 IfInString,ServerMsg,인증시간이
@@ -9028,7 +9028,8 @@ sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
-Step = 10000
+이유 := 로그인 중간 인증시간이 초과
+Step := 10000
 return
 }
 WinGetTitle, jTitle, ahk_pid %jPID%
@@ -9866,8 +9867,8 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000) ;초과시 끄기 [마지막 체크필요]
 {
-이전스텝 := step
-step = 10000
+이유 := 메모리 부족
+step := 10000
 }
 if(byte <= 1000000)
 {
@@ -9878,8 +9879,8 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-이전스텝 := step
-step = 10000  ;초과시 끄기 [마지막 체크필요]
+이유 := 메모리 부족
+step := 10000  ;초과시 끄기 [마지막 체크필요]
 }
 if(byte <= 620000)
 {
@@ -11082,8 +11083,8 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000)
 {
-이전스텝 := step
-step = 10000
+이유 := 메모리 부족
+step := 10000
 return
 }
 ;if(byte <= 1000000)
@@ -11094,8 +11095,8 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-이전스텝 := step
-step = 10000
+이유 := 메모리 부족
+step := 10000
 return
 }
 ;if(byte <= 620000)
@@ -11697,7 +11698,8 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
  || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
  || InStr(ServerMsg, "인증시간이")
             {
-                step = 10000
+                이유 := 감응 이후 서버 연결 오류
+                step := 10000
                 return
             }
         }
@@ -11727,7 +11729,8 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
  || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
  || InStr(ServerMsg, "인증시간이")
             {
-                step = 10000
+                이유 := 감응 이후 서버연결 종료
+                step := 10000
                 return
             }
         }
@@ -11883,7 +11886,8 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
  || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
  || InStr(ServerMsg, "인증시간이")
             {
-                step = 10000
+                이유 := 감응 이후 서버연결 종료
+                step := 10000
                 ipmak += 1
                 return
             }
@@ -11943,7 +11947,8 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
  || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
  || InStr(ServerMsg, "인증시간이")
             {
-                step = 10000
+                이유 := 감응 이후 서버연결 종료
+                step := 10000
                 ipmak += 1
                 return
             }
@@ -12819,8 +12824,8 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000)
 {
-이전스텝 := step
-step = 10000
+이유 := 메모리 부족
+step := 10000
 return
 }
 if(byte <= 1000000)
@@ -12832,8 +12837,8 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-이전스텝 := step
-step = 10000
+이유 := 메모리 부족
+step := 10000
 return
 }
 if(byte <= 620000)
@@ -18409,8 +18414,8 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000)
 {
-이전스텝 := step
-step = 10000
+이유 := 메모리 부족
+step := 10000
 }
 if(byte <= 1000000)
 {
@@ -18421,8 +18426,8 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-이전스텝 := step
-step = 10000
+이유 := 메모리 부족
+step := 10000
 }
 if(byte <= 620000)
 {
@@ -19581,8 +19586,8 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000)
 {
-이전스텝 := step
-step = 10000
+이유 := 메모리 부족
+step := 10000
 }
 if(byte <= 1000000)
 {
@@ -19595,8 +19600,8 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-이전스텝 := step
-step = 10000
+이유 := 메모리 부족
+step := 10000
 }
 if(byte <= 620000)
 {
@@ -19758,12 +19763,13 @@ FormatTime, newTime1, %newTime%, yyyyMMddHHmm
 CheckPB = 1
 pbtalkcheck = 0
 Sleep, 50
-step = 1016
+step := 1016
 TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 [원격] 시간별 정상작동.|" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
 텔레그램메시지보내기(TMessage)
 sleep,100
 }
 }
+이유 := 오류2
 if(Step = 10000)
 {
 internet := ConnectedToInternet()
@@ -19858,6 +19864,8 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
+TMessage :="[ Helancia_Log ]>>" jTitle "<<: 메모리 정리후 리로드 [ 종료횟수 : " Reserver "/ 이유:" 이유 "]"
+텔레그램메시지보내기(TMessage)
 return
 }
 else
