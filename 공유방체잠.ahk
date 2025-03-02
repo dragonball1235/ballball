@@ -2822,7 +2822,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.76 [공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.75 [공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -8579,17 +8579,10 @@ while (Patch = "")  ; Patch가 ""이면 반복
     WinActivate, ahk_exe Jelancia.exe
     WINWAIT, ahk_exe jElancia.exe, , 15
     ControlGetText, Patch, Static2, Elancia
-    sb_settext("patch 인식중" ,2)
+    sb_settext("patch 인식중")
     Sleep, 1000  ; 1초 대기
     if (InStr(Patch, "최신 버전입니다."))  ; Patch에 "최신 버전입니다."가 포함되어 있으면
     {
-        break
-    }
-    if (InStr(Patch, "일랜시아 서버에"))  ; Patch에 "최신 버전입니다."가 포함되어 있으면
-    {
-        WinClose, Elancia
-        WinKill, ahk_exe MRMsph.exe
-        step := 0
         break
     }
 }
