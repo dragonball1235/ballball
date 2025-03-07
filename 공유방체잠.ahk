@@ -8582,7 +8582,10 @@ while (Patch = "")  ; Patch가 ""이면 반복
     sb_settext("patch 인식중" ,2)
     Sleep, 1000  ; 1초 대기
     if (InStr(Patch, "최신 버전입니다."))  ; Patch에 "최신 버전입니다."가 포함되어 있으면
-        break
+    WinActivate, ahk_exe Jelancia.exe
+    WINWAIT, ahk_exe jElancia.exe, , 15
+    ControlGetText, Patch, Static2, Elancia
+    break
 }
     Sleep, 3000
     SB_SetText("일랜실행중", 1)
@@ -9052,6 +9055,7 @@ if(Step = 7 and gui_Startmap = 1)
 GuiControl, , Gui_NowState, 마을로 이동.
 SB_SetText("마을로 라깃이동")
 차원체크()
+Move_NPCTalkForm()
 if( 현재차원 = CountPortal )
 {
 if(Gui_huntMummy = 1)
@@ -18945,6 +18949,7 @@ GuiControl, , Gui_NowState, [포북] 사냥터 도착.
 SB_SetText("파수꾼과 원격 대화 중")
 Get_Location()
 포북대화시도 := A_TickCount
+Move_NPCTalkForm()
 IfInString,Location,[알파차원]
 {
 호출대상 := "알파 - 길잃은수색대"
