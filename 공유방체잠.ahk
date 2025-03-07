@@ -8579,16 +8579,15 @@ while (Patch = "")  ; Patch가 ""이면 반복
     WinActivate, ahk_exe Jelancia.exe
     WINWAIT, ahk_exe jElancia.exe, , 15
     ControlGetText, Patch, Static2, Elancia
-    sb_settext("patch 인식중")
+    sb_settext("patch 인식중" ,2)
     Sleep, 1000  ; 1초 대기
     if (InStr(Patch, "최신 버전입니다."))  ; Patch에 "최신 버전입니다."가 포함되어 있으면
-    {
         break
-    }
 }
     Sleep, 3000
     SB_SetText("일랜실행중", 1)
     sb_settext("서버메시지 - " Patch "젤랜:" ,2)
+
     IfNotInString, Patch, 최신 버전입니다.
     {
         SetTitleMatchMode, 1 ; 부분 일치 모드 활성화
@@ -10796,6 +10795,7 @@ else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
 if (무바여부 = 사용할무기수량)
 {
 RepairWeaponCount := 0
+suri := 0
 }
 if (무바여부 != 사용할무기수량)
 {
@@ -14101,6 +14101,15 @@ if(Step = 300)
 {
 GuiControl, , Gui_NowState, [수리점] 상점으로 이동 중.
 SB_SetText("무기수리 - 수리점으로 이동 중")
+suri += 1
+if( suri > 3 )
+{
+    TMessage := "[ Helancia_Log ]>>" jTitle "<<: 무바 오류로 인한 수리점 반복 재접속."
+    텔레그램메시지보내기(TMessage)
+    suri := 0
+    step := 10000
+    return
+}
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
