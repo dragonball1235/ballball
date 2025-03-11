@@ -2822,7 +2822,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.76 [공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.77 [공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -9162,7 +9162,7 @@ ActiveAscript12()
 Sleep,500
 Run,*RunAs %A_ScriptDir%\MRMSPH.exe
 WinWait, ahk_exe MRMSPH.exe,,15
-Sleep, 3000
+Sleep, 5000
 IfWinExist, ahk_exe MRMSPH.exe
 {
 WinHide, ahk_exe MRMSPH.exe
@@ -12966,6 +12966,7 @@ if(step = 750)
 {
 GuiControl, , Gui_NowState, [병원] 체력회복을 위한 이동 중.
 SB_SetText("병원이동 - 회복하러 이동 중")
+HPoring := A_TickCount
 CheckPB := 0
 CheckPN := 0
 countsignal := 0
@@ -13016,8 +13017,23 @@ GuiControl, , Gui_RasCount, %라깃카운트%
 Step = 751
 return
 }
+    Loop
+    {
+        if (A_TickCount - HPoring > 10000)  ; 5초 이상 멈춰있다면 강제 진행
+        {
+            keyclick("프로세스종료")
+            step := 10000
+            return
+        }
+    }
 }
 IfInString,Location,신전
+{
+keyclick("프로세스종료")
+step = 751
+return
+}
+IfInString,Location,길드
 {
 keyclick("프로세스종료")
 step = 751
