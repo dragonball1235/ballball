@@ -13023,7 +13023,7 @@ return
         {
             keyclick("프로세스종료")
             step := 10000
-            return
+            break
         }
     }
 }
