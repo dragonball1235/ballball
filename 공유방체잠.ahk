@@ -2715,6 +2715,7 @@ LV_Add("", "25.02.12/AM07:13", "메모리 정리 부분 일부 수정")
 LV_Add("", "25.02.12/AM07:13", "크롬 팝업창 뜰 경우 확인누름")
 LV_Add("", "25.02.12/AM07:13", "캐릭터 선택 시 인증시간 초과 부분 수정1")
 LV_Add("", "25.02.28/AM08:07", "베이커리 이동중 시 멈추는 부분 수정")
+LV_Add("", "25.03.14/PM10:25", "자주 팅기는 부분 수정")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -2822,7 +2823,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.77 [공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.77[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -5413,7 +5414,7 @@ SetTimer, Hunt, 50
 SetTimer, AttackCheck, 50
 SetTimer, AttackMGB, 5000
 SetTimer, 타겟팅, 100
-SetTimer, RL, 15000000
+SetTimer, RL, 21600000
 시작탭사이즈 := 1
 return
 
@@ -9162,7 +9163,7 @@ ActiveAscript12()
 Sleep,500
 Run,*RunAs %A_ScriptDir%\MRMSPH.exe
 WinWait, ahk_exe MRMSPH.exe,,15
-Sleep, 5000
+Sleep, 3000
 IfWinExist, ahk_exe MRMSPH.exe
 {
 WinHide, ahk_exe MRMSPH.exe
@@ -10799,7 +10800,6 @@ else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
 if (무바여부 = 사용할무기수량)
 {
 RepairWeaponCount := 0
-suri := 0
 }
 if (무바여부 != 사용할무기수량)
 {
@@ -12966,7 +12966,6 @@ if(step = 750)
 {
 GuiControl, , Gui_NowState, [병원] 체력회복을 위한 이동 중.
 SB_SetText("병원이동 - 회복하러 이동 중")
-HPoring := A_TickCount
 CheckPB := 0
 CheckPN := 0
 countsignal := 0
@@ -13017,23 +13016,8 @@ GuiControl, , Gui_RasCount, %라깃카운트%
 Step = 751
 return
 }
-    Loop
-    {
-        if (A_TickCount - HPoring > 10000)  ; 5초 이상 멈춰있다면 강제 진행
-        {
-            keyclick("프로세스종료")
-            step := 10000
-            break
-        }
-    }
 }
 IfInString,Location,신전
-{
-keyclick("프로세스종료")
-step = 751
-return
-}
-IfInString,Location,길드
 {
 keyclick("프로세스종료")
 step = 751
@@ -14121,15 +14105,6 @@ if(Step = 300)
 {
 GuiControl, , Gui_NowState, [수리점] 상점으로 이동 중.
 SB_SetText("무기수리 - 수리점으로 이동 중")
-suri += 1
-if( suri > 3 )
-{
-    TMessage := "[ Helancia_Log ]>>" jTitle "<<: 무바 오류로 인한 수리점 반복 재접속."
-    텔레그램메시지보내기(TMessage)
-    suri := 0
-    step := 10000
-    return
-}
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
