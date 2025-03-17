@@ -2823,7 +2823,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.77[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.78[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -18650,6 +18650,7 @@ if(Step = 1007)
 {
 GuiControl, , Gui_NowState, [포북] 사냥터 도착.
 SB_SetText("파수꾼으로 이동 중")
+Move_NPCTalkForm()
 if(Gui_jjOn = 1)
 {
 Send, {F18 Down}
@@ -18936,6 +18937,7 @@ if( GUI_KON = 1 )
 if(Step = 1007)
 {
 정수체크()
+Move_NPCTalkForm()
 GuiControl, , Gui_NowState, [포북] 사냥터 도착.
 SB_SetText("파수꾼과 원격 대화 중")
 Get_Location()
