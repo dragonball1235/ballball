@@ -7974,9 +7974,9 @@ if(ErrorLevel = 0)
 {
 GUICONTROL, , Gui_NowState, [포남] 헉 만드다. . . !
 GuiControl, , jTitle, %jTitle%
-TMessage :="[ Helancia_Log ]>>" jTitle "<<: X:" .  MandX . "와 Y : " . MandY . "에"  . "만드발견. 튑니다. "
-텔레그램메시지보내기(TMessage)
-sleep,10
+;TMessage :="[ Helancia_Log ]>>" jTitle "<<: X:" .  MandX . "와 Y : " . MandY . "에"  . "만드발견. 튑니다. "
+;텔레그램메시지보내기(TMessage)
+;sleep,10
 AttackLoopCount = 0
 AttackCount = 0
 Step = 19
