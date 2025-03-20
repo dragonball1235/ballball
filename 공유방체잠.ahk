@@ -8581,13 +8581,11 @@ while (Patch = "")  ; Patch가 ""이면 반복
     WINWAIT, ahk_exe jElancia.exe, , 15
     ControlGetText, Patch, Static2, Elancia
     sb_settext("patch 인식중" ,2)
-    Sleep, 1000  ; 1초 대기
-    if (InStr(Patch, "최신 버전입니다."))  ; Patch에 "최신 버전입니다."가 포함되어 있으면
+    Sleep, 3000  ; 1초 대기
+}
     WinActivate, ahk_exe Jelancia.exe
     WINWAIT, ahk_exe jElancia.exe, , 15
     ControlGetText, Patch, Static2, Elancia
-    break
-}
     Sleep, 3000
     SB_SetText("일랜실행중", 1)
     sb_settext("서버메시지 - " Patch "젤랜:" ,2)
