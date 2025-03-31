@@ -8572,6 +8572,7 @@ Step = 3
 }
 if(Step = 3)
 {
+    WinClose, ahk_exe NexonPlug.exe
     WinActivate, ahk_exe Jelancia.exe
     WINWAIT, ahk_exe jElancia.exe, , 15
     Sleep, 1000
@@ -11134,11 +11135,12 @@ SB_SetText("움직임 체크 중")
 Check_Moving()
 if(Moving = 0)
 {
-Sleep, 200
+Sleep, 300
 Check_Moving()
 if(Moving = 0)
 {
 AltR()
+Sleep, 300
 }
 }
 }
@@ -11200,7 +11202,7 @@ Step = 17
 }
 if(Step = 17)
 {
-포북캐릭()
+캐릭제거()
 Get_Location()
 SB_SetText("원격대화 시도 중")
 Move_NPCTalkForm()
@@ -11320,17 +11322,15 @@ IfWinNotActive, ahk_pid %jPID%
 {
 WinActivate, ahk_pid %jPID%
 }
-PixelSearch, MobX, MobY,  0, 0, 775, 460, 0x7351AD, 3, *Fast  *RGB
+PixelSearch, MobX, MobY,  258, 184, 654, 439, 0x7351AD, 2, *Fast  *RGB
 if(ErrorLevel = 1)
 {
 Sleep, 200
 AltR()
-Sleep, 200
-PixelSearch, MobX, MobY,  0, 0, 775, 460, 0x7351AD, 3, *Fast  *RGB
+PixelSearch, MobX, MobY,  258, 184, 654, 439, 0x7351AD, 2, *Fast  *RGB
 }
 if(ErrorLevel = 0)
 {
-Sleep, 300
 PostClick(MobX,MobY)
 }
 Sleep, 200
