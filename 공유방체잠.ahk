@@ -2823,7 +2823,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.78[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.79[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -8575,6 +8575,7 @@ if(Step = 3)
     WinClose, ahk_exe NexonPlug.exe
     WinActivate, ahk_exe Jelancia.exe
     WINWAIT, ahk_exe jElancia.exe, , 15
+    ControlGetText, Patch, Static2, Elancia
     Sleep, 1000
 while (Patch = "")  ; Patch가 ""이면 반복
 {
@@ -8584,13 +8585,16 @@ while (Patch = "")  ; Patch가 ""이면 반복
     sb_settext("patch 인식중" ,2)
     Sleep, 3000  ; 1초 대기
 }
-    WinActivate, ahk_exe Jelancia.exe
-    WINWAIT, ahk_exe jElancia.exe, , 15
     ControlGetText, Patch, Static2, Elancia
     Sleep, 3000
     SB_SetText("일랜실행중", 1)
     sb_settext("서버메시지 - " Patch "젤랜:" ,2)
-
+    IfInString, Patch, 확인중
+    {
+    Sleep, 4000
+    ControlGetText, Patch, Static2, Elancia
+    sb_settext("서버메시지 - " Patch "젤랜:" ,2)
+    }
     IfNotInString, Patch, 최신 버전입니다.
     {
         SetTitleMatchMode, 1 ; 부분 일치 모드 활성화
@@ -8903,7 +8907,7 @@ if(jTitle = "일랜시아 - 엘" or jTitle = "일랜시아 - 테스")
 Server := jelan.read(0x0058DAD0, "UChar", 0xC, 0x8, 0x8, 0x6C)
 if(Server = 1)
 {
-Sleep, 1000
+Sleep, 1500
 if(Gui_CharNumber = 1)
 {
 PostMessage, 0x200, 0, 13107662, , ahk_pid %jPID%
@@ -8976,7 +8980,7 @@ Step = 6
 if(Step = 6)
 {
 GuiControl, , 로그인상태정보, [로그인] - 접속 대기 중
-Sleep, 7000
+Sleep, 10000
 Server := jelan.read(0x0058DAD0, "UChar", 0xC, 0x10, 0x8, 0x36C)
 if(Server = 1)
 {
@@ -10822,11 +10826,12 @@ if(Step = 9 and gui_Startmap = 3)
 {
 GuiControl, , Gui_NowState, [포남] 사냥터로 가기.
 sleep,100
-value := jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
-value := jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
-value := jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
-value := jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
-value := jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
+;포북캐릭()
+;value := jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
+;value := jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
+;value := jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
+;value := jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
+;value := jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
 CheckPN := 0
 countsignal := 0
 CheckPB = 0
@@ -10857,11 +10862,12 @@ if(Step = 9 and gui_Startmap = 4)
 {
 GuiControl, , Gui_NowState, [포남] 사냥터로 가기.
 sleep,100
-value := jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
-value := jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
-value := jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
-value := jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
-value := jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
+;value := jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
+;value := jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
+;value := jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
+;value := jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
+;value := jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
+;포북캐릭()
 CheckPN := 0
 countsignal := 0
 CheckPB = 0
@@ -11202,7 +11208,7 @@ Step = 17
 }
 if(Step = 17)
 {
-캐릭제거()
+머미캐릭()
 Get_Location()
 SB_SetText("원격대화 시도 중")
 Move_NPCTalkForm()
@@ -13018,8 +13024,16 @@ return
 IfInString,Location,신전
 {
 keyclick("프로세스종료")
+step = 10000
+}
+IfInString,Location,길드
+{
+keyclick("프로세스종료")
+step = 10000
+}
+IfInString,Location,병원
+{
 step = 751
-return
 }
 }
 if(Step = 751)
