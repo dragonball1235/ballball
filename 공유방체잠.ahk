@@ -8446,6 +8446,7 @@ while (PageInst.Evaluate("document.readyState").value != "complete")
 }
 sleep,1000
 PageInst.Evaluate("PS.game.startGame({ gameCode:74276 });")
+sleep,500
 SB_SetText("크롬 실행")
 while (PageInst.Evaluate("document.readyState").value != "complete")
 {
