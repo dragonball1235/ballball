@@ -8271,42 +8271,28 @@ ProfilePath := A_ScriptDir . "\ChromeProfile" ; 사용자 프로파일 경로 �
     ; 새로운 페이지 탭 가져오기
     Sleep, 100
     PageInst := ChromeInst.GetPage()
-    PageInst.Call("Page.enable")  ; 페이지 로드 기능 활성화
     Sleep, 100
     PageInst.Call("Page.navigate", {"url": "https://elancia.nexon.com/"})
     SB_SetText("홈페이지 접속중")
-    while (PageInst.Evaluate("document.readyState").value != "complete")
+while (PageInst.Evaluate("document.readyState").value != "complete")
 {
-    sleep, 100  ; 0.5초 대기 후 다시 확인
+sleep, 100  ; 0.5초 대기 후 다시 확인
 }
     PageInst.Evaluate("PS.game.startGame({ gameCode:74276 });")
-    while (PageInst.Evaluate("document.readyState").value != "complete")
-{
-    sleep, 100  ; 0.5초 대기 후 다시 확인
-}
+    sleep,4000
 LoginURL := PageInst.Evaluate("window.location.href").value
 ;    MsgBox, % "현재 URL은: " LoginURL
 If (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
 {
-    GuiControl, , 로그인상태정보, [로그인] - 실패 ( 접속불량 )
-    Gui_Enable()
-    SetTimer, Hunt, Off
-    SetTimer, AttackCheck, Off
-    SetTimer, AttackMGB, off
-    SetTimer, 타겟팅, Off
-    SetTimer, incineration, off
-    CheckPB = 0
-    CheckPN := 0
-    countsignal := 0
-    랜덤감응 = 0
-    return
-}
-If (LoginURL = "https://elancia.nexon.com/")
-{
-GuiControl, , 로그인상태정보, [로그인] - 로그인이 되어있습니다. ( 중복 )
+GuiControl, , 로그인상태정보, [로그인] - 실패 ( 접속불량 )
+SB_SetText("인터넷 로그인 재시도")
+WinClose, Elancia
+WinKill, ahk_exe MRMsph.exe
 PageInst.WaitForLoad()
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
+sleep,1000
+PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
@@ -8317,8 +8303,6 @@ SetTimer, AttackCheck, Off
 SetTimer, AttackMGB, off
 SetTimer, 타겟팅, Off
 SetTimer, incineration, off
-SetTimer, GetMemory, OFF
-SetTimer, ClearMem, OFF
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
@@ -8344,6 +8328,8 @@ GuiControl, , 로그인상태정보, [로그인] - 실패 ( ID,비번 틀림 )
  PageInst.WaitForLoad()
  PageInst.Evaluate("inface.auth.gotoSignOut();")
  ; JavaScript 실행
+sleep,1000
+PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
@@ -8377,6 +8363,8 @@ CDP.Call("Page.enable")  ; Page 이벤트 활성화
 CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
 WinWait, ahk_exe jElancia.exe, , 15
 PageInst.Evaluate("inface.auth.gotoSignOut();")
+sleep,1000
+PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
 ; 테스트 종료: 크롬 브라우저 닫기
 PageInst.Call("Browser.close")
@@ -8471,6 +8459,7 @@ sleep,4000 ; 만약 그대로면 클라 켜진거니 그냥 step = 2진행
     ; 테스트 종료: 크롬 브라우저 닫기
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
+sleep,2000
 PageInst.Evaluate(removeCookiesScript)
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
@@ -8514,6 +8503,7 @@ CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들�
 sleep,3000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게임실행하고 진행
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
+sleep,2000
 PageInst.Evaluate(removeCookiesScript)
 PageInst.Call("Browser.close")
 PageInst.Disconnect() ;꺼
@@ -8527,7 +8517,7 @@ GuiControl, , 로그인상태정보, [로그인] - 실패 ( 접속오류 )
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
 PageInst.Evaluate(removeCookiesScript)
-sleep,4000
+sleep,2000
 PageInst.Call("Browser.close")
 PageInst.Disconnect() ;꺼
 ChromeInst.Close() ; 크롬 인스턴스 종료
@@ -8551,6 +8541,7 @@ sleep, 6000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
 PageInst.Evaluate(removeCookiesScript)
+sleep,2000
 PageInst.Call("Browser.close")
 PageInst.Disconnect() ;꺼
 ChromeInst.Close() ; 크롬 인스턴스 종료
@@ -11414,6 +11405,8 @@ if(Step = 18)
 {
 SB_SetText("포남 입장 시도 중")
 Get_Location()
+keyclick("tab")
+sleep,100
 if(Gui_KON = 1)
 {
 IfInString,Location,[알파차원]
