@@ -8555,7 +8555,7 @@ Step = 2
 }
 if(Step = 2)
 {
-Sleep, 7000
+Sleep, 5000
 SB_SetText("로그인 상태 체크")
 GuiControl, , 로그인상태정보, [로그인] - 실행중
 WinKill, ahk_exe MRMsph.exe
@@ -8568,6 +8568,7 @@ if(Step = 3)
     WinActivate, ahk_exe Jelancia.exe
     WINWAIT, ahk_exe jElancia.exe, , 15
     ControlGetText, Patch, Static2, Elancia
+    sb_settext("서버메시지 - " Patch,2)
     IfNotInString, Patch, 최신 버전입니다.
     {
         SetTitleMatchMode, 1 ; 부분 일치 모드 활성화
