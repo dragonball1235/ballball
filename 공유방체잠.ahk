@@ -2823,7 +2823,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.79[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.80[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -8563,7 +8563,7 @@ Step = 2
 }
 if(Step = 2)
 {
-Sleep, 2000
+Sleep, 7000
 SB_SetText("로그인 상태 체크")
 GuiControl, , 로그인상태정보, [로그인] - 실행중
 WinKill, ahk_exe MRMsph.exe
@@ -8576,25 +8576,6 @@ if(Step = 3)
     WinActivate, ahk_exe Jelancia.exe
     WINWAIT, ahk_exe jElancia.exe, , 15
     ControlGetText, Patch, Static2, Elancia
-    Sleep, 1000
-while (Patch = "")  ; Patch가 ""이면 반복
-{
-    WinActivate, ahk_exe Jelancia.exe
-    WINWAIT, ahk_exe jElancia.exe, , 15
-    ControlGetText, Patch, Static2, Elancia
-    sb_settext("patch 인식중" ,2)
-    Sleep, 3000  ; 1초 대기
-}
-    ControlGetText, Patch, Static2, Elancia
-    Sleep, 3000
-    SB_SetText("일랜실행중", 1)
-    sb_settext("서버메시지 - " Patch "젤랜:" ,2)
-    IfInString, Patch, 확인중
-    {
-    Sleep, 4000
-    ControlGetText, Patch, Static2, Elancia
-    sb_settext("서버메시지 - " Patch "젤랜:" ,2)
-    }
     IfNotInString, Patch, 최신 버전입니다.
     {
         SetTitleMatchMode, 1 ; 부분 일치 모드 활성화
@@ -20855,6 +20836,7 @@ if (Step >= 7 && Step < 10000)
 }
 if(Step = 27 or Step = 1026 or step = 3030)
 {
+gosub, 어빌리티탭확인
 AttackLoopCount += 1
 Check_Attack()
 if(Attack = 0)
