@@ -2824,7 +2824,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.80[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.81[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -8270,9 +8270,8 @@ FileCreateDir, ChromeProfile
 ProfilePath := A_ScriptDir . "\ChromeProfile" ; 사용자 프로파일 경로 지정
     ChromeInst := new Chrome(ProfilePath, , , , , False) ; Headless 모드를 끔(False)
     ; 새로운 페이지 탭 가져오기
-    Sleep, 100
     PageInst := ChromeInst.GetPage()
-    Sleep, 100
+    PageInst.Call("Page.enable")  ; 페이지 로드 기능 활성화
     PageInst.Call("Page.navigate", {"url": "https://elancia.nexon.com/"})
     SB_SetText("홈페이지 접속중")
 while (PageInst.Evaluate("document.readyState").value != "complete")
@@ -8280,34 +8279,26 @@ while (PageInst.Evaluate("document.readyState").value != "complete")
 sleep, 100  ; 0.5초 대기 후 다시 확인
 }
     PageInst.Evaluate("PS.game.startGame({ gameCode:74276 });")
-    sleep,4000
-LoginURL := PageInst.Evaluate("window.location.href").value
-;    MsgBox, % "현재 URL은: " LoginURL
-If (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
+    sleep,500
+    while (PageInst.Evaluate("document.readyState").value != "complete")
 {
-GuiControl, , 로그인상태정보, [로그인] - 실패 ( 접속불량 )
-SB_SetText("인터넷 로그인 재시도")
-WinClose, Elancia
-WinKill, ahk_exe MRMsph.exe
-PageInst.WaitForLoad()
+sleep, 100  ; 0.5초 대기 후 다시 확인
+}
+LoginURL := PageInst.Evaluate("window.location.href").value
+if (InStr(LoginURL, "https://elancia.nexon.com/"))
+{
+SB_SetText("일랜시아 확인1")
+sleep,4000 ; 만약 그대로면 클라 켜진거니 그냥 step = 2진행
+;PageInst.Evaluate("inface.auth.gotoSignOut();")
+    ; 테스트 종료: 크롬 브라우저 닫기
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
-sleep,1000
-PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
+sleep,2000
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
 ChromeInst.Close() ; 크롬 인스턴스 종료
-Gui_Enable()
-SetTimer, Hunt, Off
-SetTimer, AttackCheck, Off
-SetTimer, AttackMGB, off
-SetTimer, 타겟팅, Off
-SetTimer, incineration, off
-CheckPB = 0
-CheckPN := 0
-countsignal := 0
-랜덤감응 = 0
+step = 2
 return
 }
     PageInst.Evaluate("document.querySelector('#txtNexonID').value = '" Gui_NexonID "';") ; ID 입력
@@ -8329,9 +8320,9 @@ GuiControl, , 로그인상태정보, [로그인] - 실패 ( ID,비번 틀림 )
  PageInst.WaitForLoad()
  PageInst.Evaluate("inface.auth.gotoSignOut();")
  ; JavaScript 실행
-sleep,1000
 PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
+sleep,1000
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
 ChromeInst.Close() ; 크롬 인스턴스 종료
@@ -8364,9 +8355,9 @@ CDP.Call("Page.enable")  ; Page 이벤트 활성화
 CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
 WinWait, ahk_exe jElancia.exe, , 15
 PageInst.Evaluate("inface.auth.gotoSignOut();")
-sleep,1000
 PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
+sleep,1000
 ; 테스트 종료: 크롬 브라우저 닫기
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
@@ -8556,7 +8547,7 @@ Step = 2
 }
 if(Step = 2)
 {
-Sleep, 5000
+Sleep, 3000
 SB_SetText("로그인 상태 체크")
 GuiControl, , 로그인상태정보, [로그인] - 실행중
 WinKill, ahk_exe MRMsph.exe
