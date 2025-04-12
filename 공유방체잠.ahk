@@ -7445,13 +7445,12 @@ if(ParasTime >= 1200000)
 {
 ParasCount = 0
 }
-if(ParasCount >= 3)
+if(ParasCount > 3)
 {
-GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.2
+GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.
 ParasCount = 3
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 포북으로 잠시 이동."
 텔레그램메시지보내기(TMessage)
-sleep,10
 파라스방해감지 := 1
 GuiControl,,Gui_huntpobuk,1
 파라스감지++
@@ -7468,14 +7467,12 @@ if(Entrance > 2)
 MsgBox, , 비정상종료감지, OID리셋, 3
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 초기 입구 감응 실패. OID 리셋."
 텔레그램메시지보내기(TMessage)
-sleep,10
 OID리셋()
 step := 8
 sleep,1000
 return
 }
 }
-이유 := 일랜시아 서버와 연결 종료
 Step := 10000
 return
 }
