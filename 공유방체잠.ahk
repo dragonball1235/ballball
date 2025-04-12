@@ -8556,7 +8556,9 @@ if(Step = 3)
     WinClose, ahk_exe NexonPlug.exe
     WinActivate, ahk_exe Jelancia.exe
     WINWAIT, ahk_exe jElancia.exe, , 15
+    Sleep, 1000
     ControlGetText, Patch, Static2, Elancia
+    Sleep, 1000
     sb_settext("서버메시지 - " Patch,2)
     IfNotInString, Patch, 최신 버전입니다.
     {
