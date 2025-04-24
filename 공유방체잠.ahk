@@ -2312,16 +2312,18 @@ Gui, Font
 Gui, Font, s8
 Gui, Add, Text, x260 y57 +Left, 체크시 원격마법을 사용합니다.
 Gui, Add, Checkbox, x240 y55 w15 h15 gCheckUseMagic vGui_CheckUseMagic c000000
-Gui, Add, Text, x150 y220 +Left
+;Gui, Add, Text, x150 y220 +Left
 Gui, Add, Text, x240 y80 +Left, HP가
 Gui, Add, Edit, x270 y78 +Left w55 h15 Limit7 number cRed vGui_CHP, 0
 Gui, Add, Text, x328 y80 +Left, 되면 리메듐 사용
-
-Gui, Add, Text, x240 y103 +Left, 스펠슬롯
-Gui, Add, DropDownList, x295 y100 w80 +Left vGui_MagicNStack, 3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20
-Gui, Add, Text, x378 y103 +Left, 번 까지 사용
-Gui, Add, Text, x240 y128 +Left, 스펠슬롯 1번 (엘)리메듐을 고정 해 주세요
-Gui, Add, Text, x240 y153 +Left, 스펠슬롯 2번 브렐을 고정 해 주세요
+Gui, Add, Text, x240 y100 +Left, MP가
+Gui, Add, Edit, x270 y98 +Left w55 h15 Limit7 number cRed vGui_CMP, 0
+Gui, Add, Text, x328 y100 +Left, 되면 퀵슬롯 4번으로 브렐
+Gui, Add, Text, x240 y123 +Left, 스펠슬롯
+Gui, Add, DropDownList, x295 y120 w80 +Left vGui_MagicNStack, 3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20
+Gui, Add, Text, x378 y123 +Left, 번 까지 사용
+Gui, Add, Text, x240 y143 +Left, 스펠슬롯 1번 (엘)리메듐을 고정 해 주세요
+Gui, Add, Text, x240 y158 +Left, 스펠슬롯 2번 브렐을 고정 해 주세요
 Gui, Add, Button, x240 y183 w200 h30 g원격마법설명서, 사용법
 
 Gui, Font,
@@ -2824,7 +2826,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.81[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.82[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -2868,6 +2870,7 @@ RegRead, RegHPPortal, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPPortal
 RegRead, RegUseHPLimited, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseHPLimited
 RegRead, RegHPLimited, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPLimited
 RegRead, RegCritHP, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, CrittHP
+RegRead, RegCritMP, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, CrittMP
 RegRead, RegMuba, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Muba
 RegRead, RegWeapon1, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Weapon1
 RegRead, RegWeapon2, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Weapon2
@@ -3413,12 +3416,14 @@ if(RegUseMagic = 1)
 {
 GuiControl, , Gui_CheckUseMagic, 1
 GuiControl, Enabled, Gui_CHP
+GuiControl, Enabled, Gui_CMP
 GuiControl, Enabled, Gui_MagicNStack
 }
 if(RegUseMagic = 0)
 {
 GuiControl, , Gui_CheckUseMagic, 0
 GuiControl, Disabled, Gui_CHP
+GuiControl, Disabled, Gui_CMP
 GuiControl, Disabled, Gui_MagicNStack
 }
 if(RegUseParty = 1)
@@ -3445,6 +3450,10 @@ GuiControl, , Gui_HPExit, %RegHPExit%
 if(RegCritHP != "")
 {
 GuiControl, , Gui_CHP, %RegCritHP%
+}
+if(RegCritMP != "")
+{
+GuiControl, , Gui_CMP, %RegCritMP%
 }
 if(RegHPHospital != "")
 {
@@ -4661,11 +4670,13 @@ GuiControl, % (Gui_CheckUseMagic ? "enable":"disable"), Gui_Magic
 if(Gui_CheckUseMagic = 0)
 {
 GuiControl, Disabled, Gui_CHP
+GuiControl, Disabled, Gui_CMP
 GuiControl, Disabled, Gui_MagicNStack
 }
 else if(Gui_CheckUseMagic = 1)
 {
 GuiControl, Enabled, Gui_CHP
+GuiControl, Enabled, Gui_CMP
 GuiControl, Enabled, Gui_MagicNStack
 }
 return
@@ -5372,6 +5383,7 @@ GuiControl, Disable, Gui_HPHospital
 GuiControl, Disable, Gui_HPPortal
 GuiControl, Disable, Gui_HPLimited
 GuiControl, Disable, Gui_CHP
+GuiControl, Disable, Gui_CMP
 GuiControl, Disable, Gui_Weapon1
 GuiControl, Disable, Gui_Weapon2
 GuiControl, Disable, Gui_Weapon3
@@ -5510,6 +5522,7 @@ RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPHospital, %G
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPPortal, %Gui_HPPortal%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPLimited, %Gui_HPLimited%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, CrittHP, %Gui_CHP%
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, CrittMP, %Gui_CMP%
 if(Gui_1Muba = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Muba, 1
@@ -7342,6 +7355,14 @@ GuiControl,,파라스타이머,파라스대기 = %파라스타이머카운트%
 else
 {
 GuiControl,,파라스타이머, 다시포남까지 = 0:00:00
+}
+GuiControl, , Gui_CMP, %RegCritMP%
+NowMP := jelan.read(0x0058DAD4, "UInt", 0x178, 0x5F)
+if(Gui_CMP >= NowMP and NowMP != "" )
+{
+keyclick(4)
+sleep,10
+SB_SetText("브렐사용" , 1)
 }
 if(Gui_CheckUseHPExit = 1)
 {
@@ -9191,6 +9212,10 @@ WriteExecutableMemory("타겟스킬사용")
 sleep,1
 WriteExecutableMemory("타겟스킬호출")
 sleep,1
+WriteExecutableMemory("마법사용")
+sleep,1
+WriteExecutableMemory("마법호출")
+sleep,1
 WriteExecutableMemory("마법모션제거")
 sleep,1
 WriteExecutableMemory("공속")
@@ -9370,6 +9395,7 @@ Send, {F17 UP}
 value := jelan.write(0x00527A4C, 3, "UInt")
 Stack_MN()
 CritHP := Gui_CHP
+CritMP := Gui_CHP
 Crit_HM()
 jelan.write(0x004CB504, 0xE9, "Char", aOffsets*)
 jelan.write(0x004CB505, 0xF7, "Char", aOffsets*)
@@ -20986,6 +21012,7 @@ RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPExit, %Gui_H
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPPortal, %Gui_HPPortal%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPLimited, %Gui_HPLimited%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, CrittHP, %Gui_CHP%
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, CrittMP, %Gui_CMP%
 if(Gui_1Muba = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Muba, 1
@@ -30104,7 +30131,7 @@ Addrs := 0x0058D600
 }
 else if (코드 = "마법사용")  {
 Run_Thread := 1
-Addrs := 0x00590400
+Addrs := 0x00590200
 }
 else if (코드 = "타겟스킬사용")  {
 Run_Thread := 1
@@ -30253,13 +30280,13 @@ target = 0D8B00000001B80002BA0059073058DAD4358B0000F3A3B0E8515000C3FF
 executable := jelan.executable(Addrs, RegionSize)
 }
 else if (코드 = "마법사용") {
-Addrs := 0x00590400
+Addrs := 0x00590200
 RegionSize := 0x100
 target = 00B900590420B8F424DCE80000000000000000C3FF
 executable := jelan.executable(Addrs, RegionSize)
 }
 else if (코드 = "마법호출") {
-Addrs := 0x00590420
+Addrs := 0x00590220
 RegionSize := 0x50
 target = 00000F00548038000000548044000000000000000000010201000000
 executable := jelan.executable(Addrs, RegionSize)
@@ -32637,6 +32664,7 @@ sleep, 10
 }
 }
 return
+
 타겟스킬사용(스킬번호)
 {
 타겟스킬대상 := jelan.read(0x00584C2C, "UInt", aOffsets*)
@@ -32650,7 +32678,7 @@ sleep,10
 RunMemory("타겟스킬사용")
 }
 }
-마법사용(대상)
+마법사용(마법이름, 대상)
 {
 마법번호 := 0
 마법대상 := 0
@@ -32667,18 +32695,26 @@ else
 {
 마법대상 := 대상
 }
-마법번호 := Gui_MagicNStack
-Random, 마법번호, 3, 마법번호
+임시이름 := 마법이름 . "번호"
+Random, 마법번호, 3, 임시이름
+GuiControlGet, 마법번호,, %임시이름%
 if (마법번호 != 0 && 마법대상!= 0)
 {
 WriteExecutableMemory("마법호출")
-jelan.write(0x0059043A, 마법번호, "Char", aOffsets*)
-jelan.write(0x0059043B, 마법대상, "UInt", aOffsets*)
+jelan.write(0x0059023A, 마법번호, "Char", aOffsets*)
+jelan.write(0x0059023B, 마법대상, "UInt", aOffsets*)
 sleep,10
 RunMemory("마법사용")
+임시이름 := 마법이름 . "사용횟수"
+; 동적 변수 이름 사용
+GuiControlGet, 현재값,, %임시이름%
+임시횟수 := 현재값 + 1
+GuiControl,, %임시이름%, %임시횟수%
 }
 SetFormat, Integer, D
+return
 }
+;}
 IsDataInList(data, list)
 {
 for _, item in list
