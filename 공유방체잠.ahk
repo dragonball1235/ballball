@@ -2716,6 +2716,7 @@ LV_Add("", "25.02.12/AM07:13", "크롬 팝업창 뜰 경우 확인누름")
 LV_Add("", "25.02.12/AM07:13", "캐릭터 선택 시 인증시간 초과 부분 수정1")
 LV_Add("", "25.02.28/AM08:07", "베이커리 이동중 시 멈추는 부분 수정")
 LV_Add("", "25.03.14/PM10:25", "자주 팅기는 부분 수정")
+LV_Add("", "25.04.11/PM10:25", "그레이드오류, 로그인 오류 약간 조정")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -2823,7 +2824,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.79[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.81[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -7444,13 +7445,12 @@ if(ParasTime >= 1200000)
 {
 ParasCount = 0
 }
-if(ParasCount >= 3)
+if(ParasCount > 3)
 {
-GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.2
+GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.
 ParasCount = 3
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 포북으로 잠시 이동."
 텔레그램메시지보내기(TMessage)
-sleep,10
 파라스방해감지 := 1
 GuiControl,,Gui_huntpobuk,1
 파라스감지++
@@ -7467,14 +7467,12 @@ if(Entrance > 2)
 MsgBox, , 비정상종료감지, OID리셋, 3
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 초기 입구 감응 실패. OID 리셋."
 텔레그램메시지보내기(TMessage)
-sleep,10
 OID리셋()
 step := 8
 sleep,1000
 return
 }
 }
-이유 := 일랜시아 서버와 연결 종료
 Step := 10000
 return
 }
@@ -8269,60 +8267,35 @@ FileCreateDir, ChromeProfile
 ProfilePath := A_ScriptDir . "\ChromeProfile" ; 사용자 프로파일 경로 지정
     ChromeInst := new Chrome(ProfilePath, , , , , False) ; Headless 모드를 끔(False)
     ; 새로운 페이지 탭 가져오기
-    Sleep, 100
     PageInst := ChromeInst.GetPage()
     PageInst.Call("Page.enable")  ; 페이지 로드 기능 활성화
-    Sleep, 100
     PageInst.Call("Page.navigate", {"url": "https://elancia.nexon.com/"})
     SB_SetText("홈페이지 접속중")
-    while (PageInst.Evaluate("document.readyState").value != "complete")
+while (PageInst.Evaluate("document.readyState").value != "complete")
 {
-    sleep, 100  ; 0.5초 대기 후 다시 확인
+sleep, 100  ; 0.5초 대기 후 다시 확인
 }
     PageInst.Evaluate("PS.game.startGame({ gameCode:74276 });")
+    sleep,500
     while (PageInst.Evaluate("document.readyState").value != "complete")
 {
-    sleep, 100  ; 0.5초 대기 후 다시 확인
+sleep, 100  ; 0.5초 대기 후 다시 확인
 }
 LoginURL := PageInst.Evaluate("window.location.href").value
-;    MsgBox, % "현재 URL은: " LoginURL
-If (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
+if (InStr(LoginURL, "https://elancia.nexon.com/"))
 {
-    GuiControl, , 로그인상태정보, [로그인] - 실패 ( 접속불량 )
-    Gui_Enable()
-    SetTimer, Hunt, Off
-    SetTimer, AttackCheck, Off
-    SetTimer, AttackMGB, off
-    SetTimer, 타겟팅, Off
-    SetTimer, incineration, off
-    CheckPB = 0
-    CheckPN := 0
-    countsignal := 0
-    랜덤감응 = 0
-    return
-}
-If (LoginURL = "https://elancia.nexon.com/")
-{
-GuiControl, , 로그인상태정보, [로그인] - 로그인이 되어있습니다. ( 중복 )
-PageInst.WaitForLoad()
+SB_SetText("일랜시아 확인1")
+sleep,4000 ; 만약 그대로면 클라 켜진거니 그냥 step = 2진행
+;PageInst.Evaluate("inface.auth.gotoSignOut();")
+    ; 테스트 종료: 크롬 브라우저 닫기
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
 PageInst.Evaluate(removeCookiesScript)
+sleep,2000
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
 ChromeInst.Close() ; 크롬 인스턴스 종료
-Gui_Enable()
-SetTimer, Hunt, Off
-SetTimer, AttackCheck, Off
-SetTimer, AttackMGB, off
-SetTimer, 타겟팅, Off
-SetTimer, incineration, off
-SetTimer, GetMemory, OFF
-SetTimer, ClearMem, OFF
-CheckPB = 0
-CheckPN := 0
-countsignal := 0
-랜덤감응 = 0
+step = 2
 return
 }
     PageInst.Evaluate("document.querySelector('#txtNexonID').value = '" Gui_NexonID "';") ; ID 입력
@@ -8344,7 +8317,9 @@ GuiControl, , 로그인상태정보, [로그인] - 실패 ( ID,비번 틀림 )
  PageInst.WaitForLoad()
  PageInst.Evaluate("inface.auth.gotoSignOut();")
  ; JavaScript 실행
+PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
+sleep,1000
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
 ChromeInst.Close() ; 크롬 인스턴스 종료
@@ -8377,7 +8352,9 @@ CDP.Call("Page.enable")  ; Page 이벤트 활성화
 CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
 WinWait, ahk_exe jElancia.exe, , 15
 PageInst.Evaluate("inface.auth.gotoSignOut();")
+PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
+sleep,1000
 ; 테스트 종료: 크롬 브라우저 닫기
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
@@ -8457,6 +8434,7 @@ while (PageInst.Evaluate("document.readyState").value != "complete")
 }
 sleep,1000
 PageInst.Evaluate("PS.game.startGame({ gameCode:74276 });")
+sleep,500
 SB_SetText("크롬 실행")
 while (PageInst.Evaluate("document.readyState").value != "complete")
 {
@@ -8471,6 +8449,7 @@ sleep,4000 ; 만약 그대로면 클라 켜진거니 그냥 step = 2진행
     ; 테스트 종료: 크롬 브라우저 닫기
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
+sleep,2000
 PageInst.Evaluate(removeCookiesScript)
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
@@ -8514,6 +8493,7 @@ CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들�
 sleep,3000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게임실행하고 진행
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
+sleep,2000
 PageInst.Evaluate(removeCookiesScript)
 PageInst.Call("Browser.close")
 PageInst.Disconnect() ;꺼
@@ -8527,7 +8507,7 @@ GuiControl, , 로그인상태정보, [로그인] - 실패 ( 접속오류 )
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
 PageInst.Evaluate(removeCookiesScript)
-sleep,4000
+sleep,2000
 PageInst.Call("Browser.close")
 PageInst.Disconnect() ;꺼
 ChromeInst.Close() ; 크롬 인스턴스 종료
@@ -8551,6 +8531,7 @@ sleep, 6000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
 PageInst.Evaluate(removeCookiesScript)
+sleep,2000
 PageInst.Call("Browser.close")
 PageInst.Disconnect() ;꺼
 ChromeInst.Close() ; 크롬 인스턴스 종료
@@ -8563,7 +8544,7 @@ Step = 2
 }
 if(Step = 2)
 {
-Sleep, 2000
+Sleep, 3000
 SB_SetText("로그인 상태 체크")
 GuiControl, , 로그인상태정보, [로그인] - 실행중
 WinKill, ahk_exe MRMsph.exe
@@ -8575,26 +8556,10 @@ if(Step = 3)
     WinClose, ahk_exe NexonPlug.exe
     WinActivate, ahk_exe Jelancia.exe
     WINWAIT, ahk_exe jElancia.exe, , 15
+    Sleep, 1000
     ControlGetText, Patch, Static2, Elancia
     Sleep, 1000
-while (Patch = "")  ; Patch가 ""이면 반복
-{
-    WinActivate, ahk_exe Jelancia.exe
-    WINWAIT, ahk_exe jElancia.exe, , 15
-    ControlGetText, Patch, Static2, Elancia
-    sb_settext("patch 인식중" ,2)
-    Sleep, 3000  ; 1초 대기
-}
-    ControlGetText, Patch, Static2, Elancia
-    Sleep, 3000
-    SB_SetText("일랜실행중", 1)
-    sb_settext("서버메시지 - " Patch "젤랜:" ,2)
-    IfInString, Patch, 확인중
-    {
-    Sleep, 4000
-    ControlGetText, Patch, Static2, Elancia
-    sb_settext("서버메시지 - " Patch "젤랜:" ,2)
-    }
+    sb_settext("서버메시지 - " Patch,2)
     IfNotInString, Patch, 최신 버전입니다.
     {
         SetTitleMatchMode, 1 ; 부분 일치 모드 활성화
@@ -11433,6 +11398,8 @@ if(Step = 18)
 {
 SB_SetText("포남 입장 시도 중")
 Get_Location()
+keyclick("tab")
+sleep,100
 if(Gui_KON = 1)
 {
 IfInString,Location,[알파차원]
@@ -20855,6 +20822,7 @@ if (Step >= 7 && Step < 10000)
 }
 if(Step = 27 or Step = 1026 or step = 3030)
 {
+gosub, 어빌리티탭확인
 AttackLoopCount += 1
 Check_Attack()
 if(Attack = 0)
