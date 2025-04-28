@@ -32299,8 +32299,8 @@ SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
 jelan.write(0x0058FFE0,0,"UInt", aOffsets*)
-jelan.write(0x0058DAD4, 400, "UInt", 0x178, 0x9C)
-jelan.write(0x0058DAD4, 400, "UInt", 0x178, 0x98)
+jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x9C)
+jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x98)
 sleep,100
 jelan.write(0x0045D28F, 0x0F, "Char", aOffsets*)
 jelan.write(0x0045D290, 0x84, "Char", aOffsets*)
