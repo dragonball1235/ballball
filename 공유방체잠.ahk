@@ -2826,7 +2826,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.82[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.83[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -7361,7 +7361,7 @@ NowMP := jelan.read(0x0058DAD4, "UInt", 0x178, 0x5F)
 if(Gui_CMP >= NowMP and NowMP != "" )
 {
 keyclick(4)
-sleep,10
+sleep,100
 SB_SetText("브렐사용" , 1)
 }
 if(Gui_CheckUseHPExit = 1)
