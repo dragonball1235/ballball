@@ -8562,6 +8562,7 @@ Sleep, 5000
 SB_SetText("로그인 상태 체크")
 GuiControl, , 로그인상태정보, [로그인] - 실행중
 WinKill, ahk_exe MRMsph.exe
+WinMinimize, ahk_exe NexonPlug.exe
 WinActivate, ahk_exe Jelancia.exe
 Step = 3
 }
@@ -11307,6 +11308,7 @@ WinActivate, ahk_pid %jPID%
 PixelSearch, MobX, MobY,  258, 184, 654, 439, 0x7351AD, 2, *Fast  *RGB
 if(ErrorLevel = 1)
 {
+WinMinimize, ahk_exe NexonPlug.exe
 Sleep, 200
 AltR()
 PixelSearch, MobX, MobY,  258, 184, 654, 439, 0x7351AD, 2, *Fast  *RGB
@@ -11528,6 +11530,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
         if (step = 1061)
         {
             ;Get_Location()
+            SB_SetText("포남 동파 감응 장소로 이동.")
             if InStr(Location, "남쪽")
             {
             XX := 188
@@ -11553,17 +11556,18 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
             {
             GuiControl, , Gui_NowState, [포남] 동파 감응 위치확인
             SB_SetText("포남 동파 감응 위치 확인.")
-            Sleep, 2000
-            IfWinNotActive, ahk_pid %jPID%
-            {
+            Sleep, 1000
             WinActivate, ahk_pid %jPID%
-            }
-            PixelSearch, MobX, MobY,  310, 100, 580, 235, 0xEF8AFF, 5,Fast
+            WinWaitActive, ahk_pid %jPID%, , 3
+            PixelSearch, MobX, MobY, 390, 99, 750, 420, 0xB56900, 10, Fast RGB
             if(ErrorLevel = 1)
             {
+            WinMinimize, ahk_exe NexonPlug.exe
+            keyclick("tab")
+            sleep,400
             AltR()
-            sleep,100
-            PixelSearch, MobX, MobY,  0, 0, 760, 450, 0xEF8AFF, 5, Fast
+            sleep,300
+            PixelSearch, MobX, MobY, 200, 100, 750, 420, 0xB56900, 10, Fast RGB
             }
             if(ErrorLevel = 0)
             {
@@ -11580,8 +11584,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
             Z := 1
             좌표입력(XX, YY, Z)
             RunMemory("좌표이동")
-            Sleep, 3500
-            step = 1061
+            Sleep, 1500
             }
             else
             {
@@ -11769,12 +11772,13 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
                 {
                     WinActivate, ahk_pid %jPID%
                 }
-                    PixelSearch, MobX, MobY,  0, 0, 760, 450, 0xEF8AFF, 1, Fast
+                    PixelSearch, MobX, MobY,  200, 100, 370, 450, 0xEF8AFF, 1, Fast
                     if(ErrorLevel = 1)
                     {
+                    WinMinimize, ahk_exe NexonPlug.exe
                     AltR()
                     Sleep,200
-                    PixelSearch, MobX, MobY,  0, 0, 760, 450, 0xEF8AFF, 1, Fast
+                    PixelSearch, MobX, MobY,  200, 100, 370, 450, 0xEF8AFF, 1, Fast
                     }
                     if(ErrorLevel = 0)
                     {
