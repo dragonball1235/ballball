@@ -1975,6 +1975,7 @@ global filePath
 Global 무기종류, 머미맵선택
 Global RecentWeapons := []
 Global Attacking , AttackingCount
+global 감응 := 0, 이유
 TTSTOP := 0
 WinGetTitle, 플러그타이틀, ahk_exe NexonPlug.exe
 WinGet, 플러그, PID , ahk_exe NexonPlug.exe
@@ -2717,6 +2718,7 @@ LV_Add("", "25.02.12/AM07:13", "캐릭터 선택 시 인증시간 초과 부분 
 LV_Add("", "25.02.28/AM08:07", "베이커리 이동중 시 멈추는 부분 수정")
 LV_Add("", "25.03.14/PM10:25", "자주 팅기는 부분 수정")
 LV_Add("", "25.04.11/PM10:25", "그레이드오류, 로그인 오류 약간 조정")
+LV_Add("", "25.06.22/AM01:48", "넥슨플러그 및 자주 팅기는거 1차수정")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -2824,7 +2826,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.81.5[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.90[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -6470,7 +6472,7 @@ if(invenstack > 150)
 SLEEP, 100
 이전스텝 := step
 invenError += 1
-이유 := 인벤슬롯 가득참
+이유 := "인벤슬롯 가득참"
 step := 10000
 return
 }
@@ -7336,8 +7338,8 @@ SB_SetText(" 시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPH
 }
 if(파라스방해감지 = 1)
 {
-파라스타이머카운트 := FormatSeconds(3600-((A_TickCount-파라스타이머시작)/1000))
 GuiControl,,파라스타이머,파라스대기 = %파라스타이머카운트%
+파라스타이머카운트 := FormatSeconds(3600-((A_TickCount-파라스타이머시작)/1000))
 }
 else
 {
@@ -7386,7 +7388,7 @@ IfWinExist,ahk_pid %jPID%
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
-이유 := 인터넷 연결 종료
+이유 := "인터넷 연결 종료"
 Step := 10000
 return
 }
@@ -7445,18 +7447,18 @@ if(ParasTime >= 1200000)
 {
 ParasCount = 0
 }
-if(ParasCount > 3)
+if(ParasCount >= 3)
 {
-GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.
+GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.2
 ParasCount = 3
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 포북으로 잠시 이동."
 텔레그램메시지보내기(TMessage)
+sleep,10
 파라스방해감지 := 1
 GuiControl,,Gui_huntpobuk,1
 파라스감지++
 }
 }
-Reserver += 1
 실행초기화 += 1
 if(Step = 17 or step = 18)
 {
@@ -7467,12 +7469,15 @@ if(Entrance > 2)
 MsgBox, , 비정상종료감지, OID리셋, 3
 TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 초기 입구 감응 실패. OID 리셋."
 텔레그램메시지보내기(TMessage)
+sleep,10
 OID리셋()
 step := 8
 sleep,1000
 return
 }
 }
+이유 := "일랜시아 서버와 연결 종료"
+이전스텝 := Step
 Step := 10000
 return
 }
@@ -7528,7 +7533,7 @@ if(pbtalkcheck2 >= 120000)
 {
 Sleep, 100
 pbtalkcheck = 0
-이유 := 포북 메세지 시간초과
+이유 := "포북 메세지 시간초과"
 step := 10000
 Sleep, 100
 }
@@ -8234,7 +8239,8 @@ SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
 Sleep, 2000
-}else
+}
+else
 {
 SB_SetText("서버연결종료. 재접속 설정중")
 SplashImage, 1: off
@@ -8267,8 +8273,9 @@ FileCreateDir, ChromeProfile
 ProfilePath := A_ScriptDir . "\ChromeProfile" ; 사용자 프로파일 경로 지정
     ChromeInst := new Chrome(ProfilePath, , , , , False) ; Headless 모드를 끔(False)
     ; 새로운 페이지 탭 가져오기
+    Sleep, 100
     PageInst := ChromeInst.GetPage()
-    PageInst.Call("Page.enable")  ; 페이지 로드 기능 활성화
+    Sleep, 100
     PageInst.Call("Page.navigate", {"url": "https://elancia.nexon.com/"})
     SB_SetText("홈페이지 접속중")
 while (PageInst.Evaluate("document.readyState").value != "complete")
@@ -8276,26 +8283,34 @@ while (PageInst.Evaluate("document.readyState").value != "complete")
 sleep, 100  ; 0.5초 대기 후 다시 확인
 }
     PageInst.Evaluate("PS.game.startGame({ gameCode:74276 });")
-    sleep,500
-    while (PageInst.Evaluate("document.readyState").value != "complete")
-{
-sleep, 100  ; 0.5초 대기 후 다시 확인
-}
+    sleep,4000
 LoginURL := PageInst.Evaluate("window.location.href").value
-if (InStr(LoginURL, "https://elancia.nexon.com/"))
+;    MsgBox, % "현재 URL은: " LoginURL
+If (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
 {
-SB_SetText("일랜시아 확인1")
-sleep,4000 ; 만약 그대로면 클라 켜진거니 그냥 step = 2진행
-;PageInst.Evaluate("inface.auth.gotoSignOut();")
-    ; 테스트 종료: 크롬 브라우저 닫기
+GuiControl, , 로그인상태정보, [로그인] - 실패 ( 접속불량 )
+SB_SetText("인터넷 로그인 재시도")
+WinClose, Elancia
+WinKill, ahk_exe MRMsph.exe
+PageInst.WaitForLoad()
 PageInst.Evaluate("inface.auth.gotoSignOut();")
 ; JavaScript 실행
+sleep,1000
+PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
-sleep,2000
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
 ChromeInst.Close() ; 크롬 인스턴스 종료
-step = 2
+Gui_Enable()
+SetTimer, Hunt, Off
+SetTimer, AttackCheck, Off
+SetTimer, AttackMGB, off
+SetTimer, 타겟팅, Off
+SetTimer, incineration, off
+CheckPB = 0
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
 return
 }
     PageInst.Evaluate("document.querySelector('#txtNexonID').value = '" Gui_NexonID "';") ; ID 입력
@@ -8317,9 +8332,9 @@ GuiControl, , 로그인상태정보, [로그인] - 실패 ( ID,비번 틀림 )
  PageInst.WaitForLoad()
  PageInst.Evaluate("inface.auth.gotoSignOut();")
  ; JavaScript 실행
+sleep,1000
 PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
-sleep,1000
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
 ChromeInst.Close() ; 크롬 인스턴스 종료
@@ -8352,9 +8367,9 @@ CDP.Call("Page.enable")  ; Page 이벤트 활성화
 CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
 WinWait, ahk_exe jElancia.exe, , 15
 PageInst.Evaluate("inface.auth.gotoSignOut();")
+sleep,1000
 PageInst.WaitForLoad()
 PageInst.Evaluate(removeCookiesScript)
-sleep,1000
 ; 테스트 종료: 크롬 브라우저 닫기
 PageInst.Call("Browser.close")
 PageInst.Disconnect()
@@ -8368,7 +8383,9 @@ if(Gui_Login = "넥슨플러그")
 if(Step = 1)
 {
 GuiControl, , 로그인상태정보, [로그인] - 접속 중
-SetTitleMatchMode,3
+SB_SetText("넥슨플러그 구동중")
+Winshow, ahk_exe NexonPlug.exe
+WinActivate, ahk_exe NexonPlug.exe
 IfWinNotExist ahk_exe NexonPlug.exe
 {
 SB_SetText("넥슨플러그를 확인해 주세요.")
@@ -8392,8 +8409,6 @@ return
 }
 else
 {
-WinShow, ahk_exe NexonPlug.exe
-sleep,1000
 WinActivate, ahk_exe NexonPlug.exe
 Sleep, 1500
 IfWinActive ahk_exe NexonPlug.exe
@@ -8410,7 +8425,6 @@ return
 Sleep,2000
 IfWinExist ahk_exe Jelancia.exe
 {
-WinHide, ahk_exe NexonPlug.exe
 Step = 2
 }
 }
@@ -8544,7 +8558,7 @@ Step = 2
 }
 if(Step = 2)
 {
-Sleep, 3000
+Sleep, 5000
 SB_SetText("로그인 상태 체크")
 GuiControl, , 로그인상태정보, [로그인] - 실행중
 WinKill, ahk_exe MRMsph.exe
@@ -8553,12 +8567,9 @@ Step = 3
 }
 if(Step = 3)
 {
-    WinClose, ahk_exe NexonPlug.exe
     WinActivate, ahk_exe Jelancia.exe
     WINWAIT, ahk_exe jElancia.exe, , 15
-    Sleep, 1000
     ControlGetText, Patch, Static2, Elancia
-    Sleep, 1000
     sb_settext("서버메시지 - " Patch,2)
     IfNotInString, Patch, 최신 버전입니다.
     {
@@ -8568,7 +8579,7 @@ if(Step = 3)
         TMessage := "[ Helancia_Log ] 패치 이상 재설정. [추정오류 : 젤랜시아 재접속]"
         텔레그램메시지보내기(TMessage)
         Sleep, 2000
-        이유 := 패치 못읽어옴
+        이유 := "패치못읽어옴"
         Step := 10000
         return
     }
@@ -8959,7 +8970,7 @@ WinKill, ahk_exe MRMSPH.exe
 }
 GuiControl, , 로그인상태정보, 접속 오류로 대기 후 재시작 합니다.
 Sleep, 60000
-이유 := 서버 오류
+이유 := "서버오류"
 Step := 10000
 return
 }
@@ -8971,7 +8982,7 @@ TMessage := "[ Helancia_Log ]" ServerMsg
 sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
-이유 := 로그인 중간 서버 연결 오류
+이유 := "로그인오류"
 Step := 10000
 sleep,50000
 return
@@ -8987,7 +8998,7 @@ sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
-이유 := 로그인 중간 서버와의 연결이 끊어짐
+이유 := "로그인 중간 서버와의 연결이 끊어짐"
 Step := 10000
 return
 }
@@ -9001,7 +9012,7 @@ sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
-이유 := 로그인 중간 인증시간이 초과
+이유 := "로그인중간인증시간이초과"
 Step := 10000
 return
 }
@@ -9841,7 +9852,7 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000) ;초과시 끄기 [마지막 체크필요]
 {
-이유 := 메모리 부족
+이유 := "메모리부족"
 step := 10000
 }
 if(byte <= 1000000)
@@ -9853,7 +9864,7 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-이유 := 메모리 부족
+이유 := "메모리부족"
 step := 10000  ;초과시 끄기 [마지막 체크필요]
 }
 if(byte <= 620000)
@@ -11059,7 +11070,7 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000)
 {
-이유 := 메모리 부족
+이유 := "포남이동중메모리정리2"
 step := 10000
 return
 }
@@ -11071,7 +11082,7 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-이유 := 메모리 부족
+이유 := "포남이동중메모리정리"
 step := 10000
 return
 }
@@ -11343,6 +11354,7 @@ if (FormNumber = 85)
         GuiControl, , jTitle, %jTitle%
         TMessage := "[ Helancia_Log ]>>" . jTitle "<<:" . 차원 . G리노아 "감마 리노아 감응 완료. "
         텔레그램메시지보내기(TMessage)
+        NPCOID := 0x0
         sleep,100
         Step := 18
     }
@@ -11355,6 +11367,7 @@ if (FormNumber = 85)
         GuiControl, , jTitle, %jTitle%
         TMessage := "[ Helancia_Log ]>>" jTitle "<<:" . 차원 . B리노아 "베타 리노아 감응 완료. "
         텔레그램메시지보내기(TMessage)
+        NPCOID := 0x0
         sleep,100
         Step := 18
     }
@@ -11367,6 +11380,7 @@ if (FormNumber = 85)
         GuiControl, , jTitle, %jTitle%
         TMessage := "[ Helancia_Log ]>>" jTitle "<<:" . 차원 . A리노아 "알파 리노아 감응 완료. "
         텔레그램메시지보내기(TMessage)
+        NPCOID := 0x0
         sleep,100
         Step := 18
     }
@@ -11381,6 +11395,7 @@ GUICONTROL, , Gui_NowState, 리노아 호출오류 감응 OFF
 SLEEP, 500
         TMessage := "[ Helancia_Log ]>>" jTitle "<<:알파 리노아 호출 오류"
         텔레그램메시지보내기(TMessage)
+OID리셋()
 GUICONTROL, , Gui_KOFF, 1
 }
 }
@@ -11398,8 +11413,6 @@ if(Step = 18)
 {
 SB_SetText("포남 입장 시도 중")
 Get_Location()
-keyclick("tab")
-sleep,100
 if(Gui_KON = 1)
 {
 IfInString,Location,[알파차원]
@@ -11423,15 +11436,6 @@ Sleep, 50
 value := jelan.write(0x00527B1C, G동파, "UInt")
 Sleep, 50
 }
-ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
-if InStr(ServerMsg, "서버와의 연결이")
- || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
- || InStr(ServerMsg, "인증시간이")
-{
-OID리셋()
-차원이동감응 := 1
-GuiControl, ,Gui_KOFF, 1
-}
 }
 NPCTalkTime := A_TickCount - NPCTalkedTime
 if(NPCTalkTime >= 5000)
@@ -11444,23 +11448,24 @@ return
 }
 Check_FormNumber()
 Check_NPCMsg()
-Sleep, 100
+Sleep, 400
 PostClick(395,325)
-Sleep, 100
+Sleep, 400
 if(FormNumber = 97)
 {
 IfInString,NPCMsg,100
 {
 Entrance = 0
-Sleep, 100
+Sleep, 400
 PostClick(90,80)
-Sleep, 100
+Sleep, 400
 GuiControl, , Gui_NowState, [포남] 사냥터에 도착하였습니다.
 SB_SetText("포남 사냥터에 입장 하였습니다.")
 Entrance = 0
 PostMessage, 0x100, 54, 458753, , ahk_pid %jPID%
 PostMessage, 0x101, 54, 458753, , ahk_pid %jPID%
 JoinTime := A_TickCount
+Sleep, 400
 if(Gui_jjOn = 1)
 {
 Send, {F18 Down}
@@ -11675,7 +11680,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
  || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
  || InStr(ServerMsg, "인증시간이")
             {
-                이유 := 감응 이후 서버 연결 오류
+                이유 := "step18서버연결종료3"
                 step := 10000
                 return
             }
@@ -11706,7 +11711,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
  || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
  || InStr(ServerMsg, "인증시간이")
             {
-                이유 := 감응 이후 서버연결 종료
+                이유 := "step18서버연결종료2"
                 step := 10000
                 return
             }
@@ -11863,7 +11868,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
  || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
  || InStr(ServerMsg, "인증시간이")
             {
-                이유 := 감응 이후 서버연결 종료
+                이유 := "step18서버연결종료"
                 step := 10000
                 ipmak += 1
                 return
@@ -11924,7 +11929,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
  || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
  || InStr(ServerMsg, "인증시간이")
             {
-                이유 := 감응 이후 서버연결 종료
+                이유 := "step18감응실패"
                 step := 10000
                 ipmak += 1
                 return
@@ -12075,7 +12080,6 @@ Step = 24
 }
 if(Step = 24)
 {
-GuiControl, , Gui_NowState, [포남] 몹 딱 대라 . . .
 SB_SetText("몬스터 찾는 중")
 IfWinNotActive, ahk_pid %jPID%
 {
@@ -12497,15 +12501,12 @@ PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
 if(ErrorLevel = 0)
 {
 PostClick(MobX,MobY)
-;CheckPN := 0
 Monster_OID()
 WinGetPos, ElanciaClientX, ElanciaClientY, Width, Height, ahk_pid %jPID%
 SplashX := MobX + ElanciaClientX - 30
 SplashY := MobY + ElanciaClientY - 20
-if (MobNumber <= 10) {
-    SplashImage, %MobNumber%:, b X%SplashX% Y%SplashY% W80 H80 CW000000
-    MobNumber += 1
-}
+SplashImage, %MobNumber%:, b X%SplashX% Y%SplashY% W80 H80 CW000000
+MobNumber += 1
 if(MobNumber >= 11)
 {
 MobNumber = 1
@@ -12524,7 +12525,7 @@ return
 }
 AttackLoopCount = 0
 AttackCount = 0
-keyclick("AltR")
+Sleep, 500
 Step = 25
 return
 }
@@ -12601,6 +12602,7 @@ Check_Moving()
 if(Moving = 0)
 {
 keyclick("AltR")
+sleep,300
 Step = 27
 }
 }
@@ -12623,6 +12625,7 @@ AttackMissCount ++
 if(AttackMissCount >= 300 and 한번만 = 1)
 {
     keyclick("AltR")
+    sleep,100
     AttackMissCount := 0
     한번만 :=0
 }
@@ -12774,7 +12777,7 @@ if (RepairWeaponCount >= 400)
 {
 CheckPN := 0
 keyclick("tab")
-sleep,100
+sleep,400
 RepairWeaponCount = 0
 MapNumber = 1
 step = 300
@@ -12787,43 +12790,10 @@ SB_SetText("감응 버프 받는 중")
 CheckPN := 0
 RepairWeaponCount := 0
 countsignal := 0
-Sleep, 300
+Sleep, 400
 Keyclick("tab")
-Sleep, 300
-Step = 31
-}
-if(step = 31)
-{GuiControl, , Gui_NowState, [포남] 감응 전 메모리 점유율 확인
-
-SB_SetText("메모리 점유율 체크 중")
-GetPrivateWorkingSet(jPID)
-if(TotalPhy > 2000000)
-{
-if(byte > 1000000)
-{
-이유 := 메모리 부족
-step := 10000
-return
-}
-if(byte <= 1000000)
-{
-step = 32
-}
-}
-if(TotalPhy <= 2000000)
-{
-if(byte > 620000)
-{
-이유 := 메모리 부족
-step := 10000
-return
-}
-if(byte <= 620000)
-{
-step = 32
-}
-}
-step = 32
+Sleep, 400
+Step = 32
 }
 if(Step = 32) ;포남 무바 중 감응 파트
 {
@@ -12834,7 +12804,8 @@ if(Step = 32) ;포남 무바 중 감응 파트
     }
     감응()
     sleep,500
-    TMessage := "[ Helancia_Log ]>>" jTitle "<<: [원격] 감응 성공.[" 호출대상 ":" countsignal "]"  Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
+    감응 += 1
+    TMessage := "[ Helancia_Log ]>>" jTitle "<<:" 감응 "회차 [원격] 감응 성공.[" 호출대상 ":" countsignal "]"  Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
     텔레그램메시지보내기(TMessage)
     sleep,200
     PNnewTime = %A_Now%
@@ -12991,10 +12962,12 @@ return
 IfInString,Location,신전
 {
 keyclick("프로세스종료")
+이유 := "신전이라 위치 종료"
 step = 10000
 }
 IfInString,Location,길드
 {
+이유 := "길드집이라 위치 종료"
 keyclick("프로세스종료")
 step = 10000
 }
@@ -13657,7 +13630,7 @@ AltR()
 if(베이커리체크 > 30)
 {
     step := 10000
-    이유 := 베이커리 오류
+    이유 := "베이커리 오류"
     return
 }
 Step = 202
@@ -18407,7 +18380,7 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000)
 {
-이유 := 메모리 부족
+이유 := "메모리 부족"
 step := 10000
 }
 if(byte <= 1000000)
@@ -18419,7 +18392,7 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-이유 := 메모리 부족
+이유 := "메모리 부족"
 step := 10000
 }
 if(byte <= 620000)
@@ -19582,7 +19555,7 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000)
 {
-이유 := 메모리 부족
+이유 := "메모리 부족"
 step := 10000
 }
 if(byte <= 1000000)
@@ -19596,7 +19569,7 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-이유 := 메모리 부족
+이유 := "메모리 부족"
 step := 10000
 }
 if(byte <= 620000)
@@ -19765,7 +19738,6 @@ TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 [원격] 시간별
 sleep,100
 }
 }
-이유 := 오류2
 if(Step = 10000)
 {
 internet := ConnectedToInternet()
@@ -19849,6 +19821,8 @@ if((Trim(Server1) = "정상"))
 {
 GuiControl, , 로그인상태정보, 일랜시아 서버 정상. 재접속 중
 SB_SetText("재접속 시도 중")
+Reserver += 1
+감응 := 0
 Step = 0
 SplashImage, 1: off
 SplashImage, 2: off
@@ -19860,7 +19834,7 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
-TMessage :="[ Helancia_Log ]>>" jTitle "<<: 메모리 정리후 리로드 [ 종료횟수 : " Reserver "/ 이유:" 이유 "]"
+TMessage :="[ Helancia_Log ]>>" jTitle "<<: 메모리 정리후 리로드 [ 종료횟수 : " Reserver "/ 이유:" 이유 "/" 이전스텝 "]"
 텔레그램메시지보내기(TMessage)
 return
 }
@@ -31162,10 +31136,6 @@ return DllCall("Psapi.dll\EmptyWorkingSet", "UInt", -1)
 }
 종료:
 Gui, Submit, NoHide
-if( Gui_login = "넥슨플러그" )
-{
-WinShow, ahk_exe NexonPlug.exe
-}
 CRITICAL,On
 Gosub, GuiClose
 CRITICAL,OFF
@@ -32252,10 +32222,6 @@ return
 일시정지:
 Gui, Submit, Nohide
 keyclick("tab")
-if( Gui_login = "넥슨플러그" )
-{
-WinMinimize, ahk_exe NexonPlug.exe
-}
 GuiControl,,Gui_Nowstate, 일시정지 되었습니다.
 GuiControl,Disabled,Gui_StopButton
 GuiControl,Hide,Gui_StopButton
@@ -32271,6 +32237,10 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
+jelan.write(0x0058FFE0,0,"UInt", aOffsets*)
+jelan.write(0x0058DAD4, 400, "UInt", 0x178, 0x9C)
+jelan.write(0x0058DAD4, 400, "UInt", 0x178, 0x98)
+sleep,100
 jelan.write(0x0045D28F, 0x0F, "Char", aOffsets*)
 jelan.write(0x0045D290, 0x84, "Char", aOffsets*)
 jelan.write(0x0045D291, 0xC2, "Char", aOffsets*)
@@ -32303,10 +32273,7 @@ jelan.write(0x0045D423, 0x43, "Char", aOffsets*)
 jelan.write(0x0045D424, 0x04, "Char", aOffsets*)
 jelan.write(0x0047AD18, 0x74, "Char", aOffsets*)
 Sleep,100
-jelan.write(0x0058FFE0,0,"UInt", aOffsets*)
-jelan.write(0x0058DAD4, 1750, "UInt", 0x178, 0x9C)
-jelan.write(0x0058DAD4, 1750, "UInt", 0x178, 0x98)
-sleep,100
+Set_nomalSpeed()
 AltR()
 Pause
 SB_SetText("일시정지 상태")
