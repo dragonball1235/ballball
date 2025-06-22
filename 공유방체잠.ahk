@@ -2826,7 +2826,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.95[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.96[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -6685,7 +6685,6 @@ WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
 }
-
 IfWinExist,ahk_pid %jPID%
 {
 if((Step >= 11 and Step < 90) or (Step >= 1004 and Step < 1030) or (Step >= 3000 and Step =< 3031)) ;템뿌 파트
@@ -6830,7 +6829,22 @@ Get_FP()
 GuiControl,,Gui_NowFP,%NowFP% / %MaxFP% (%FPPercent%`%)
 GuiControl,,Pro_NowFP,%FPPercent%
 GuiControl,,Gui_NowFP,%NowFP% / %MaxFP% (%FPPercent%`%)
-
+; 이 코드는 타이머나 메인 루프 안에서 반복적으로 실행되어야 합니다.
+if (NowFP = SaveFP)
+{
+    FPreset++
+    if (FPreset >= 50000)
+    {
+        TMessage := "[ Helancia_Log ]>> FP 프리징으로 프로그램 리로드"
+        텔레그램메시지보내기(TMessage)
+        gosub, RL
+    }
+}
+else
+{
+    SaveFP := NowFP
+    FPreset := 0
+}
 GUIDimension := jelan.read(0x0058EB1C, "UInt", 0x10A)
 	if(GUIDimension>20000)
 		GUI차원:="감마"
@@ -8568,22 +8582,42 @@ Step = 3
 }
 if(Step = 3)
 {
-    WinActivate, ahk_exe Jelancia.exe
-    WINWAIT, ahk_exe jElancia.exe, , 15
+Loop, 30  ; 최대 30초까지 대기
+{
     ControlGetText, Patch, Static2, Elancia
-    sb_settext("서버메시지 - " Patch,2)
-    IfNotInString, Patch, 최신 버전입니다.
+    sb_settext("패치 찾는 중 : " . Patch, 2)
+    if (Patch != "")
+        break
+    Sleep, 1000
+}
+
+sb_settext("서버메시지 - " . Patch, 2)
+
+if !InStr(Patch, "최신 버전입니다.")
+{
+    SetTitleMatchMode, 1
+    WinGet, WinList, List
+Loop, %WinList%
+{
+    hwnd := WinList%A_Index%
+    WinGetTitle, title, ahk_id %hwnd%
+    WinGet, exe, ProcessName, ahk_id %hwnd%
+    ; 프로그램 이름이 "일랜시아"인 경우
+    if (title = "Elancia")
     {
-        SetTitleMatchMode, 1 ; 부분 일치 모드 활성화
-        WinClose, Elancia
-        WinKill, ahk_exe MRMsph.exe
-        TMessage := "[ Helancia_Log ] 패치 이상 재설정. [추정오류 : 젤랜시아 재접속]"
-        텔레그램메시지보내기(TMessage)
-        Sleep, 2000
-        이유 := "패치못읽어옴"
-        Step := 10000
-        return
+        ; 확인 로그 (선택사항)
+        ; MsgBox, 종료할 창: %title% (%exe%)
+        WinClose, ahk_id %hwnd%
+        Sleep, 300
+        WinKill, ahk_id %hwnd%
     }
+}
+    WinKill, ahk_exe MRMsph.exe
+    Sleep, 2000
+    이유 := "패치못읽어옴"
+    Step := 1
+    return
+}
 ControlGet, GameStartButton, Visible, , Button1, Elancia
 Sleep, 1000
 if(GameStartButton = 1)
@@ -11188,6 +11222,8 @@ if(Step = 17)
 머미캐릭()
 Get_Location()
 SB_SetText("원격대화 시도 중")
+keyclick("tab")
+sleep,400
 Move_NPCTalkForm()
 callid = 1
 if(Gui_KON = 1)
@@ -11585,6 +11621,15 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
             좌표입력(XX, YY, Z)
             RunMemory("좌표이동")
             Sleep, 1500
+            ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16",         aOffsets*)
+            if InStr(ServerMsg, "서버와의 연결이")
+ || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
+ || InStr(ServerMsg, "인증시간이")
+            {
+                이유 := "step18서버연결종료3"
+                step := 10000
+                return
+            }
             }
             else
             {
