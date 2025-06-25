@@ -2826,7 +2826,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.96[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.98[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -5417,7 +5417,7 @@ SetTimer, Hunt, 50
 SetTimer, AttackCheck, 50
 SetTimer, AttackMGB, 5000
 SetTimer, 타겟팅, 100
-SetTimer, RL, 21600000
+SetTimer, RL, 18000000
 시작탭사이즈 := 1
 return
 
@@ -6512,75 +6512,56 @@ GUI, Submit, Nohide
 if(A_WDay = 5 && 서버쳌쳌 = 1)
 {
 try {
-    ; Internet Explorer COM 객체 생성
-    ie := ComObjCreate("InternetExplorer.Application")
-    ie.Visible := false ; 브라우저 창 숨김 (true로 설정하면 창이 표시됨)
-    url := "https://elancia.nexon.com/"
-    ie.Navigate(url)
+    ; 임시 파일로 HTML 다운로드
+    HtmlFile := A_ScriptDir . "\elancia_tmp.html"
+    Url := "https://elancia.nexon.com/"
+    URLDownloadToFile, %Url%, %HtmlFile%
 
-    ; 로딩 완료 대기
-    while ie.Busy or ie.ReadyState != 4
-        Sleep, 100
+    if !FileExist(HtmlFile) {
+        텔레그램메시지보내기("❌ HTML 다운로드 실패")
+        throw Exception("URLDownload 실패")
+    }
 
-    ; 페이지 HTML 가져오기
-    html := ie.document.body.innerHTML
+    FileRead, html, %HtmlFile%
+    FileDelete, %HtmlFile%
 
-    ; 1단계: "서버 현황" 단어 위치 찾기 및 300자 추출
     target1 := "서버 현황"
-    pos1 := InStr(html, target1) ; "서버 현황" 단어 위치 찾기
+    pos1 := InStr(html, target1)
 
     if (pos1 > 0) {
-        extractedText := SubStr(html, pos1, 300) ; "서버 현황" 위치부터 300자 추출
-
-        ; 2단계: 추출된 300자 내에서 "엘" 단어 찾기
+        extractedText := SubStr(html, pos1, 300)
         target2 := "엘"
-        pos2 := InStr(extractedText, target2) ; "엘" 단어 위치 찾기
+        pos2 := InStr(extractedText, target2)
 
         if (pos2 > 0) {
-            ; 3단계: "엘" 위치 이후 <dd>와 </dd> 사이 텍스트 추출
-            ddStart := InStr(extractedText, "<dd>", false, pos2) ; <dd> 시작 위치
-            ddEnd := InStr(extractedText, "</dd>", false, ddStart) ; </dd> 종료 위치
+            ddStart := InStr(extractedText, "<dd>", false, pos2)
+            ddEnd := InStr(extractedText, "</dd>", false, ddStart)
 
-            if (ddStart > 0 and ddEnd > ddStart) {
-                result := SubStr(extractedText, ddStart + 4, ddEnd - ddStart - 4) ; <dd> 태그 이후 텍스트 추출
+            if (ddStart > 0 && ddEnd > ddStart) {
+                result := SubStr(extractedText, ddStart + 4, ddEnd - ddStart - 4)
                 Server1 := result
-                TMessage :="추출된 데이터: " result Server1
-                텔레그램메시지보내기(TMessage)
-                sleep,10
+            } else {
+                throw Exception("<dd> 태그를 찾을 수 없음")
             }
-            else
-            {
-        TMessage :="추출된 텍스트 내에서 단어 '" result "'을 찾을 수 없습니다."
-        텔레그램메시지보내기(TMessage)
-        sleep,10
-            }
+        } else {
+            throw Exception("'엘' 키워드를 찾을 수 없음")
         }
-        else
-        {
-        TMessage :="추출된 텍스트 내에서 단어 '" target2 "'을 찾을 수 없습니다."
-        텔레그램메시지보내기(TMessage)
-        sleep,10
-        }
+    } else {
+        throw Exception("'서버 현황' 키워드를 찾을 수 없음")
     }
-    else
-    {
-        TMessage :="HTML에서 단어 '" target1 "'을 찾을 수 없습니다."
-        텔레그램메시지보내기(TMessage)
-        sleep,10
-    }
-
-    ; IE 객체 종료
-    ie.Quit()
 }
 catch e
 {
-TMessage :="예외 발생! 상세 정보:" . e.Message . "Line: " . e.Line
-텔레그램메시지보내기(TMessage)
-sleep,10
-GROUPADD, ie_gruop, ahk_exe iexplore.exe
-WINKILL, ahk_exe iexplore.exe
-WINKILL, ahk_group ie_gruop
-GOSUB, RL
+    TMessage := "🚨 예외 발생: " . e.Message
+    텔레그램메시지보내기(TMessage)
+
+    ; IE 강제 종료
+    GROUPADD, ie_gruop, ahk_exe iexplore.exe
+    WINKILL, ahk_exe iexplore.exe
+    WINKILL, ahk_group ie_gruop
+
+    ; RL 루틴 호출
+    GOSUB, RL
 }
 if ((Trim(Server1) = "정상") && 서버쳌쳌 = 1 )
 {
@@ -6721,8 +6702,6 @@ Pause
 }
 }
 }
-
-
 if((Step >= 7 and Step < 507) or (Step >= 512 and Step < 10000)) ;수호천사 파트
 {
 Check_FormNumber()
@@ -6778,7 +6757,8 @@ TMessage := "[ Helancia_Log ]>>" jTitle FormNumber "<<: 애미뒤진 인연버�
 sleep,10
 keyclick("프로세스종료")
 이전스텝 := step
-step = 0
+이유 := 인연벅
+step = 10000
 return
 }
 IfInString,NPCMsg,렉스
@@ -6797,7 +6777,8 @@ TMessage := "[ Helancia_Log ]>>" jTitle FormNumber "<<: 애미뒤진 길드버�
 sleep,10
 keyclick("프로세스종료")
 이전스텝 := step
-step = 0
+이유 := 길드벅
+step = 10000
 return
 }
 Get_Location()
@@ -6829,6 +6810,7 @@ Get_FP()
 GuiControl,,Gui_NowFP,%NowFP% / %MaxFP% (%FPPercent%`%)
 GuiControl,,Pro_NowFP,%FPPercent%
 GuiControl,,Gui_NowFP,%NowFP% / %MaxFP% (%FPPercent%`%)
+이전스텝 := Step
 ; 이 코드는 타이머나 메인 루프 안에서 반복적으로 실행되어야 합니다.
 if (NowFP = SaveFP)
 {
@@ -7491,7 +7473,6 @@ return
 }
 }
 이유 := "일랜시아 서버와 연결 종료"
-이전스텝 := Step
 Step := 10000
 return
 }
@@ -8185,7 +8166,10 @@ IfWinNotExist,ahk_pid %jPID%
 if(Step >= 5 and Step < 10000)
 {
 GuiControl, , 로그인상태정보, 오류로 인해 재접속 합니다.
+이전스텝 := step
 Step = 0
+TMessage :="[ Helancia_Log ]>>" jTitle "<<: 일랜시아 창 사라짐 재접속" 이전스텝 "에서 종료"
+텔레그램메시지보내기(TMessage)
 }
 }
 if(Step = 0)
@@ -8278,118 +8262,86 @@ Settimer, 파라스대기, %파라스대기값%
 }
 Step = 1
 }
-if( Gui_Login = "인터넷" )
+if (Gui_Login = "인터넷")
 {
-if(Step = 1)
+if (Step = 1)
 {
-GUICONTROL, , 로그인상태정보, [로그인] - 접속 중
-FileCreateDir, ChromeProfile
-ProfilePath := A_ScriptDir . "\ChromeProfile" ; 사용자 프로파일 경로 지정
-    ChromeInst := new Chrome(ProfilePath, , , , , False) ; Headless 모드를 끔(False)
-    ; 새로운 페이지 탭 가져오기
+    GUICONTROL, , 로그인상태정보, [로그인] - 접속 중
+    FileCreateDir, ChromeProfile
+    ProfilePath := A_ScriptDir . "\ChromeProfile"
+    ChromeInst := new Chrome(ProfilePath, , , , , False)
+
     Sleep, 100
     PageInst := ChromeInst.GetPage()
     Sleep, 100
+
     PageInst.Call("Page.navigate", {"url": "https://elancia.nexon.com/"})
     SB_SetText("홈페이지 접속중")
-while (PageInst.Evaluate("document.readyState").value != "complete")
-{
-sleep, 100  ; 0.5초 대기 후 다시 확인
-}
+
+    while (PageInst.Evaluate("document.readyState").value != "complete")
+        Sleep, 100
+
     PageInst.Evaluate("PS.game.startGame({ gameCode:74276 });")
-    sleep,4000
-LoginURL := PageInst.Evaluate("window.location.href").value
-;    MsgBox, % "현재 URL은: " LoginURL
-If (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
-{
-GuiControl, , 로그인상태정보, [로그인] - 실패 ( 접속불량 )
-SB_SetText("인터넷 로그인 재시도")
-WinClose, Elancia
-WinKill, ahk_exe MRMsph.exe
-PageInst.WaitForLoad()
-PageInst.Evaluate("inface.auth.gotoSignOut();")
-; JavaScript 실행
-sleep,1000
-PageInst.WaitForLoad()
-PageInst.Evaluate(removeCookiesScript)
-PageInst.Call("Browser.close")
-PageInst.Disconnect()
-ChromeInst.Close() ; 크롬 인스턴스 종료
-Gui_Enable()
-SetTimer, Hunt, Off
-SetTimer, AttackCheck, Off
-SetTimer, AttackMGB, off
-SetTimer, 타겟팅, Off
-SetTimer, incineration, off
-CheckPB = 0
-CheckPN := 0
-countsignal := 0
-랜덤감응 = 0
-return
-}
-    PageInst.Evaluate("document.querySelector('#txtNexonID').value = '" Gui_NexonID "';") ; ID 입력
-    PageInst.Evaluate("document.querySelector('#txtPWD').value = '" Gui_NexonPassWord "';") ; 비밀번호 입력
-    PageInst.Evaluate("document.querySelector('.button01').click();") ; 로그인 버튼 클릭
-sleep,1000
-while (PageInst.Evaluate("document.readyState").value != "complete")
-{
-    sleep, 100  ; 0.5초 대기 후 다시 확인
-}
-SB_SetText("넥슨 로그인 체크")
-LoginURL := PageInst.Evaluate("window.location.href").value
-;MsgBox, % "현재 URL은: " LoginURL
-if(LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
-{
-IfInString,LoginURL,errorcode=1
-{
-GuiControl, , 로그인상태정보, [로그인] - 실패 ( ID,비번 틀림 )
- PageInst.WaitForLoad()
- PageInst.Evaluate("inface.auth.gotoSignOut();")
- ; JavaScript 실행
-sleep,1000
-PageInst.WaitForLoad()
-PageInst.Evaluate(removeCookiesScript)
-PageInst.Call("Browser.close")
-PageInst.Disconnect()
-ChromeInst.Close() ; 크롬 인스턴스 종료
-Gui_Enable()
-GuiControl, , jTitle, %jTitle%
-TMessage :="[ Helancia_Log ]>>" jTitle "<<:자동 로그인 실패"
-텔레그램메시지보내기(TMessage)
-SetTimer, Hunt, Off
-SetTimer, AttackCheck, Off
-SetTimer, AttackMGB, off
-SetTimer, incineration, off
-SetTimer, GetMemory, OFF
-SetTimer, ClearMem, OFF
-SetTimer, 타겟팅, OFF
-CheckPN := 0
-CheckPB = 0
-countsignal := 0
-랜덤감응 = 0
-return
-}
-}
-while !PageInst.Evaluate("document.querySelector('.game_start')")
-{
-    Sleep, 300  ; 0.5초 대기
-}
-sleep,2000
-PageInst.Evaluate("document.querySelector('.game_start').click();") ; 로그인 버튼 클릭
-CDP := ChromeInst.CDP
-CDP.Call("Page.enable")  ; Page 이벤트 활성화
-CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
-WinWait, ahk_exe jElancia.exe, , 15
-PageInst.Evaluate("inface.auth.gotoSignOut();")
-sleep,1000
-PageInst.WaitForLoad()
-PageInst.Evaluate(removeCookiesScript)
-; 테스트 종료: 크롬 브라우저 닫기
-PageInst.Call("Browser.close")
-PageInst.Disconnect()
-ChromeInst.Close() ; 크롬 인스턴스 종료
-Step = 2
-return
+    Sleep, 4000
+
+    LoginURL := PageInst.Evaluate("window.location.href").value
+    if (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
+    {
+        reason := "접속불량"
+        Gosub, TryLoginFail
+        step = 0
+        return
+    }
+
+    ; ID, PW 입력
+    PageInst.Evaluate("document.querySelector('#txtNexonID').value = '" Gui_NexonID "';")
+    PageInst.Evaluate("document.querySelector('#txtPWD').value = '" Gui_NexonPassWord "';")
+    PageInst.Evaluate("document.querySelector('.button01').click();")
+
+    Sleep, 1000
+    while (PageInst.Evaluate("document.readyState").value != "complete")
+        Sleep, 100
+
+    SB_SetText("넥슨 로그인 체크")
+    LoginURL := PageInst.Evaluate("window.location.href").value
+
+    if (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
+    {
+        IfInString, LoginURL, errorcode=1
+        {
+            reason := "ID,비번 틀림"
+            Gosub, TryLoginFail
+            return
+        }
+    }
+
+    TryCount := 0
+    while !PageInst.Evaluate("document.querySelector('.game_start')")
+    {
+        Sleep, 300
+        TryCount++
+        if (TryCount > 100)
+        {
+            reason := "게임 시작 버튼 없음"
+            Gosub, TryLoginFail
+            return
+        }
+    }
+
+    Sleep, 2000
+    PageInst.Evaluate("document.querySelector('.game_start').click();")
+
+    ; 엘랜시아 실행 대기
+    CDP := ChromeInst.CDP
+    ;CDP.Call("Page.enable")
+    ;CDP.On("Page.javascriptDialogOpening", "HandleDialog")
+
+    WinWait, ahk_exe jElancia.exe, , 15
+
+    Gosub, CleanChrome
+
+    Step = 2
+    return
 }
 }
 if(Gui_Login = "넥슨플러그")
@@ -12054,6 +12006,7 @@ return
 }
 }
 CharMovePonam(Gui_MoveLoute1,Gui_MoveLoute2,Gui_MoveLoute3,Gui_MoveLoute4)
+sleep,300
 Step = 20
 }
 if(Step = 20)
@@ -12639,19 +12592,18 @@ AttackMissCount := 0
 }
 }
 }
-if(Step = 26) ;포남무바수정파트
+if(Step = 26)
 {
-GUICONTROL, , Gui_NowState, [포남] 몹 근접 체크 중
 SB_SetText("몹 근접 체크 중")
-;keyclick("AltR")
 Check_Moving()
 if(Moving = 0)
 {
+Sleep, 100
+AltR()
 Check_Moving()
 if(Moving = 0)
 {
-keyclick("AltR")
-sleep,300
+Sleep, 100
 Step = 27
 }
 }
@@ -12674,7 +12626,7 @@ AttackMissCount ++
 if(AttackMissCount >= 300 and 한번만 = 1)
 {
     keyclick("AltR")
-    sleep,100
+    sleep,300
     AttackMissCount := 0
     한번만 :=0
 }
@@ -12822,7 +12774,7 @@ else
 {
   RepairWeaponCount := 0
 }
-if (RepairWeaponCount >= 400)
+if (RepairWeaponCount >= 200)
 {
 CheckPN := 0
 keyclick("tab")
@@ -12842,7 +12794,41 @@ countsignal := 0
 Sleep, 400
 Keyclick("tab")
 Sleep, 400
-Step = 32
+Step = 31
+}
+if(step = 31)
+{
+GuiControl, , Gui_NowState, [포남] 감응 전 메모리 점유율 확인
+
+SB_SetText("메모리 점유율 체크 중")
+GetPrivateWorkingSet(jPID)
+if(TotalPhy > 2000000)
+{
+if(byte > 1000000)
+{
+이전스텝 := step
+step = 10000
+return
+}
+if(byte <= 1000000)
+{
+step = 32
+}
+}
+if(TotalPhy <= 2000000)
+{
+if(byte > 620000)
+{
+이전스텝 := step
+step = 10000
+return
+}
+if(byte <= 620000)
+{
+step = 32
+}
+}
+step = 32
 }
 if(Step = 32) ;포남 무바 중 감응 파트
 {
@@ -19799,72 +19785,56 @@ Sleep, 1000
 if(internet = 1)
 {
 try {
-    ; Internet Explorer COM 객체 생성
-    ie := ComObjCreate("InternetExplorer.Application")
-    ie.Visible := false ; 브라우저 창 숨김 (true로 설정하면 창이 표시됨)
-    url := "https://elancia.nexon.com/"
-    ie.Navigate(url)
+    ; 임시 파일로 HTML 다운로드
+    HtmlFile := A_ScriptDir . "\elancia_tmp.html"
+    Url := "https://elancia.nexon.com/"
+    URLDownloadToFile, %Url%, %HtmlFile%
 
-    ; 로딩 완료 대기
-    while ie.Busy or ie.ReadyState != 4
-        Sleep, 1000
+    if !FileExist(HtmlFile) {
+        텔레그램메시지보내기("❌ HTML 다운로드 실패")
+        throw Exception("URLDownload 실패")
+    }
 
-    ; 페이지 HTML 가져오기
-    html := ie.document.body.innerHTML
+    FileRead, html, %HtmlFile%
+    FileDelete, %HtmlFile%
 
-    ; 1단계: "서버 현황" 단어 위치 찾기 및 300자 추출
     target1 := "서버 현황"
-    pos1 := InStr(html, target1) ; "서버 현황" 단어 위치 찾기
+    pos1 := InStr(html, target1)
 
     if (pos1 > 0) {
-        extractedText := SubStr(html, pos1, 300) ; "서버 현황" 위치부터 300자 추출
-
-        ; 2단계: 추출된 300자 내에서 "엘" 단어 찾기
+        extractedText := SubStr(html, pos1, 300)
         target2 := "엘"
-        pos2 := InStr(extractedText, target2) ; "엘" 단어 위치 찾기
+        pos2 := InStr(extractedText, target2)
 
         if (pos2 > 0) {
-            ; 3단계: "엘" 위치 이후 <dd>와 </dd> 사이 텍스트 추출
-            ddStart := InStr(extractedText, "<dd>", false, pos2) ; <dd> 시작 위치
-            ddEnd := InStr(extractedText, "</dd>", false, ddStart) ; </dd> 종료 위치
+            ddStart := InStr(extractedText, "<dd>", false, pos2)
+            ddEnd := InStr(extractedText, "</dd>", false, ddStart)
 
-            if (ddStart > 0 and ddEnd > ddStart) {
-                result := SubStr(extractedText, ddStart + 4, ddEnd - ddStart - 4) ; <dd> 태그 이후 텍스트 추출
+            if (ddStart > 0 && ddEnd > ddStart) {
+                result := SubStr(extractedText, ddStart + 4, ddEnd - ddStart - 4)
                 Server1 := result
+            } else {
+                throw Exception("<dd> 태그를 찾을 수 없음")
             }
-            else
-            {
-        TMessage :="일랜시아 홈페이지 점검 중"
-        텔레그램메시지보내기(TMessage)
-        sleep,100
-            }
+        } else {
+            throw Exception("'엘' 키워드를 찾을 수 없음")
         }
-        else
-        {
-        TMessage :="추출된 텍스트 내에서 단어 '" target2 "'을 찾을 수 없습니다."
-        텔레그램메시지보내기(TMessage)
-        sleep,100
-        }
+    } else {
+        throw Exception("'서버 현황' 키워드를 찾을 수 없음")
     }
-    else
-    {
-        TMessage :="HTML에서 단어 '" target1 "'을 찾을 수 없습니다."
-        텔레그램메시지보내기(TMessage)
-        sleep,100
-    }
-
-    ; IE 객체 종료
-    ie.Quit()
 }
 catch e
 {
-TMessage :="예외 발생! 상세 정보:" . e.Message . "Line: " . e.Line
-텔레그램메시지보내기(TMessage)
-sleep,100
-GROUPADD, ie_gruop, ahk_exe iexplore.exe
-WINKILL, ahk_exe iexplore.exe
-WINKILL, ahk_group ie_gruop
-GOSUB, RL
+    TMessage := "🚨 예외 발생: " . e.Message
+    텔레그램메시지보내기(TMessage)
+
+    ; IE 강제 종료
+    GROUPADD, ie_gruop, ahk_exe iexplore.exe
+    WINKILL, ahk_exe iexplore.exe
+    WINKILL, ahk_group ie_gruop
+
+    ; RL 루틴 호출
+    GOSUB, RL
 }
 if((Trim(Server1) = "정상"))
 {
@@ -35417,4 +35387,66 @@ HandleDialog(evt) {
     CDP.Call("Page.handleJavaScriptDialog", { "accept": true })  ; 확인 버튼 클릭
     sleep,500
     PageInst.Evaluate("document.querySelector('.game_start').click();") ; 넥슨 로그인
+}
+TryLoginFail:
+    GuiControl, , 로그인상태정보, [로그인] - 실패 ( %reason% )
+    SB_SetText("인터넷 로그인 실패: " . reason)
+
+    WinClose, Elancia
+    WinKill, ahk_exe MRMsph.exe
+
+    Gosub, CleanChrome
+
+    Gui_Enable()
+    GuiControl, , jTitle, %jTitle%
+    TMessage := "[ Helancia_Log ]>>" jTitle "<<:자동 로그인 실패 (" . reason . ")"
+    텔레그램메시지보내기(TMessage)
+
+    SetTimer, Hunt, Off
+    SetTimer, AttackCheck, Off
+    SetTimer, AttackMGB, Off
+    SetTimer, incineration, Off
+    SetTimer, GetMemory, Off
+    SetTimer, ClearMem, Off
+    SetTimer, 타겟팅, Off
+
+    CheckPN := 0
+    CheckPB := 0
+    countsignal := 0
+    랜덤감응 := 0
+return
+
+; ---------------------------
+CleanChrome:
+    Try {
+        PageInst.Evaluate("inface.auth.gotoSignOut();")
+        Sleep, 1000
+        PageInst.WaitForLoad()
+        PageInst.Evaluate(removeCookiesScript)
+        PageInst.Call("Browser.close")
+        PageInst.Disconnect()
+    } Catch e {
+        ; 무시
+    }
+    PageInst := ""
+    Try ChromeInst.Close()
+    ChromeInst := ""
+return
+
+; ▼ 크롬 인스턴스 정리 루틴
+CleanChrome(ByRef page, ByRef chrome)
+{
+    Try {
+        page.Evaluate("inface.auth.gotoSignOut();")
+        Sleep, 1000
+        page.WaitForLoad()
+        page.Evaluate(removeCookiesScript)
+        page.Call("Browser.close")
+        page.Disconnect()
+    } Catch e {
+        ; 무시
+    }
+    page := ""
+    Try chrome.Close()
+    chrome := ""
 }
