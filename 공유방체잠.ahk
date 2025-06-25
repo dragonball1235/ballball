@@ -2826,7 +2826,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 0.98[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 1.00[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -6525,7 +6525,7 @@ try {
     FileRead, html, %HtmlFile%
     FileDelete, %HtmlFile%
 
-    target1 := "서버 현황"
+    target1 := "서버현황"
     pos1 := InStr(html, target1)
 
     if (pos1 > 0) {
@@ -6547,7 +6547,7 @@ try {
             throw Exception("'엘' 키워드를 찾을 수 없음")
         }
     } else {
-        throw Exception("'서버 현황' 키워드를 찾을 수 없음")
+        throw Exception("'서버현황' 키워드를 찾을 수 없음")
     }
 }
 catch e
@@ -19798,7 +19798,7 @@ try {
     FileRead, html, %HtmlFile%
     FileDelete, %HtmlFile%
 
-    target1 := "서버 현황"
+    target1 := "서버현황"
     pos1 := InStr(html, target1)
 
     if (pos1 > 0) {
@@ -19820,7 +19820,7 @@ try {
             throw Exception("'엘' 키워드를 찾을 수 없음")
         }
     } else {
-        throw Exception("'서버 현황' 키워드를 찾을 수 없음")
+        throw Exception("'서버현황' 키워드를 찾을 수 없음")
     }
 }
 catch e
