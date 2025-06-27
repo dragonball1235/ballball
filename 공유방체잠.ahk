@@ -17,7 +17,6 @@ SetKeyDelay, -1
 SetMouseDelay, -1
 SetDefaultMouseSpeed, 0
 SetTitleMatchMode, 3
-Global KICKkey, MACkey
 if not A_IsAdmin {
 Run *RunAs "%A_ScriptFullPath%"
 ExitApp
@@ -32,6 +31,14 @@ Global WinVersion := GetOSVersion()
 PROCESS,Priority,,High
 DllCall("psapi.dll\EmptyWorkingSet", "Ptr", -1)
 Sleep, 100
+IfNotExist,%A_ScriptDir%\CashMemory.exe
+{
+FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
+Loop, %A_ScriptDir%\CashMemory.exe
+{
+break
+}
+}
 class Chrome
 {
 	static DebugPort := 9222
@@ -5153,7 +5160,7 @@ SetTimer, RL, 18000000
 시작탭사이즈 := 1
 return
 RL:
-Gui, Submit, NoHide
+
 Gui, Submit, Nohide
 Run, *RunAs %A_ScriptDir%\CashMemory.exe
 Sleep,300
@@ -8508,6 +8515,7 @@ if (Step = 1)
     if (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
     {
         reason := "접속불량"
+		SB_SetText("이유 : " reason)
         Gosub, TryLoginFail
         step = 0
         return
@@ -8530,7 +8538,9 @@ if (Step = 1)
         IfInString, LoginURL, errorcode=1
         {
             reason := "ID,비번 틀림"
+			SB_SetText("이유 : " reason)
             Gosub, TryLoginFail
+			step = 0
             return
         }
     }
@@ -8543,7 +8553,9 @@ if (Step = 1)
         if (TryCount > 100)
         {
             reason := "게임 시작 버튼 없음"
+			SB_SetText("이유 : " reason)
             Gosub, TryLoginFail
+			step = 0
             return
         }
     }
