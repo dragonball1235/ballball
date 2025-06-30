@@ -1,11 +1,10 @@
-ProgramVersion := "NEW 1.1"
 #SingleInstance ignore
 #NoEnv
 #Persistent
 #KeyHistory 0
 #NoTrayIcon
 #Warn All, Off
-ListLines, OFF
+ListLines, Off
 SetBatchLines, -1
 SetWinDelay, 0
 SetControlDelay, 0
@@ -17,28 +16,17 @@ SetKeyDelay, -1
 SetMouseDelay, -1
 SetDefaultMouseSpeed, 0
 SetTitleMatchMode, 3
-if not A_IsAdmin {
-Run *RunAs "%A_ScriptFullPath%"
-ExitApp
-}
-ON:
-global TotalPhys,TotalPhy
-VarSetCapacity( MEMORYSTATUSEX,64,0 ), NumPut( 64,MEMORYSTATUSEX )
-DllCall( "GlobalMemoryStatusEx", UInt,&MEMORYSTATUSEX )
-TotalPhys := NumGet( MEMORYSTATUSEX,8,"Int64"),  VarSetCapacity( PhysMem,16,0 )
-DllCall( "shlwapi.dll\StrFormatByteSize64A", Int64,TotalPhys, Str,PhysMem, UInt,16 )
-Global WinVersion := GetOSVersion()
 PROCESS,Priority,,High
-DllCall("psapi.dll\EmptyWorkingSet", "Ptr", -1)
-Sleep, 100
-IfNotExist,%A_ScriptDir%\CashMemory.exe
-{
-FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
-Loop, %A_ScriptDir%\CashMemory.exe
-{
-break
+DllCall("SetProcessWorkingSetSize", "UInt", DllCall("GetCurrentProcess"), "Int", -1, "Int", -1)
+Global WinVersion := GetOSVersion()
+
+if not A_IsAdmin {
+    MsgBox, 4,, 이 스크립트는 관리자 권한으로 실행되어야 합니다. `n관리자 권한으로 다시 실행하시겠습니까?
+    IfMsgBox Yes
+        Run *RunAs "%A_ScriptFullPath%"  ; 관리자 권한으로 스크립트 재실행
+    ExitApp  ; 관리자 권한으로 재실행하지 않을 경우 스크립트 종료
 }
-}
+
 class Chrome
 {
 	static DebugPort := 9222
@@ -703,6 +691,70 @@ Jxon_False()
 }
 }
 
+텔레그램메시지보내기:
+TTSTOP := 1
+IF(TTSTOP := 0)
+{
+텔레그램메시지보내기()
+return
+}
+
+텔레그램메시지보내기(Message := "")
+{
+
+	if (Message = "")
+		Message := "자동으로보내지는메시지"
+        Message := StrReplace(Message, "`n", "%0A")
+	/*
+	BotToken := "1111111111:AAAAAAAAAAAAAAAAAAAAAAAAAAaaaaaaaaa" ; API토큰
+	ChatID := "1111111111" ;메시지 받을 ID
+
+	Url := "https://api.telegram.org/bot" . BotToken . "/sendMessage?chat_id=" . ChatID . "&text=" . URLEncode(Message)
+	WinHttp := ComObjCreate("WinHttp.WinHttpRequest.5.1")
+	WinHttp.Open("GET", Url)
+	WinHttp.Send()
+	*/
+
+	gui, submit, nohide
+	GuiControlGet, ChatID
+	if (!IsNumber(ChatID) || ChatID == 0 || ChatID = "")
+		return
+	Url := "https://script.google.com/macros/s/AKfycbztWCnhTweHZyRtDltONV7bjhSGNq7m0OUUO4z9uN8-F-R-EOK4Puyw00JgNvmihgPs/exec"
+    EncodedMessage := URLEncode(Message)
+    EncodedMessage := StrReplace(EncodedMessage, "%0A", "`n")  ; 인코딩 후에 `%0A`를 줄바꿈으로 교체
+	Url := Url . "?chat_id=" . ChatID . "&text=" . URLEncode(Message)
+	WinHttp := ComObjCreate("WinHttp.WinHttpRequest.5.1")
+	WinHttp.Open("GET", Url)
+	try
+    {
+        WinHttp.Send()
+    }
+    catch e
+   {
+        ; Handle the error, e.g., by logging or displaying a message
+        ; This block is executed if there's an error in sending the request, which might indicate no internet connection
+        return
+    }
+}
+;}
+
+ON:
+global TotalPhys,TotalPhy
+VarSetCapacity( MEMORYSTATUSEX,64,0 ), NumPut( 64,MEMORYSTATUSEX )
+DllCall( "GlobalMemoryStatusEx", UInt,&MEMORYSTATUSEX )
+TotalPhys := NumGet( MEMORYSTATUSEX,8,"Int64"),  VarSetCapacity( PhysMem,16,0 )
+DllCall( "shlwapi.dll\StrFormatByteSize64A", Int64,TotalPhys, Str,PhysMem, UInt,16 )
+
+filePath := A_ScriptDir . "\NPCOID.ini"
+DllCall("psapi.dll\EmptyWorkingSet", "Ptr", -1)
+IfNotExist,%A_ScriptDir%\CashMemory.exe
+{
+FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
+Loop, %A_ScriptDir%\CashMemory.exe
+{
+break
+}
+}
 class _ClassMemory
 {
 static baseAddress, hProcess, PID, currentProgram
@@ -1252,6 +1304,51 @@ Return, this.SizeOfStructure
 }
 }
 }
+
+URLEncode(str, sExcepts = "!#$&'()*+,-./:;=?@_~")
+{
+    len := StrPutVar(str, var, "UTF-8") - 1
+    result := ""
+    i := 0
+    oldFmt := A_FormatInteger
+    SetFormat, Integer, H
+    While (i < len) {
+        b := NumGet(var, i, "UChar")
+        If (b >= 0x41 && b <= 0x5A ; A-Z
+            || b >= 0x61 && b <= 0x7A ; a-z
+            || b >= 0x30 && b <= 0x39 ; 0-9
+            || InStr(sExcepts, Chr(b), true))
+            result .= Chr(b)
+        Else {
+            hex := SubStr(StrUpper(b), 3)
+            If (StrLen(hex) == 1)
+                hex := "0" . hex
+            result .= "%" . hex
+        }
+        i++
+    }
+    SetFormat, Integer, D
+    return result
+}
+
+StrUpper(str)
+{
+    StringUpper, out, str
+    return out
+}
+MouseClick(MouseX,MouseY,PID := "")  ; 지정한 X, Y 좌표 마우스왼쪽버튼으로 클릭
+		{
+			if (PID = "")
+				PID := TargetPID
+			if (Multiplyer = "없음" || Multiplyer < 1)
+				gosub, 일랜시아창크기구하기
+			MouseX := MouseX * Multiplyer
+			MouseY := MouseY * Multiplyer
+			MousePos := MouseX|MouseY<< 16
+			PostMessage, 0x200, 0, %MousePos% ,,ahk_pid %PID%
+			PostMessage, 0x201, 1, %MousePos% ,,ahk_pid %PID%
+			PostMessage, 0x202, 0, %MousePos% ,,ahk_pid %PID%
+		}
 KeyClick(Key,PID := "")
 {
 if (PID = "")
@@ -1507,6 +1604,12 @@ PostMessage, 0x101, 18, 540540929,, ahk_pid %PID%
 sleep, 1
 }
 }
+else if(Key = "프로세스종료"){
+      loop, 1 {
+      Process,Close, %PID%
+      sleep,1
+      }
+  }
 else if (Key>=0&&KEY<=9){
 if (key=0)
 key := 10
@@ -1783,536 +1886,522 @@ sleep, 1
 }
 }
 }
-TargetSkillList := ["현혹","폭검","독침","무기공격"]
-Global 아이콘 := chr(9829)
-Global 경계선 := chr(3500)
+게임내수련인형 := ["의수련인형","의정령"]
+게임내고용상인들 := ["의소야","의터그","의네시","의미피엘","의엘가노","의휘리스", "의Nesi"]
+게임내NPC이미지 := [131,83,137]
+게임내NPC들 := ["대장로","성향안내","장로","모험가","초보모험가","요리사","초보요리사","사냥꾼","초보무도가","세크티","콥","미너터","카리스","행운장","길드기","길드예선전보로1","길드예선전보로2","길드예선전보로3","길드예선전보로4","길드예선전보로5","길드예선전보로6","길드예선전보로7","길드예선전보로8","우물지기","우물지킴이","파미","실루엣","케이","휴","에레노아","길드만들기","라드","예절보로","할아버지","레나","초브","칼라스","브라키의여전사","테레즈","루비","오크왕자","슈","카딜라","나무보로","이사크","미소니","성궁사","수련장","그레파","미용바니","티포네","홀리","올드스미스","테디","피니","큐트","키드니","스텔라","실비아","네루아","사라","오블로","메티니","무타이","성검사","커스피스","쿠니퍼","라체","지올라","플린","헬러","브레너","에드가","두갈","아이렌","케드마","제프","젠","소니아","아바","네시아","래리","마리오","빈","렉스","다바트","코바니","플라노","미너스","토리온","브로이","카멘","카로에","시상보로","견습미용사","할머니","미스토","브라키의여전사","그라치","드리트","레시트","로크","메크","스타시","스테티나","이스카","호디니","베니","은행가드","파이","샤네트","코페","아일리아","퀘이드","레야","싱","유키오","이시","앨리아","오바","테론","윌라","페툴라","스티븐","우리안","빅터","리프","미네티","피트","비엔","칸느","포럼","콘스티","다인","티셔","백작","보초병","우트","랜스","뮤즈","리즈","브라키의여전사","에스피","코니","스투","라니체","드류","체드","체스터","케인","울드","티모시","포츠","마카","미카","경비병","니키","수라","카르고","엘피","쿠퍼","페니","터크","나크레토","로비어","앤타이","셀포이","비바","마데이아","가토고","엑소포","토이슨","코메이오","저주받은엘프","야노모이","오이피노","카레푸","엠토포","아이보","마나오","클레오","파노아","타키아","카오네자","나노아","미노스","세니코","주사위소녀1","주사위소녀2","주사위소녀3","주사위소녀4","주사위소녀5","주사위소녀6","주사위소녀7","주사위소녀8","주사위소녀9","주사위소녀10","주사위지배인","리노스","투페","히포프","베스","쿠키","소피","포프리아","나무꾼","레아","키아","세르니오","코르티","베커","포비","크로리스","길잃은수색대","동쪽파수꾼","서쪽파수꾼","리노아","펫조련사","게시판","드골"]
+로랜시아간판 := [111,608,610,612,614,618,620,622,624,626,630,632,634,636,638,640,642,644,646,648,650]
+이름이바뀌는존재들 := [21,751,753,552,554,560,558,556,496,297]
+Lists := [ "CheckBoxList", "DropDownList", "EditList", "RadioButton" ]
+CheckBoxList := ["수련길탐딜레이","이동속도사용","게임배속사용","길탐색책사용","원거리타겟","리메듐타겟","오란의깃사용여부","길탐색1번사용여부","길탐색2번사용여부","길탐색3번사용여부","길탐색4번사용여부","길탐색5번사용여부","자동재접속사용여부","힐링포션사용여부", "HP마을귀환사용여부", "리메듐사용여부", "마나포션사용여부", "MP마을귀환사용여부", "브렐사용여부", "식빵사용여부", "식빵구매여부", "골드바판매여부", "골드바구매여부", "대화사용", "명상사용", "더블어택사용", "체력향상사용", "민첩향상사용", "활방어사용", "마력향상사용", "마법방어향상사용", "3번", "4번", "5번", "6번", "7번", "8번", "은행넣기활성화", "소각활성화","아템먹기여부","자동이동여부", "훔치기사용", "훔쳐보기사용", "Sense사용", "자동사냥여부", "무기사용여부","특오자동교환여부","행깃구매여부","라깃구매여부","독침사용","현혹사용","폭검사용","무기공격사용","집중사용","회피사용","몸통찌르기사용","리메듐사용","라리메듐사용","엘리메듐사용","쿠로사용","빛의갑옷사용","공포보호사용","다라사용","브렐사용","브레마사용","물의갑옷사용","감속사용","마스사용","라크사용","번개사용","브리스사용","파스티사용","슈키사용","클리드사용","스톤스킨사용","파라스사용","베네피쿠스사용","저주사용","자동파티여부", "포레스트네자동대화","RemoveArmor사용","좀비몹감지", "위치고정", "배경제거", "캐릭제거","버스기사모드","나프사용","제작이동","자동그레이드","무기자동수리여부","사냥터자동복귀여부","재접속알림설정","인벤꽉참알림설정","체력저하알림설정","마을귀환알림설정","그레이드알림설정","상인어빌알림설정","맵변경알림설정"]
+SpellList := ["나프", "마스","리메듐","라리메듐","엘리메듐","쿠로","빛의갑옷","공포보호","다라","브렐","브레마","물의갑옷","감속","라크","번개","브리스","파스티","슈키","클리드","스톤스킨","파라스","베네피쿠스","저주"]
+DropDownList := ["오란의깃마을","길탐색1번목적지", "길탐색2번목적지", "길탐색3번목적지", "길탐색4번목적지", "길탐색5번목적지", "오란의깃단축키", "길탐색책단축키", "메인캐릭터서버", "메인캐릭터순서", "힐링포션사용단축키", "마나포션사용단축키", "식빵사용단축키", "식빵구매마을" ,"지침서", "오란의깃사용단축키", "포레스트네자동대화딜레이","CurrentMode","링단축키","사냥터이름"]
+EditList := ["원거리타겟아이디","리메듐타겟아이디","힐링포션사용제한", "HP마을귀환사용제한", "MP마을귀환사용제한", "리메듐사용제한", "마나포션사용제한", "브렐사용제한", "식빵사용제한", "MP마을귀환사용여부", "넣을아이템","Multiplyer","NPC_MSG_ADR" ,"마지막사냥장소", "수련용길탐색딜레이", "NPC대화딜레이", "MoveSpeed", "게임배속", "특수리메듐타겟OID","수동레벨기입","수리소야이름","수리소야아이템순서","수리소야아이템갯수", "ChatID"]
+공격어빌 := ["격투", "봉", "검", "창", "활", "스태프", "현금", "도", "도끼", "단검"]
+마통작마법 := ["리메듐","엘리메듐","라리메듐","브렐","마스","마하","엘","다뉴"]
+CommonSkillList := ["대화","명상"]
+NormalSkillList := ["더블어택","체력향상","민첩향상","활방어","마력향상","마법방어향상","회피", "집중"]
+무바여부 := 0
+TargetSkillList := ["훔치기","훔쳐보기","Sense","현혹","폭검","독침","무기공격"]
+SkillListA := ["훔치기","훔쳐보기","Sense","현혹","폭검","독침","무기공격","더블어택","체력향상","민첩향상","활방어","마력향상","마법방어향상","집중","회피","대화","명상","몸통지르기","RemoveArmor"]
+SelectedMummy2 := ""
+;메모리검색용
+removeCookiesScript := "
+(
+    document.cookie.split(';').forEach(function(c) {
+        document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/';
+    });
+    '쿠키가 삭제되었습니다.'
+)"
+global HourlyIncrease := 0
+global PrevCheckUPHP := 0
+global LastCheckTime := ProgramStartTime  ; 마지막 1시간 체크 시간
+global Myloute,CDP,PageInst,Evt
+Global 상승어빌주소, randKey, 중복어빌카운트, countsignal
+Global 9번사용 = 1, FPcount := 0, Aloute, Bloute,Cloute, 랜덤감응 = 0
+Global WantedItemlength := 0
+Global WantedMonsters := []
+Global DisWantedMonsters := []
+Global WantedItems := []
+Global BlackList := []
+Global MonsterList := []
+Global itemList := []
+Global PlayerList := []
+Global 파라스타이머시작, 파라스타이머카운트, 파라스타이머값 := 3600, 파라스대기값 := 600000 ; 10분을 밀리초로 변환
+Global MoveSpeed, Speed:=300, randomX, itemValue
+
+Global 쿨:=100, 수리카운트, 감응감응=0, 포남입장시간, ReadHitOID := 0
+Global 동파실패, 서파실패, 포북가자, 저장완료, OID이상=0,차원이동감응,적용날짜,S적용날짜 ; OID제어 변수
+Global ChatID,TTM,TMessage,동파감응시간셋팅,서파감응시간셋팅
+Global 게임배속, 배속, mem
 global jelan,jPID,jTitle,pwb,MapNumber,RunDirect,NowDate,Version,lov,identt,bann,byte,bytes
-global Location,jjc,MsgMacro,State,Inven,Buy,Repair,Ras,SelectRas,Map,AAD,MapSize,GAD,Weapon,Chat,Attack,Mount,NPCMenu,AAS,PosX,PosY,MovePosX,MCC,BAI,MovePosY,NowHP,HCC,AAI,MaxHP,NowMP,MaxMP,NowFP,MaxFP,Gold,Gold1,AGI,FormNumber,NPCMsg,NPCMenuBuyPosX,SCC,CTC,NPCMenuBuyPosY,DCC,NPCMenuRepairPosX,BAD,NPCMenuRepairPosY,rCTC,AbilityNameADD,SSC,AbilityValueADD,BAS,AbilityName,SSS,AbilityValue,Moving,Slot1Ability,GAI,SST,Slot2Ability,Slot3Ability,GAS,Slot4Ability,HPPercent,MPPercent,FPPercent,Shield,NowInven,invenstack = 0,invenError = 0,StatePosX,StatePosY,CheckFirstHP,CheckUPHP,RunningTime,ChangeValue,MagicN,CritHP,CritMP,Get_CharOID,CharID_1,CharID_2,CharID_3,CharID_4,CharID_5,CharID_6,ChangeValue,pP1,pP2,pP3,pP4,pP5,pP6,P1,P2,P3,P4,P5,P6,loady,ProgramStartTime,RPST,RPST,BasicWValue0,BasicWValue1,BasicWValue2,BasicWValue3,BWValue0,BWValue1,BWValue2,BWValue3,RMNS,MNS,RMNN,MLimit,incinerateitem,RowNumber,inciNumber = 1,inciItem,CCD,CheckPB,newTime1,newTime,nowtime1,nowtime,RCC,pbtalkcheck,pbtalkcheck1,pbtalkcheck2
+global Location,jjc,MsgMacro,State,Inven,Buy,Repair,Ras,SelectRas,Map,AAD,MapSize,GAD,Weapon,Chat,Attack,Mount,NPCMenu,AAS,PosX,PosY,MovePosX,MCC,BAI,MovePosY,NowHP,HCC,AAI,MaxHP,NowMP,MaxMP,NowFP,MaxFP,Gold,Gold1,AGI,FormNumber,NPCMsg,NPCMenuBuyPosX,SCC,CTC,NPCMenuBuyPosY,DCC,NPCMenuRepairPosX,BAD,NPCMenuRepairPosY,rCTC,AbilityNameADD,SSC,AbilityValueADD,BAS,AbilityName,SSS,AbilityValue,Moving,Slot1Ability,GAI,SST,Slot2Ability,Slot3Ability,GAS,Slot4Ability,HPPercent,MPPercent,FPPercent,Shield,NowInven,invenstack = 0,invenError = 0,StatePosX,StatePosY,CheckFirstHP,CheckUPHP,RunningTime,ChangeValue,MagicN,CritHP,CritMP,Get_CharOID,CharID_1,CharID_2,CharID_3,CharID_4,CharID_5,CharID_6,ChangeValue,pP1,pP2,pP3,pP4,pP5,pP6,P1,P2,P3,P4,P5,P6,loady,ProgramStartTime,RPST,RPST,BasicWValue0,BasicWValue1,BasicWValue2,BasicWValue3,BWValue0,BWValue1,BWValue2,BWValue3,RMNS,MNS,RMNN,Slot3MN,Slot4MN,Slot5MN,Slot6MN,Slot7MN,Slot8MN,Slot3Magic,Slot4Magic,Slot5Magic,Slot6Magic,Slot7Magic,Slot8Magic,MLimit,incinerateitem,RowNumber,inciNumber = 1,inciItem,CCD,CheckPB,CheckPN,newTime1,nowtime1,PNnowtiem,PNnowTime1,PNnewtime1,PNnewTime,nowtime,RCC,pbtalkcheck,pbtalkcheck1,pbtalkcheck2,UAD,pntalkcheck2,pntalkcheck1
 global Slot1Ability,Slot2Ability,Slot3Ability,Slot4Ability,Slot5Ability,Slot6Ability,Slot7Ability,Slot8Ability,Slot9Ability,Slot10Ability,Slot11Ability,Slot12Ability,Slot13Ability,Slot14Ability,Slot15Ability,Slot16Ability,Slot17Ability,Slot18Ability,Slot19Ability,Slot20Ability,Slot21Ability,Slot22Ability,Slot23Ability,Slot24Ability,Slot25Ability,Slot26Ability,Slot27Ability,Slot28Ability,Slot29Ability,Slot30Ability,Slot31Ability,Slot32Ability,Slot33Ability,Slot34Ability,Slot35Ability,Slot36Ability,Slot37Ability,Slot38Ability,Slot39Ability,Slot40Ability,Slot41Ability,Slot42Ability,Slot43Ability,Slot44Ability,Slot45Ability,Slot46Ability,Slot47Ability,Slot48Ability,Slot49Ability,Slot50Ability,Slot51Ability,Slot52Ability,Slot53Ability,Slot54Ability,Slot55Ability,Slot56Ability
 global Slot1AN,Slot2AN,Slot3AN,Slot4AN,Slot5AN,Slot6AN,Slot7AN,Slot8AN,Slot9AN,Slot10AN,Slot11AN,Slot12AN,Slot13AN,Slot14AN,Slot15AN,Slot16AN,Slot17AN,Slot18AN,Slot19AN,Slot20AN,Slot21AN,Slot22AN,Slot23AN,Slot24AN,Slot25AN,Slot26AN,Slot27AN,Slot28AN,Slot29AN,Slot30AN,Slot31AN,Slot32AN,Slot33AN,Slot34AN,Slot35AN,Slot36AN,Slot37AN,Slot38AN,Slot39AN,Slot40AN,Slot41AN,Slot42AN,Slot43AN,Slot44AN,Slot45AN,Slot46AN,Slot47AN,Slot48AN,Slot49AN,Slot50AN,Slot51AN,Slot52AN,Slot53AN,Slot54AN,Slot55AN,Slot56AN
-global Slot3Magic,Slot4Magic,Slot5Magic,Slot6Magic,Slot7Magic,Slot8Magic,Slot9Magic,Slot10Magic,Slot11Magic,Slot12Magic,Slot13Magic,Slot14Magic,Slot15Magic,Slot16Magic,Slot17Magic,Slot18Magic
-global Slot3MN,Slot4MN,Slot5MN,Slot6MN,Slot7MN,Slot8MN,Slot9MN,Slot10MN,Slot11MN,Slot12MN,Slot13MN,Slot14MN,Slot15MN,Slot16MN,Slot17MN,Slot18MN
-Global 몬스터ID
-global NPC_STARTversion
+Global MonsterPID
+global Pro_version,NPC_STARTversion
+global 동파, 서파
 global A리노아,A동파,A서파,B리노아,B동파,B서파,G리노아,G동파,G서파,A길잃파,B길잃파,G길잃파
 global SA리노아,SA동파,SA서파,SB리노아,SB동파,SB서파,SG리노아,SG동파,SG서파,SA길잃파,SB길잃파,SG길잃파
 global monitor
 global Start_Time
 Global 아이템갯수 := {}
-Global 라깃카운트,정보카운트,결정갯수,나무갯수,가루갯수,골드바카운트
+Global 소지아이템리스트업데이트딜레이 := A_TickCount
+Global RasCount,정보카운트,결정갯수,나무갯수,가루갯수,골드바카운트
 global 게임시작x,게임시작y
+global 기존버젼,신버젼,패치
 global 좌표고정
+global 플러그,플러그타이틀
 global 점검 = 0
-global 업데이트체크
+global 업데이트체크,S업데이트체크,골바정보=0
 Global StartTime := A_TickCount
+Global 소지아이템리스트업데이트딜레이 := A_TickCount
 Global RunThreadCounter := A_TickCount
-Global 서버상태,CountPortal,차원
-Global 빵,몸찌방지,식빵갯수,절반FP,몸찌방지시작
-Global 몸찌체크 = 0 , 상점밖이동 = 0
+Global PT_Delays := A_TickCount
+Global NSK_Counts := A_TickCount
+Global NPC_TALK_DELAYCOUNT := A_TickCount
+Global Read_Memory_Count := A_TickCount
+Global 서버상태,CountPortal,차원, 랜덤차원, 알파차원, 베타차원, 감마차원,Gui_PartyON,차원,Gui_CheckUseParty,Gui_KON = 0,Gui_KOFF = 0,적용날짜, 포남입장시간
+    global 업데이트체크, 적용날짜
+Global 차원체크
+Global 빵,몸찌방지,식빵갯수,절반FP,몸찌이동인식 = 0
 global 실행창위치 = 0 , 시작탭사이즈 = 0
-global 서버팅김,파라스감지,수천감지,파라스방해감지
-Global 현혹번호, 폭검번호, 독침번호, 무기공격번호
+global 무바중 = 0
+global Reserver,파라스감지,수호천사방지,파라스방해감지,인연방지,이유
+global 몹찾기 = 0
+Global 현혹번호, 폭검번호, 독침번호, 무기공격번호, 타겟팅랜덤
 Global 대화번호, 명상번호, 더블어택번호, 체력향상번호, 집중번호, 회피번호, 몸통지르기번호, 리무브아머번호, 민첩향상번호, 활방어번호, 마력향상번호, 마력방어번호
 Global 빛의갑옷번호, 물의갑옷번호, 스톤스킨번호
-Global 포북시작, 초기마을이동, 현재차원
+Global Run타겟,타겟number := 0
+Global 포북시작, gui_Startmap, 현재차원
 Global 포북생콩섭취, 포남생콩섭취, 가방수량체크
 Global VMRESET
 Global 상승체력평균값, 상승체력평균치
 Global jean, Cap, Top, Shoes
 Global 호출대상
-Global WaaponLimit
-Global UsePunch
-Global 무기_Coin
-Global hit1 := jelan.read(0x0058dad4,"UINT",0x1a5)
-Global 무바딜레이 :=300
-Global 맵이동속도 := 300
-Global 무기종류
+global filePath
+Global 무기종류, 머미맵선택
 Global RecentWeapons := []
 Global Attacking , AttackingCount
-Global 파라스타이머시작, 파라스타이머카운트, 파라스타이머값 := 3600, 파라스대기값 := 3600000
-FileReadLine, NPC_STARTversion, C:\NPC좌표.ini , 1
+global 감응 := 0, 이유
+TTSTOP := 0
+WinGetTitle, 플러그타이틀, ahk_exe NexonPlug.exe
+WinGet, 플러그, PID , ahk_exe NexonPlug.exe
+Gui, -MaximizeBox -MinimizeBox
 SysGet,monitor,16
-Gui, color, ffffff
-Gui, -MaximizeBox -MinimizeBox -Caption -Border
 Gui, Font
-Gui, Font, s8 Bold,Arial
+Gui, Font, s8 ,Arial
+Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
+Gui, Add, Tab, x0 y4 w750 h660, 기본설정|Utility|Grade+|NPC|
+Gui, Font
+Gui, Font, s8 ,
 Gui, Add, StatusBar, , 시작대기중
-SB_SetParts(210,260,310)
-Gui, Font
-Gui, Font,s8 ,Arial
-Gui, Add, Tab3, v탭2 x442 y42 w150 h240 AltSubmit cBlack, 퀵슬롯||잠수어빌|타겟어빌|포남설정|
-Gui, tab, 퀵슬롯
-Gui, Font
-Gui, Font, s8 Bold,Arial
-Gui, Add, Text, x+15 y+15 h20 c205375, ★ 1 ~ 3번 무기설정
-Gui, Add, checkbox, xp yp+30 h20 v4번사용 c112b3c, 　4번
-Gui, Add, checkbox, xp yp+30 h20 v5번사용 c112b3c, 　5번
-Gui, Add, checkbox, xp yp+30 h20 v6번사용 c112b3c, 　6번
-Gui, Add, checkbox, xp yp+30 h20 v7번사용 c112b3c, 　7번
-Gui, Add, Text, xp yp+30 h20 c205375, ★ 8 ~ 0번 고정
-Gui, tab, 잠수어빌
-Gui, Font
-Gui, Font, s8 Bold,Arial
-Gui, Add, checkbox, x+5 y+15 h20 v대화사용 cff6666, 대화
-Gui, Add, checkbox, xp yp+31 h20 v명상사용 cff6666, 명상
-Gui, Add, checkbox, xp yp+31 h20 v몸통지르기사용 cff6666, 몸찌
-Gui, Add, checkbox, xp yp+31 h20 v집중사용 cff6666, 집중
-Gui, Add, checkbox, xp yp+31 h20 v회피사용 cff6666, 회피
-Gui, Add, checkbox, xp yp+31 h20 v활방어사용 cff6666, 활방어
-Gui, Add, checkbox, xp+65 yp-155 h20 v리무브아머사용 cff6666, 리뭅아머
-Gui, Add, checkbox, xp yp+31 h20 v체력향상사용 cff6666, 체력향상
-Gui, Add, checkbox, xp yp+31 h20 v민첩향상사용 cff6666, 민첩향상
-Gui, Add, checkbox, xp yp+31 h20 v더블어택사용 cff6666, 더블어택
-Gui, Add, checkbox, xp yp+31 h20 v마력향상사용 c0099ff, 마법향상
-Gui, Add, checkbox, xp yp+31 h20 v마력방어사용 c0099ff, 마력방어
-Gui, tab, 타겟어빌
-Gui, Font
-Gui, Font, s8 Bold,Arial
-Gui, Add, checkbox, x+15 y+15 h20 v현혹사용 cff0066, 현혹
-Gui, Add, checkbox, xp yp+30 h20 v폭검사용 cff0066, 폭검
-Gui, Add, checkbox, xp yp+30 h20 v독침사용 cff0066, 독침
-Gui, Add, checkbox, xp yp+30 h20 v무기공격사용 cff0066, 무기공격
-Gui, tab, 포남설정
-Gui, Font
-Gui, Font, s8 Bold,Arial
-Gui, Add, Radio, x+15 y+15 h15 Checked vGui_Ent gCheckMob cff6666, 엔트
-Gui, Add, Radio, xp+55 yp h15 vGui_Rockey gCheckMob cff6666, 록키
-Gui, Add, Radio, xp-55 yp+30 h15 vGui_Mand gCheckMob cff6666, 만드
-Gui, Add, Radio, xp+55 yp h15 vGui_MobMagic gCheckMob c0099ff, 마법
-Gui, Add, Radio, xp-55 yp+30 h15 vGui_EntRockey gCheckMob cff0066, 엔트록키
-Gui, Add, Radio, xp yp+30 h15 vGui_AllMobAND gCheckMob cff0066, 수련어빌 모두
-Gui, Add, Radio, xp yp+30 h15 Checked vGui_AllMobOR gCheckMob cff0066, 수련어빌 1개라도
-Gui, Add, Edit, xp-4 yp+30 w33 +Right Limit4 number Disabled cblack vGui_AllMobLimit, 9200
-Gui, Add, Text, x+1 yp+5 +Left v포남설정, 이상 만드만 공격
-Gui, Font
-Gui, Font,s8 ,Arial
-Gui, Add, Tab3, v탭3 x600 y42 w165 h240 AltSubmit cBlack, 소각설정|세부설정||
-Gui, tab, 소각설정
-Gui, Font
-Gui, Font, s8,Arial
-Gui, Add, ListView, x+5 y+5 h130 w150 -LV0x20 -Multi -HDR v포프레스네소각, 아이템
-Gui, add, Edit, xp yp+140 w150 vGui_incinerateitem
-Gui, Add, Button, xp yp+30 w60 h25 g소각갱신, 새로갱신
-Gui, Add, Button, xp+65 yp w40 h25 gAddincinerate, 추가
-Gui, Add, Button, xp+45 yp w40 h25 gDelincinerate, 삭제
-LV_ModifyCol(1, 320)
-Gui, tab, 세부설정
-Gui, Font
-Gui, Font, s8  Bold,Arial
-Gui, Add, GroupBox, x605 y80 w155 h50 +Center c343a40, [포북 생콩설정]
-Gui, Font
-Gui, Font, s8,Arial
-Gui, Add, Text, xp+5 yp+23 , 생콩섭취
-Gui, Add, DropDownList, xp+60 yp-4 h100 w85 +Center v포북생콩설정 g생콩설정, FP 500이하||상시사용
-Gui, Font
-Gui, Font, s8  Bold,Arial
-Gui, Add, GroupBox, x605 y135 w155 h50 +Center c343a40, [포남 생콩설정]
-Gui, Font
-Gui, Font, s8,Arial
-Gui, Add, Text, xp+5 yp+23 , 생콩섭취
-Gui, Add, DropDownList, xp+60 yp-4 h100 w85 +Center v포남생콩설정 g생콩설정, FP 500이하||상시사용
-Gui, Font
-Gui, Font, s8  Bold,Arial
-Gui, Add, GroupBox, x605 y190 w155 h50 +Center c343a40, [줍줍 가방설정]
-Gui, Font
-Gui, Font, s8,Arial
-Gui, Add, Text, xp+5 yp+23 , 가방갯수
-Gui, Add, DropDownList, xp+60 yp-4 h100 w85 +Center v가방설정 g가방수량설정, 줍줍끄기|40개 초과시||45개 초과시|제한없음
-Gui, Font
-Gui, Font,s8 ,Arial
-Gui, Add, Tab3, v탭4 x432 y300 w340 h191 AltSubmit cBlack, 캐릭터정보|무바설정|마법설정|안전설정|파티설정|
-Gui, Tab, 캐릭터정보
-Gui, Font
-Gui, Font, s9 ,Arial
-Gui, Add, Text, x442 yp+30 w70 +Right, 캐릭터명 :
-Gui, Add, Text, x442 yp+27 w70 +Right, 갈리드 :
-Gui, Add, Text, x442 yp+27 w70 +Right, 골드바 :
-Gui, Add, Text, x442 yp+27 w70 +Right, 라스의깃 :
-Gui, Add, Text, x442 yp+27 w70 +Right, 정령의보석 :
-Gui, Font
-Gui, Font, s8  Bold, Arial
-Gui, Add, Text, x492 yp+27 w100 +Left vNPC_version cf66b0e,%NPC_STARTversion%
-Gui, Font
-Gui, Font, s9 ,Arial
-Gui, Add, Text, x532 y330 w200 +Left vGui_CharName
-Gui, Add, Text, x532 yp+27 w200 +Left vGui_NowGold
-Gui, Add, Text, x532 yp+27 w200 +Left vGui_NowGoldbar
-Gui, Add, Text, x532 yp+27 w200 +Left CBlue vGui_RasCount
-Gui, Add, Text, x532 yp+27 w200 +Left CRed vGui_정보Count
-Gui, Font
-Gui, Font, s8 cGray Bold,Arial
-Gui, Add, Text, x592 yp+27 w120 +Right ,마개조 똘룸체잠 %ProgramVersion%
-Gui, Add, Groupbox, x442 y454 w320 h30,
-Gui, Tab, 무바설정
-Gui, Font
-Gui, Font, s8 ,Arial
-Gui, Add, GroupBox, x440 y417 w325 h70 +Center c343a40,
-Gui, Font
-Gui, Font, s8 ,Arial
-Gui, Add, Radio, x457 y330 h15 Checked vGui_1Muba gSelectMuba c000000, 1무바
-Gui, Add, Radio, xp+100 yp h15 vGui_2Muba gSelectMuba c000000, 2무바
-Gui, Add, Radio, xp+100 yp h15 vGui_3Muba gSelectMuba c000000, 3무바
-Gui, Add, Radio, xp-200 yp+27 h15 vGui_2ButMuba gSelectMuba c000000, 2벗무바
-Gui, Add, Radio, xp+100 yp h15 vGui_3ButMuba gSelectMuba c000000, 3벗무바
-Gui, Add, Radio, xp+100 yp h15 vGui_4ButMuba gSelectMuba c000000, 4벗무바
-Gui, Add, Text, xp-195 yp+27 +Left, [1번 무기어빌]
-Gui, Add, Text, xp+100 yp +Left, [2번 무기어빌]
-Gui, Add, Text, xp+100 yp +Left, [3번 무기어빌]
-Gui, Add, DropDownList, xp-202 yp+15 w80 +Left cblack vGui_Weapon1 gSelectAbility, 검|단검|도|도끼|대검|대도|창, 특수창|봉, 해머|현금|활|거대검|거대도|거대도끼|양손단검|양손도끼|스태프
-Gui, Add, DropDownList, xp+100 yp w80 +Left cblack Disabled vGui_Weapon2 gSelectAbility, 검|단검|도|도끼|대검|대도|창, 특수창|봉, 해머|현금|활|거대검|거대도|거대도끼|양손단검|양손도끼|스태프
-Gui, Add, DropDownList, xp+100 yp w80 +Left cblack Disabled vGui_Weapon3 gSelectAbility, 검|단검|도|도끼|대검|대도|창, 특수창|봉, 해머|현금|활|거대검|거대도|거대도끼|양손단검|양손도끼|스태프
-Gui, Font
-Gui, Font, s8  ,Arial
-Gui, Add, Text, x490 yp+30 w27 h30 +Center, 격투
-Gui, Font
-Gui, Font, s8  ,Arial
-Gui, Add, Text, xp+64 yp w25 +Center vGui_WeaponLimit1, 1번
-Gui, Add, Text, xp+64 yp w25 +Center vGui_WeaponLimit2, 2번
-Gui, Add, Text, xp+64 yp w25 +Center vGui_WeaponLimit3, 3번
-Gui, Font
-Gui, Font, s8 ,Arial
-Gui, Add, Edit, xp-200 yp+15 w40 h17 +Center Limit4 number Disabled cblack vGui_LimitAbility0, 9200
-Gui, Add, Edit, xp+64 yp w40 h17 +Center Limit4 number cblack vGui_LimitAbility1, 9200
-Gui, Add, Edit, xp+64 yp w40 h17 +Center Limit4 number Disabled cblack vGui_LimitAbility2, 9200
-Gui, Add, Edit, xp+64 yp w40 h17 +Center Limit4 number Disabled cblack vGui_LimitAbility3, 9200
-Gui, Add, Text, xp-192 yp+22 , 장소 "자동" 선택시 설정값에 도달하면 포북이동
-Gui, tab, 마법설정
-Gui, Font
-Gui, Font, s8 ,Arial
-Gui, Add, Text, x480 y345 +Left,원격마법 사용
-Gui, Add, Checkbox, xp-20 yp-2 w15 h15 gCheckUseMagic vGui_CheckUseMagic c000000
-Gui, Add, Text, xp+20 yp+30 +Right, HP가
-Gui, Add, Edit, xp+30 yp-4 w80 +Right Limit7 number cRed vGui_CHP, 0
-Gui, Add, Text, xp+85 yp+4, 되면 리메듐 사용
-Gui, Add, Text, xp-135 yp+26 +Right, 스펠슬롯
-Gui, Add, DropDownList, xp+50 yp-4 w80 +Left vGui_MagicNStack, 3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20
-Gui, Add, Text, xp+85 yp+4 +Left, 번 까지 전부 사용
-Gui, Add, Text, xp-135 yp+30 c6666ff +Left, (스펠슬롯1번) (엘)리메듐 고정
-Gui, Add, Text, xp yp+24 C6666ff +Left, (스펠슬롯2번) 브렐 고정
-Gui, tab, 안전설정
-Gui, Font, s8  Bold,Arial
-Gui, Add, GroupBox, x450 y340 w230 h65 c343a40, [설정 #1]
-Gui, Font
-Gui, Font, s8 ,Arial
-Gui, Add, Checkbox, xp10 yp+20 w15 h15 gCheckUseHPExit vGui_CheckUseHPExit c000000
-Gui, Add, Text, xp18 yp+1 +Left, 체력이
-Gui, Add, Edit, xp35 yp-2 w50 h17 +Right Limit6 number Disabled cRed vGui_HPExit, 0
-Gui, Add, Text, xp53 yp+2 +Left, 이하 종료 (재접속x)
-Gui, Add, Checkbox, xp-106 yp+20 w15 h15 gCheckUseHPPortal vGui_CheckUseHPPortal c000000
-Gui, Add, Text, xp18 yp+1 +Left, 체력이
-Gui, Add, Edit, xp35 yp-2 w50 h17 +Right Limit6 number Disabled cRed vGui_HPPortal, 0
-Gui, Add, Text, xp53 yp+2 +Left, 이하 차원이동
-Gui, Font, s8  Bold,Arial
-Gui, Add, GroupBox, x450 y420 w230 h48 c343a40, [설정 #2]
-Gui, Font
-Gui, Font, s8 Bold,Arial
-Gui, Add, Radio, xp+27 yp+22 w90 h15 Checked v방어구방지ON c205375, 장비체크ON
-Gui, Add, Radio, xp+100 yp w95 h15 v방어구방지OFF c6977a9, 장비체크OFF
-Gui, tab, 파티설정
-Gui, Font
-Gui, Font, s8 ,Arial
-Gui, Add, Checkbox, x660 y332 w15 h15 vGui_CheckUseParty g원격파티사용 c000000
-Gui, Add, Text, xp+20 yp +Left , 원격파티 사용
-Gui, Add, Button, xp-20 yp+20 w80 h30 g원격파티설명서, 사용법
-Gui, Add, Text, x450 y337, 파티1 -
-Gui, add, Edit, xp+40 yp-5 w100 cblack vName1
-Gui, Add, DropDownList, xp+110 yp w38 +Left vGui_P1CharNumber, 1|2|3|4|5|6|7|8|9|10
-Gui, Add, Text, xp-150 yp+30, 파티2 -
-Gui, add, Edit, xp+40 yp-5 w100 cblack vName2
-Gui, Add, DropDownList, xp+110 yp w38 +Left vGui_P2CharNumber, 1|2|3|4|5|6|7|8|9|10
-Gui, Add, Text, xp-150 yp+30, 파티3 -
-Gui, add, Edit, xp+40 yp-5 w100 cblack vName3
-Gui, Add, DropDownList, xp+110 yp w38 +Left vGui_P3CharNumber, 1|2|3|4|5|6|7|8|9|10
-Gui, Add, Text, xp-150 yp+30, 파티4 -
-Gui, add, Edit, xp+40 yp-5 w100 cblack vName4
-Gui, Add, DropDownList, xp+110 yp w38 +Left vGui_P4CharNumber, 1|2|3|4|5|6|7|8|9|10
-Gui, Add, Text, xp-150 yp+30, 파티5 -
-Gui, add, Edit, xp+40 yp-5 w100 cblack vName5
-Gui, Add, DropDownList, xp+110 yp w38 +Left vGui_P5CharNumber, 1|2|3|4|5|6|7|8|9|10
-Gui, Add, Text, xp-150 yp+30, 파티6 -
-Gui, add, Edit, xp+40 yp-5 w100 cblack vName6
-Gui, Add, DropDownList, xp+110 yp w38 +Left vGui_P6CharNumber, 1|2|3|4|5|6|7|8|9|10
-Gui, Font
-Gui, Font, s8 Bold,Arial
-Gui, Add, Radio, x660 y400 h15 vGui_PartyOn c205375 g원격파티사용, 파티ON
-Gui, Add, Radio, xp yp+25 h15 Checked vGui_PartyOff g원격파티사용 c6977a9, 파티OFF
-Gui, Font
-Gui, Font,s8 ,Arial
-Gui, Add, Tab, vTabsize x0 y0 w780 h680 AltSubmit gTab, 기본설정|스펠그레이드 / 목록스캔|어빌리티그레이드|
-Gui, Font
-Gui, Font, s8 Bold,Arial
-Gui, Add, GroupBox, x432 y29 w340 h265 +Center c343a40,
+SB_SetParts(160,200,360)
+DetectHiddenWindows, ON
+Gui, Add, Checkbox, x590 y2 w110 h18  vGui_relogerror, 재접속 오류
 gui, tab, 기본설정
-
 Gui, Font
-Gui, Font, s9 Bold,Arial
-Gui, Add, GroupBox, x245 y29 w185 h375 c343a40, [NPCOID설정]
+Gui, Font, s8 ,Arial
+Gui, Font
+Gui, Font, s8  Bold,Arial
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x10 y30 w330 h145 v로그인, 로그인 설정
 Gui, Font
 Gui, Font, s8
-
-; 기준: 알파 리노아 텍스트 (x260 y60), Edit (x340 y55)
-Gui, Add, Text,  x260 y60 +Left , 알파 리노아   :
-Gui, Add, Edit,  x340 y55 w80 Disabled va리노아 , 0
-
-Gui, Add, Text,  x260 y85 +Left , 알파 동파   :
-Gui, Add, Edit,  x340 y80 w80 Disabled va동파, 0
-
-Gui, Add, Text,  x260 y110 +Left , 알파 서파   :
-Gui, Add, Edit,  x340 y105 w80 Disabled vA서파, 0
-
-Gui, Add, Text,  x260 y135 +Left , 베타 리노아  :
-Gui, Add, Edit,  x340 y130 w80 Disabled vB리노아, 0
-
-Gui, Add, Text,  x260 y160 +Left , 베타 동파  :
-Gui, Add, Edit,  x340 y155 w80 Disabled vB동파, 0
-
-Gui, Add, Text,  x260 y185 +Left , 베타 서파  :
-Gui, Add, Edit,  x340 y180 w80 Disabled vB서파, 0
-
-Gui, Add, Text,  x260 y210 +Left , 감마 리노아  :
-Gui, Add, Edit,  x340 y205 w80 Disabled vG리노아, 0
-
-Gui, Add, Text,  x260 y235 +Left , 감마 동파  :
-Gui, Add, Edit,  x340 y230 w80 Disabled vG동파, 0
-
-Gui, Add, Text,  x260 y260 +Left , 감마 서파  :
-Gui, Add, Edit,  x340 y255 w80 Disabled vG서파, 0
-
-Gui, Add, Text,  x260 y285 +Left , 알파 길잃파  :
-Gui, Add, Edit,  x340 y280 w80 Disabled vA길잃파, 0
-
-Gui, Add, Text,  x260 y310 +Left , 베타 길잃파  :
-Gui, Add, Edit,  x340 y305 w80 Disabled vB길잃파, 0
-
-Gui, Add, Text,  x260 y335 +Left , 감마 길잃파  :
-Gui, Add, Edit,  x340 y330 w80 Disabled vG길잃파, 0
-
-Gui, Add, Button, x260 y360 w155 h30 , NPCOID리셋
-
-Gui, ADD, Edit, x280 y420 Disabled w120 h18 +Center v현재타겟OID값,
-Gui, ADD, Edit, xp yp+20 Disabled w120 h18 +Center v호출대상이름,
-Gui, ADD, Edit, xp yp+20 Disabled w120 h18 +Center v파라스타이머,
+Gui, Add, Text, x30 y55 +Left vGui_NexonID2 , ID   :
+Gui, Add, Text, x30 y80 +Left vGui_NexonPassWord2 , PW   :
+Gui, Add, Edit, x110 y52 w140 +Left vGui_NexonID
+Gui, Add, Edit, x110 y77 w140 +Left Password vGui_NexonPassWord
+Gui, Add, Text, x30 y105 +Left, 서버   :
+Gui, Add, Text, x30 y130 +Left, 캐릭터번호   :
+Gui, Add, Text, x30 y152 +Left, 로그인방식   :
+Gui, Add, DropDownList, x110 y105 w140 +Left vGui_Server, 엘|테스
+Gui, Add, DropDownList, x110 y128 w140 +Left vGui_CharNumber, 1|2|3|4|5|6|7|8|9|10
+Gui, Add, DropDownList, x110 y150 w140 +Left vGui_Login gCheck로그인, 인터넷|넥슨플러그|홈페이지클릭[구글]
 Gui, Font
-Gui, Font, s8  Bold,Arial
-Gui, Add, GroupBox, x12 y29 w230 h150 center v로그인 c343a40, [로그인 세팅]
+Gui, Font, s10 Bold
+Gui, Add, Button, x260 y51 w70 h45 +Center vGui_StartButton gStart, 시작
 Gui, Font
-Gui, Font, s9 ,Arial
-Gui, Add, Edit, x22 y49 w210 h20 vGui_NexonID c000000,
-Gui, Add, Edit, x22 y79 w210 h20 Password vGui_NexonPassWord c000000,
-Gui, Add, DropDownList, x22 y109 w50 h150 +Center Disabled vGui_Server, 엘||
-Gui, Add, DropDownList, x77 y109 w50 h200 +Center vGui_CharNumber, 1|2|3|4|5|6|7|8|9|10
-Gui, Add, DropDownList, x132 y109 w100 +Center vGui_Login gCheck로그인, 인터넷||넥슨플러그
-Gui, Add, Button, x82 y139 w90 h30 +Center  vGui_StartButton gStart , 실행
+Gui, Font, s10 Bold
+Gui, Add, Button, x260 y111 w70 h45 +Center vGui_Resetting gResetting, 리셋
 Gui, Font
-Gui, Font, s8  Bold,Arial
-Gui, Add, GroupBox, x12 y180 w230 h65 +Center c343a40, [로그인 상태]
+Gui, Font, s8 cGreen Bold
+Gui, Add, Text, x30 y50 h20 v설명, [컨트롤 + G로 로그인 클릭 좌표를 지정]
+Gui, Add, Text, x30 y50 h20 v설명2, [컨트롤 + G로 시작 좌표를 지정]
 Gui, Font
-Gui, Font, s8,Arial
-Gui, Add, Text, xp10 yp20 w210 h20 +Center v로그인상태정보, 실행 준비 중
-Gui, Add, Text, xp yp20 w60 h20 , 실행시간:
-Gui, Add, Text, xp50 yp w150 h20 +Center v실행시간,
+Gui, Font, s10 cGreen Bold
 Gui, Font
-Gui, Font, s9,Arial
+Gui, Font, s8 cGreen Bold
 Gui, Add, Text, x30 y70 h20 v넥슨x, 좌표X :
 Gui, Add, Text, x140 y70 h20 v넥슨y, 좌표Y :
 Gui, Add, Text, x80 y70 w50 h20 v좌표x, Ctrl
-Gui, Add, Text, x190 y70 w50 h20 v좌표y, Q
+Gui, Add, Text, x190 y70 w50 h20 v좌표y, G
 Gui, Font
-Gui, Font, s8 Bold,Arial
-Gui, Add, GroupBox, x25 y398 w205 h33 center c343a40,
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x10 y180 w330 h105, HP 설정
 Gui, Font
-Gui, Font, s9 cBlue Bold
-Gui, Add, Text, x35 y410 w60 , 감응:
-Gui, Add, Radio, x80 y410 w50 vGui_KON, ON
+Gui, Font, s8
+Gui, Add, Checkbox, x30 y196 w15 h15 gCheckUseHPExit vGui_CheckUseHPExit
+Gui, Add, Checkbox, x30 y218 w15 h15 gCheckUseHPPortal vGui_CheckUseHPPortal
+Gui, Add, Checkbox, x30 y240 w15 h15 gCheckUseHPLimited vGui_CheckUseHPLimited
+Gui, Add, Text, x55 y198 +Left, 체력이
+Gui, Add, Text, x55 y220 +Left, 체력이
+Gui, Add, Text, x55 y242 +Left, 체력이
+Gui, Add, Edit, x95 y193 w50 +Right Limit6 number Disabled cRed vGui_HPExit, 0
+Gui, Add, Edit, x95 y215 w50 +Right Limit6 number Disabled cRed vGui_HPPortal, 0
+Gui, Add, Edit, x95 y237 w50 +Right Limit6 number Disabled cRed vGui_HPLimited, 0
+Gui, Add, Text, x150 y198 +Left, 이하시 종료(재접속 하지 않음)
+Gui, Add, Text, x150 y220 +Left, 이하시 차원이동
+Gui, Add, Text, x150 y242 +Left, 까지 상승시 종료(재접속 하지 않음)
+
+Gui, Add, Checkbox, x30 y262 w15 h15 gCheckUseHPHospital vGui_CheckUseHPHospital
+Gui, Add, Text, x55 y264 +Left, 체력이
+Gui, Add, Edit, x95 y259 w50 +Right Limit6 number Disabled cRed vGui_HPHospital, 0
+Gui, Add, Text, x150 y264 +Left, 까지 낮아졌을 경우 병원가기
+
 Gui, Font
-Gui, Font, s9 cRed Bold
-Gui, Add, Radio, x130 y410 w50 vGui_KOFF, OFF
-Gui, Add, GroupBox, x25 y427 w205 h33 center c343a40,
-Gui, Add, Radio, x30 y440 h15 Checked vGui_HuntAuto gSelectHuntPlace c205375, 자동
-Gui, Add, Radio, xp+50 yp h15 vGui_HuntPonam gSelectHuntPlace c6977a9, 포남
-Gui, Add, Radio, xp+50 yp h15 vGui_HuntPobuk gSelectHuntPlace cc197d2, 포북
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x10 y288 w330 h105, 무바 설정
 Gui, Font
-Gui, Font, s8 Bold,Arial
-Gui, Add, GroupBox, x25 y457 w205 h33 center c343a40,
+Gui, Font, s8
+Gui, Add, Radio, x30 y304 h15 Checked vGui_1Muba gSelectMuba, 1무바
+Gui, Add, Radio, x130 y304 h15 vGui_2Muba gSelectMuba, 2무바
+Gui, Add, Radio, x230 y304 h15 vGui_3Muba gSelectMuba, 3무바
+Gui, Add, Radio, x30 y324 h15 vGui_2ButMuba gSelectMuba, 2벗무바
+Gui, Add, Radio, x130 y324 h15 vGui_3ButMuba gSelectMuba, 3벗무바
+Gui, Add, Radio, x230 y324 h15 vGui_4ButMuba gSelectMuba, 4벗무바
+Gui, Add, Text, x35 y345 +Left, 1번 무기어빌
+Gui, Add, Text, x135 y345 +Left, 2번 무기어빌
+Gui, Add, Text, x235 y345 +Left, 3번 무기어빌
+Gui, Add, DropDownList, x30 y360 w80 +Left vGui_Weapon1 gSelectAbility, 검|단검|도|도끼|대검|대도|창, 특수창|봉, 해머|현금|활|거대검|거대도|거대도끼|양손단검|양손도끼|스태프|지하탐색|발굴
+Gui, Add, DropDownList, x130 y360 w80 +Left Disabled vGui_Weapon2 gSelectAbility, 검|단검|도|도끼|대검|대도|창, 특수창|봉, 해머|현금|활|거대검|거대도|거대도끼|양손단검|양손도끼|스태프|지하탐색|발굴
+Gui, Add, DropDownList, x230 y360 w80 +Left Disabled vGui_Weapon3 gSelectAbility, 검|단검|도|도끼|대검|대도|창, 특수창|봉, 해머|현금|활|거대검|거대도|거대도끼|양손단검|양손도끼|스태프|지하탐색|발굴
+
 Gui, Font
-Gui, Font, S8  Bold,Arial
-Gui, Add, Radio, x30 y470 h15 Checked v랜덤차원 g차원체크 c205375, 랜덤
-Gui, Add, Radio, xp+50 yp h15 v알파차원 g차원체크 c6977a9, 알파
-Gui, Add, Radio, xp+50 yp h15 v베타차원 g차원체크 cc197d2, 베타
-Gui, Add, Radio, xp+50 yp h15 v감마차원 g차원체크 cd3b1c2, 감마
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x10 y395 w330 h55, 기타 상태
 Gui, Font
-Gui, Font, s8  Bold,Arial
-Gui, Add, GroupBox, x275 y240 w120 h50 center c343a40 v줍줍설정, [줍줍/소각 설정]
+Gui, Font, s8
+Gui, Add, Text, x20 y420 +Left, [라스의깃]  :
+Gui, Add, Edit, x95 y417 w30 +Right Limit3 number vGui_RasCount, 0
+Gui, Add, Text, x130 y420 +Left, 개
 Gui, Font
-Gui, Font, s8  Bold ,Arial
-Gui, Add, Radio, xp+15 yp+22 w40 h15 vGui_jjON c205375, ON
+Gui, Font, s9
+Gui, Add, Button, x142 y412 w16 h13 +Center  glagitu, ∧
+Gui, Add, Button, x142 y428 w16 h13 +Center  glagitd, ∨
 Gui, Font
-Gui, Font, s8  Bold ,Arial
-Gui, Add, Radio, xp+50 yp w50 h15 vGui_jjOFF c6977a9, OFF
+Gui, Font, s8
+Gui, Add, Text, x168 y420 w40, [정보] :
+Gui, Add, Edit, x203 y417 w30 +Right Limit3 number vGui_정보Count, 0
+Gui, Add, Text, x237 y420 w30, 개
 Gui, Font
-Gui, Font, S8  Bold,Arial
-GuiControl,HIDE,줍줍설정
-GuiControl,HIDE,Gui_jjON
-GuiControl,HIDE,Gui_jjOFF
+Gui, Font, s8
+Gui, Add, Text, x250 y420 w40, [골바] :
+Gui, Add, Edit, x285 y417 w30 +Right Limit3 number vGui_NowGoldbar, 0
+Gui, Add, Text, x320 y420 w10, 개
+
 Gui, Font
-Gui, Font, s9  Bold,Arial
-Gui, Add, GroupBox, x12 y515 w760 h138 center v그룹모니터링 c343a40,[모니터링]
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x10 y460 w330 h140, 어빌리티
+Gui, Font
+Gui, Font, s8
+Gui, Add, Text, x90 y485 w55 +Center, 격투
+Gui, Add, Text, x150 y485 w55 +Center, 1번
+Gui, Add, Text, x210 y485 w55 +Center, 2번
+Gui, Add, Text, x265 y485 w55 +Center, 3번
+Gui, Add, Text, x20 y510, 어빌리티
+Gui, Add, Text, x20 y535, 어빌레벨
+Gui, Add, Text, x20 y560, 그레이드
+;Gui, Add, Text, x20 y578, TagetOID
+
+
+Gui, Font, s8
+Gui, Add, Text, x90 y510 w55 +Center vGui_BasicWName0
+Gui, Add, Text, x150 y510 w55 +Center vGui_BasicWName1
+Gui, Add, Text, x210 y510 w55 +Center vGui_BasicWName2
+Gui, Add, Text, x265 y510 w55 +Center vGui_BasicWName3
+Gui, Add, Text, x90 y535 w55 +Center vGui_BasicWValue0
+Gui, Add, Text, x150 y535 w55 +Center vGui_BasicWValue1
+Gui, Add, Text, x210 y535 w55 +Center vGui_BasicWValue2
+Gui, Add, Text, x265 y535 w55 +Center vGui_BasicWValue3
+Gui, Add, Text, x90 y560 w55 +Center vGui_Grade0
+Gui, Add, Text, x150 y560 w55 +Center vGui_Grade1
+Gui, Add, Text, x210 y560 w55 +Center vGui_Grade2
+Gui, Add, Text, x265 y560 w55 +Center vGui_Grade3
+;Gui, ADD, Edit, x100 y573 w100 Center vCallTarget Disabled, TargetName
+;Gui, ADD, Edit, x205 y573 w100 +Center vMonsterTargetPID Disabled, TargetOID
+
+
+Gui, Font
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x350 y30 w350 h150, 포남 설정
+Gui, Font
+Gui, Font, s8
+Gui, Add, Text, x370 y50 +Left, 만드 체크
+Gui, Add, Checkbox, x450 y48 h15 vGui_EvadeMand, 주위에 만드가 있으면 다른몹 찾기
+Gui, Add, Text, x370 y75 +Left, 동선 설정
+Gui, Add, Radio, x450 y73 h15 Checked vGui_MoveLoute1, 기본
+Gui, Add, Radio, x500 y73 h15 vGui_MoveLoute2, 구석
+Gui, Add, Radio, x550 y73 h15 vGui_MoveLoute3, 위아래
+Gui, Add, Radio, x610 y73 h15 vGui_MoveLoute4, 아래만
+Gui, Add, Text, x370 y100 +Left, 몬스터 설정
+Gui, Add, Radio, x450 y98 h15 Checked vGui_Ent gCheckMob, 엔트
+Gui, Add, Radio, x500 y98 h15 vGui_Rockey gCheckMob, 록키
+Gui, Add, Radio, x570 y98 h15 vGui_EntRockey gCheckMob, 엔트록키
+Gui, Add, Radio, x450 y123 h15 vGui_Mand gCheckMob, 만드
+Gui, Add, Radio, x400 y123 h15 vGui_MobMagic gCheckMob, 마법
+Gui, Add, Radio, x500 y123 h15 vGui_AllMobAND gCheckMob, 전체AND
+Gui, Add, Radio, x570 y123 h15 vGui_AllMobOR gCheckMob, 전체OR
+Gui, Add, Text, x370 y155 +Left, 전체 몬스터 선택시 어빌
+Gui, Add, Edit, x495 y152 w35 +Right Limit4 number Disabled vGui_AllMobLimit, 9200
+Gui, Add, Text, x535 y155 +Left v포남설정, 이상이면 만드만 공격
+
+Gui, Font
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x350 y185 w350 h145, 공통 설정
+Gui, Font
+Gui, Font, s8
+Gui, Add, Text, x370 y203 +Left, 체작 장소
+Gui, Add, Radio, x440 y200 h15 Checked vGui_HuntAuto gSelectHuntPlace, 자동
+Gui, Add, Radio, x495 y200 h15 vGui_HuntPonam gSelectHuntPlace, 포남
+Gui, Add, Radio, x550 y200 h15 vGui_HuntPobuk gSelectHuntPlace, 포북
+Gui, Add, Radio, x605 y200 h18 vGui_Huntmummy gSelectHuntPlace, 머미/포북
+Gui, Add, Text, x370 y225 w25, 격투
+Gui, Add, Text, x435 y225 w25, 1번
+Gui, Add, Text, x500 y225 w25, 2번
+Gui, Add, Text, x565 y225 w25, 3번
+Gui, Add, Edit, x395 y222 w35 +Center Limit5 number vGui_LimitAbility0, 9200
+Gui, Add, Edit, x460 y222 w35 +Center Limit5 number vGui_LimitAbility1, 9200
+Gui, Add, Edit, x525 y222 w35 +Center Limit5 number vGui_LimitAbility2, 9200
+Gui, Add, Edit, x590 y222 w35 +Center Limit5 number vGui_LimitAbility3, 9200
+
+
+Gui, Add, Text, x370 y250 +Left, 파티 설정
+Gui, Add, Radio, x450 y247 h15 vGui_PartyOn g원격파티사용 Checked, ON
+Gui, Add, Radio, x510 y247 h15 vGui_PartyOff g원격파티사용, OFF
+Gui, ADD, Edit, x565 y247 h15 w120 Disabled +Center v파라스타이머, 다시 포남까지 0:00
+Gui, Add, Text, x370 y270 +Left, 자동 그레이드
+Gui, Add, Checkbox, x450 y268 h15 vGui_Grade
+Gui, Add, Text, x480 y270 +Left, [묵-찌-빠!]
+Gui, Add, Checkbox, x543 y268 h15 vGui_MGB
+Gui, Add, Text, x370 y290 +Left, 강제 그레이드
+Gui, Add, Button, x535 y284 w40 h21 +Center vGui_FG gforcegrade, 실행
+Gui, Add, DropDownList, x450 y285 w80 +Left vGui_forceweapon, 선택|격투|검|단검|도|도끼|거대도끼|대검|대도|창, 특수창|봉, 해머|현금|활|거대검|거대도|양손단검|양손도끼|스태프
+Gui, Add, Text, x370 y310 +Left, 차원 설정
+Gui, Add, Radio, x450 y310 h15 Checked v랜덤차원 g차원체크, 랜덤
+Gui, Add, Radio, x510 y310 h15 v알파차원 g차원체크, 알파
+Gui, Add, Radio, x570 y310 h15 v베타차원 g차원체크, 베타
+Gui, Add, Radio, x625 y310 h15 v감마차원 g차원체크, 감마
+
+
+Gui, Font
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x350 y340 w350 h178 , 캐릭터 상태
+Gui, Font
+Gui, Font, s8
+Gui, Add, Text, x360 y365 w60 +Right, 캐릭터명 :
+Gui, Add, Text, x360 y387 w60 +Right, 진행상황 :
+Gui, Add, Text, x360 y408 w60 +Right, 지역 :
+Gui, Add, Text, x360 y428 w60 +Right, 갈리드 :
+Gui, Add, Text, x360 y453 w60 +Right, HP :
+Gui, Add, Text, x360 y475 w60 +Right, FP :
+Gui, Add, Text, x360 y495 w60 +Right, 좌표 :
+Gui, Add, Text, x445 y365 w220 vGui_CharName
+Gui, Add, Text, x445 y387 w220 vGui_NowState
+Gui, Add, Text, x445 y408 w220 vGui_NowLocation
+Gui, Add, Text, x445 y428 w220 vGui_NowGold
+Gui, Add, Text, x445 y453 w220 cRed vGui_NowHP
+Gui, Add, Text, x445 y475 w220 cBlue vGui_NowFP
+Gui, Add, Text, x445 y495 w230 v좌표,
+
+Gui, Font
+Gui, Font, s8 cGreen Bold
+Gui, Add, Text, x10 y610 w330 h30, 단축키 설정 :
+Gui, Font
+Gui, Font, s7 Bold,Arial
+Gui, Add, Text, x90 y608 w100 h30, [1 ~ 3번 무기넣어]
+Gui, Font
+Gui, Font, s8
+Gui, Add, checkbox, x190 y600 w50 h30 v4번사용,4번
+Gui, Add, checkbox, x240 y600 w50 h30 v5번사용,5번
+Gui, Add, checkbox, x290 y600 w50 h30 v6번사용,6번
+Gui, Add, checkbox, x340 y600 w40 h30 v7번사용,7번
+Gui, Add, checkbox, x390 y600 w40 h30 v8번사용,8번
+Gui, Font
+Gui, Font, s7 Bold,Arial
+Gui, Add, Text, x440 y608 w125 h30, [9번:식빵 0번:라깃]
+
+Gui, Font
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x350 y520 w350 h80, 기능 설정
 Gui, Font
 Gui, Font, s8  Bold, Arial
-Gui, Add, Button, x672 y530 w90 h30 Disabled vGui_StopButton g일시정지, 일시정지
-Gui, Add, Button, xp yp w90 h30 Disabled vGui_RestartButton g재시작, 정지해제
-Gui, Add, Button, xp y572 w90 h30 Disabled vGui_Resetting gResetting, 재실행
-Gui, Add, Button, xp y614 w90 h30 g종료, 종료
+Gui, Add, Text, x370 y540 w220 , 원격 감응 :
+Gui, Font
+Gui, Font, s9 cBlue Bold
+Gui, Add, Radio, x440 y540 w60 vGui_KON, ON
+Gui, Font
+Gui, Font, s9 cRed Bold
+Gui, Add, Radio, x500 y540 w60 vGui_KOFF, OFF
+
+Gui, Font
+Gui, Font, s8  Bold, Arial
+Gui, Add, Text, x560 y540 w110 , [ ↓ 템뿌 방지 설정 ]
+Gui, Font
+Gui, Font, s9 cBlue Bold
+Gui, Add, Radio, x560 y570 w60 vProtect_AmorON, ON
+Gui, Font
+Gui, Font, s9 cRed Bold
+Gui, Add, Radio, x620 y570 w50 vProtect_AmorOFF, OFF
+
+Gui, Font
+Gui, Font, s8  Bold, Arial
+Gui, Add, Text, x370 y570 w150 , 줍줍/소각 :
+Gui, Font
+Gui, Font, s9 cBlue Bold
+Gui, Add, Radio, x440 y570 w60 vGui_jjON, ON
+Gui, Font
+Gui, Font, s9 cRed Bold
+Gui, Add, Radio, x500 y570 w50 vGui_jjOFF, OFF
+
+
+Gui, Font
+Gui, Font, s8  Bold, Arial
+Gui, Add, Button, x550 y605 w60 Disabled vGui_StopButton g일시정지, 일시정지
+Gui, Add, Button, x550 y605 w60 Disabled vGui_RestartButton g재시작, 재시작
+Gui, Add, Button, x620 y605 w60 +Center g종료, 종료
 GuiControl,HIDE,Gui_RestartButton
+
+Gui, Tab, Utility
+
+Gui, Font,
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x10 y250 w360 h155, 스킬 설정
 Gui, Font
-Gui, Font, s8 cSilver,Verdana
-Gui, Add, Text, x35 y635 w270 +Left, Made With %아이콘% and ING %A_Year%.%A_MM%.%A_DD%,by 꼴똘룸
-Gui, Font
-Gui, Font, s9,Arial
-Gui, Add, Progress, x15 y495 w218 h15 CE64740 Background555555 vPro_NoWHP ,
-Gui, Add, Text, xp yp w218 h15 0x201 Cwhite BackgroundTrans vGui_NowHP,
-Gui, Add, Progress, x283 y495 w218 h15 cC1CD0E Background555555 vPro_NoWMP ,
-Gui, Add, Text, xp yp w218 0x201 Cwhite BackgroundTrans vGui_NowMP,
-Gui, Add, Progress, x551 y495 w218 h15 c9594D5 Background555555 vPro_NoWFP ,
-Gui, Add, Text, xp yp w218 0x201 Cwhite BackgroundTrans vGui_NowFP,
-Gui, Font
-Gui, Font, s9 ,Arial
-Gui, Add, Text, x15 y545 w80 +Center v격투, [격투]
-Gui, Add, Text, xp+71 y545 w80 +Center v1번, [1번]
-Gui, Add, Text, xp+71 y545 w80 +Center v2번, [2번]
-Gui, Add, Text, xp+71 y545 w80 +Center v3번, [3번]
-Gui, Font
-Gui, Font, s9 ,Arial
-Gui, Add, Text, x15 y565 w80 +Center vGui_BasicWName0
-Gui, Add, Text, xp+71 y565 w80 +Center vGui_BasicWName1
-Gui, Add, Text, xp+71 y565 w80 +Center vGui_BasicWName2
-Gui, Add, Text, xp+71 y565 w80 +Center vGui_BasicWName3
-Gui, Font
-Gui, Font, s9 ,Arial
-Gui, Add, Text, x15 y585 w80 +Center vGui_BasicWValue0
-Gui, Add, Text, xp+71 y585 w80 +Center vGui_BasicWValue1
-Gui, Add, Text, xp+71 y585 w80 +Center vGui_BasicWValue2
-Gui, Add, Text, xp+71 y585 w80 +Center vGui_BasicWValue3
-Gui, Add, Text, x15 y605 w80 +Center vGui_Grade0
-Gui, Add, Text, xp+71 y605 w80 +Center vGui_Grade1
-Gui, Add, Text, xp+71 y605 w80 +Center vGui_Grade2
-Gui, Add, Text, xp+71 y605 w80 +Center vGui_Grade3
-Gui, Font
-Gui, Font, s11  Bold,Arial
-Gui, Add, Text, x312 y535 +Left ,시작체력 :
-Gui, Add, Text, xp y565 +Left ,상승체력 :
-Gui, Add, Text, xp y595 +Left ,경과시간 :
-Gui, Font
-Gui, Font, s11  Bold,Arial
-Gui, Add, Text, xp y625 +Left, 진행상황 :
-Gui, Font
-Gui, Font, s15  Bold,Arial
-Gui, Add, Text, x400 y532 w105 +Left v시작체력 c121013
-Gui, Add, Text, xp y562 w165 +Left v상승체력 cEB596E
-Gui, Add, Text, xp y592 w165 +Left v경과시간
-Gui, Font
-Gui, Font, s9  Bold,Arial
-Gui, Add, Text, xp y625 w270 +Left vGui_NowState
-Gui, Tab, 스펠그레이드 / 목록스캔
-Gui, Font
-Gui, Font, s8  Bold,Arial
-Gui, Add, text, x20 y30 w335 h510 c343a40, [스펠 그레이드 설정]-------------------------------------------
-Gui, Font
-Gui, Font, s8  ,Arial
-Gui, Add, Text, x35 y55 +Center, 스펠 3슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 4슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 5슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 6슬롯
-Gui, Add, Text, xp+110 yp +Center, 스펠 7슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 8슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 9슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 10슬롯
-Gui, Add, Text, x35 yp+70 +Center, 스펠 11슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 12슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 13슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 14슬롯
-Gui, Add, Text, xp+110 yp +Center, 스펠 15슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 16슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 17슬롯
-Gui, Add, Text, xp+80 yp +Center, 스펠 18슬롯
-Gui, Font
-Gui, Font, s8  ,Arial
-Gui, Add, edit, xp-605 yp-50 w80 +Left Disabled vGui_MagicName3
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName4
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName5
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName6
-Gui, Add, edit, xp+110 yp w80 +Left Disabled vGui_MagicName7
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName8
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName9
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName10
-Gui, Add, edit, xp-590 yp+70 w80 +Left Disabled vGui_MagicName11
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName12
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName13
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName14
-Gui, Add, edit, xp+110 yp w80 +Left Disabled vGui_MagicName15
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName16
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName17
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicName18
-Gui, Font
-Gui, Font, s8  ,Arial
-Gui, Add, edit, xp-590 yp-47 w80 +Left Disabled vGui_MagicValue3
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue4
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue5
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue6
-Gui, Add, edit, xp+110 yp w80 +Left Disabled vGui_MagicValue7
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue8
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue9
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue10
-Gui, Add, edit, xp-590 yp+70 w80 +Left Disabled vGui_MagicValue11
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue12
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue13
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue14
-Gui, Add, edit, xp+110 yp w80 +Left Disabled vGui_MagicValue15
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue16
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue17
-Gui, Add, edit, xp+80 yp w80 +Left Disabled vGui_MagicValue18
-Gui, Font
-Gui, Font, s8  c000000,Arial
-Gui, Add, Checkbox, xp-590 yp-115 w15 h15 gCheckM3 vGui_MagicCheck3
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM4 vGui_MagicCheck4
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM5 vGui_MagicCheck5
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM6 vGui_MagicCheck6
-Gui, Add, Checkbox, xp+110 yp w15 h15 gCheckM7 vGui_MagicCheck7
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM8 vGui_MagicCheck8
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM9 vGui_MagicCheck9
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM10 vGui_MagicCheck10
-Gui, Add, Checkbox, xp-590 yp+70 w15 h15 gCheckM11 vGui_MagicCheck11
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM12 vGui_MagicCheck12
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM13 vGui_MagicCheck13
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM14 vGui_MagicCheck14
-Gui, Add, Checkbox, xp+110 yp w15 h15 gCheckM15 vGui_MagicCheck15
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM16 vGui_MagicCheck16
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM17 vGui_MagicCheck17
-Gui, Add, Checkbox, xp+80 yp w15 h15 gCheckM18 vGui_MagicCheck18
-Gui,Font
-Gui, Font, s8 ,Arial
-Gui, Add, Listview, x20 y200 w320 h320 -Multi v어빌리티리스트, 어빌순서 | 어빌명 | 그레이드 | 어빌리티
-Gui, listview , 어빌리티리스트
-LV_ModifyCol(1,"68 Right")
-LV_ModifyCol(2,"90 Center")
-LV_ModifyCol(3,"70 Center")
-LV_ModifyCol(4,"87 Left")
-Gui, Add, Button, xp+110 y+1 w90 g어빌리티리스트갱신, 어빌목록스캔
+Gui, Font, s8
+Gui, Add, checkbox, x30 y265 w80 h20 v대화사용, 대화
+Gui, Add, checkbox, x30 y285 w80 h20 v명상사용, 명상
+Gui, Add, checkbox, x30 y305 w80 h20 v더블어택사용, 더블어택
+Gui, Add, checkbox, x30 y325 w80 h20 v체력향상사용, 체력향상
+Gui, Add, checkbox, x30 y345 w80 h20 v집중사용, 집중
+Gui, Add, checkbox, x30 y365 w80 h20v회피사용, 회피
+Gui, Add, checkbox, x120 y265 w80 h20 v몸통지르기사용, 몸통지르기
+Gui, Add, checkbox, x120 y285 w80 h20 v리무브아머사용, 리무브아머
+Gui, Add, checkbox, x120 y305 w80 h20 v민첩향상사용, 민첩향상
+Gui, Add, checkbox, x120 y325 w80 h20 v활방어사용, 활방어
+Gui, Add, checkbox, x120 y345 w80 h20 v마력향상사용, 마력향상
+Gui, Add, checkbox, x120 y365 w80 h20 v마력방어사용, 마력방어
+Gui, Add, checkbox, x230 y265 w120 h20 v현혹사용, 현혹
+Gui, Add, checkbox, x230 y285 w120 h20 v폭검사용, 폭검
+Gui, Add, checkbox, x230 y305 w120 h20 v독침사용, 독침
+Gui, Add, checkbox, x230 y325 w120 h20 v무기공격사용, 무기공격
+
+Gui, Font,
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x375 y250 w305 h70, 가방 설정
 Gui, Font
 Gui, Font, s8,Arial
-Gui, Add, ListView, x370 y200 w320 h320 v마법리스트,스펠순서 | 스펠명 | 그레이드 | 스펠레벨
-LV_ModifyCol(1,"68 Right")
+Gui, Add, Text, x393 y298 , [인벤토리 줍줍 조정]    :
+Gui, Add, DropDownList, x525 y295 h100 w120 +Center v가방설정 g가방수량설정, 줍줍끄기|40개 초과시 정지||45개 초과시 정지|제한없음
+Gui, Add, Text, x393 y270 , [8번 생콩 먹기 조정]    :
+Gui, Add, DropDownList, x525 y268 h100 w120 +Center v포남생콩설정 g생콩설정, FP 500이하에 먹기||상시사용으로 먹기
+Gui, Font,
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x375 y325 w310 h80, 텔레그램 알림 설정
+Gui, Font
+Gui, Font, s7.5,Arial
+Gui, Add, Text, x395 y340 w135 h40, @HelanciaBot 친구추가`n후 아이디 입력하세요
+gui, add, Edit, x395 y370 w120 h20 vChatID, 아이디입력
+gui, add, button, x535 y345 w120 h40 g텔레그램메시지사용법, 보내기사용법
+
+Gui, Font,
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x235 y30 w220 h205, 마법 설정
+Gui, Font
+Gui, Font, s8
+Gui, Add, Text, x260 y57 +Left, 체크시 원격마법을 사용합니다.
+Gui, Add, Checkbox, x240 y55 w15 h15 gCheckUseMagic vGui_CheckUseMagic c000000
+Gui, Add, Text, x150 y220 +Left
+Gui, Add, Text, x240 y80 +Left, HP가
+Gui, Add, Edit, x270 y78 +Left w55 h15 Limit7 number cRed vGui_CHP, 0
+Gui, Add, Text, x328 y80 +Left, 되면 리메듐 사용
+
+Gui, Add, Text, x240 y103 +Left, 스펠슬롯
+Gui, Add, DropDownList, x295 y100 w80 +Left vGui_MagicNStack, 3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20
+Gui, Add, Text, x378 y103 +Left, 번 까지 사용
+Gui, Add, Text, x240 y128 +Left, 스펠슬롯 1번 (엘)리메듐을 고정 해 주세요
+Gui, Add, Text, x240 y153 +Left, 스펠슬롯 2번 브렐을 고정 해 주세요
+Gui, Add, Button, x240 y183 w200 h30 g원격마법설명서, 사용법
+
+Gui, Font,
+Gui, Font, s8 cGreen Bold
+Gui, Add, Button, x160 y50 w60 h20 g원격파티설명서, 사용법
+Gui, Add, Checkbox, x15 y55 w15 h15 vGui_CheckUseParty g원격파티사용
+Gui, Add, GroupBox, x10 y30 w220 h205, 파티 설정
+Gui, Font
+Gui, Font, s8
+Gui, Add, Text, x35 y57 +Left, 체크시 원격파티 사용
+Gui, Add, Text, x15 y78, 파티장
+Gui, add, Edit, x65 y75 w100 vName1
+Gui, Add, DropDownList, x178 y75 w38 +Left vGui_P1CharNumber, 1|2|3|4|5|6|7|8|9|10
+Gui, Add, Text, x15 y103, 파티원
+Gui, add, Edit, x65 y100 w100 vName2
+Gui, Add, DropDownList, x178 y100 w38 +Left vGui_P2CharNumber, 1|2|3|4|5|6|7|8|9|10
+Gui, Add, Text, x15 y128, 파티원
+Gui, add, Edit, x65 y125 w100 vName3
+Gui, Add, DropDownList, x178 y125 w38 +Left vGui_P3CharNumber, 1|2|3|4|5|6|7|8|9|10
+Gui, Add, Text, x15 y153, 파티원
+Gui, add, Edit, x65 y150 w100 vName4
+Gui, Add, DropDownList, x178 y150 w38 +Left vGui_P4CharNumber, 1|2|3|4|5|6|7|8|9|10
+Gui, Add, Text, x15 y178, 파티원
+Gui, add, Edit, x65 y175 w100 vName5
+Gui, Add, DropDownList, x178 y175 w38 +Left vGui_P5CharNumber, 1|2|3|4|5|6|7|8|9|10
+Gui, Add, Text, x15 y203, 파티원
+Gui, add, Edit, x65 y200 w100 vName6
+Gui, Add, DropDownList, x178 y200 w38 +Left vGui_P6CharNumber, 1|2|3|4|5|6|7|8|9|10
+
+
+Gui, Font,
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x460 y30 w220 h205, 체잠 소각 설정
+Gui, Font
+Gui, Font, s8
+Gui, Add, ListView, x465 y50 h120 w210 -LV0x20  -Multi -HDR v포프레스네소각, 아이템
+Gui, add, Edit, x465 y210 w110 vGui_incinerateitem
+Gui, Add, Button, x465 y175 w200 h30 g소각갱신, 소각INI새로고침
+Gui, Add, Button, x580 y210 w40 h20 gAddincinerate, 추가
+Gui, Add, Button, x623 y210 w40 h20 gDelincinerate, 삭제
+LV_ModifyCol(1, 320)
+
+Gui, Font,
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x10 y410 w670 h175, Listview 설정
+Gui, Font
+Gui, Font, s8
+Gui,Font
+Gui, Font, s8 ,Arial
+Gui, Add, Listview, x35 y430 w280 h120 -Multi v어빌리티리스트, 순서 | 어빌명 | 글드 | 어빌레벨
+Gui, listview , 어빌리티리스트
+LV_ModifyCol(1,"38 Right")
 LV_ModifyCol(2,"90 Center")
-LV_ModifyCol(3,"70 Center")
-LV_ModifyCol(4,"88 Left")
-Gui, Add, Button, xp+110 y+1 w90 g마법갱신,마법목록스캔
+LV_ModifyCol(3,"55 Center")
+LV_ModifyCol(4,"87 Left")
+Gui, Add, Button, x120 y555 w90 g어빌리티리스트갱신, 어빌목록스캔
 Gui, Font
-Gui, Font, s8 cSilver,Verdana
-Gui, Add, Text, x35 y560 w270 +Left, Made With %아이콘% and ING %A_Year%.%A_MM%.%A_DD%,by 꼴똘룸
-Gui, Tab, 어빌리티그레이드
-Gui, Font
-Gui, Font, s8  Bold,Arial
-Gui, Add, text, x20 y30 w335 h510 c343a40, [어빌리티 그레이드 설정]-------------------------------------------
+Gui, Font, s8,Arial
+
+Gui, Add, ListView, x350 y430 w300 h120 v마법리스트,순서 | 스펠명 | 글드 | 스펠레벨
+LV_ModifyCol(1,"38 Right")
+LV_ModifyCol(2,"90 Center")
+LV_ModifyCol(3,"75 Center")
+LV_ModifyCol(4,"87 Left")
+Gui, Add, Button, x470 y555 w90 g마법갱신,마법목록스캔
+
+
+Gui, Tab, Grade+
+Gui, Font,
+Gui, Font, s8 cGreen Bold
+Gui, Add, text, x20 y30 w335 h510,[어빌리티 그레이드]
 Gui, Add, Button, x370 y29 w70 h20 g어빌선택,전체선택
 Gui, Add, Button, x450 y29 w70 h20 g어빌해제,전체해제
 Gui, Font
@@ -2551,31 +2640,201 @@ Gui, Add, Checkbox, x370 y473 w15 h15 gCheckW53 vGui_WeaponCheck53
 Gui, Add, Checkbox, x450 y473 w15 h15 gCheckW54 vGui_WeaponCheck54
 Gui, Add, Checkbox, x530 y473 w15 h15 gCheckW55 vGui_WeaponCheck55
 Gui, Add, Checkbox, x610 y473 w15 h15 gCheckW56 vGui_WeaponCheck56
+Gui, Font,
+Gui, Font, s8 cGreen Bold
+Gui, Add, text, x20 y545 w335 h510,[스펠 그레이드]
 Gui, Font
-Gui, Font, s8 cSilver,Verdana
-Gui, Add, Text, x35 y560 w270 +Left, Made With %아이콘% and ING %A_Year%.%A_MM%.%A_DD%,by 꼴똘룸
+Gui, Font, s8
+Gui, Add, Text, x68 y570 +Center, 스펠 3슬롯
+Gui, Add, Text, x166 y570 +Center, 스펠 4슬롯
+Gui, Add, Text, x264 y570 +Center, 스펠 5슬롯
+Gui, Add, Text, x362 y570 +Center, 스펠 6슬롯
+Gui, Add, Text, x460 y570 +Center, 스펠 7슬롯
+Gui, Add, Text, x558 y570 +Center, 스펠 8슬롯
+Gui, Add, edit, x54 y590 w80 +Left Disabled vGui_MagicName3
+Gui, Add, edit, x152 y590 w80 +Left Disabled vGui_MagicName4
+Gui, Add, edit, x250 y590 w80 +Left Disabled vGui_MagicName5
+Gui, Add, edit, x348 y590 w80 +Left Disabled vGui_MagicName6
+Gui, Add, edit, x446 y590 w80 +Left Disabled vGui_MagicName7
+Gui, Add, edit, x544 y590 w80 +Left Disabled vGui_MagicName8
+Gui, Add, edit, x54 y610 w80 +Left Disabled vGui_MagicValue3
+Gui, Add, edit, x152 y610 w80 +Left Disabled vGui_MagicValue4
+Gui, Add, edit, x250 y610 w80 +Left Disabled vGui_MagicValue5
+Gui, Add, edit, x348 y610 w80 +Left Disabled vGui_MagicValue6
+Gui, Add, edit, x446 y610 w80 +Left Disabled vGui_MagicValue7
+Gui, Add, edit, x544 y610 w80 +Left Disabled vGui_MagicValue8
+Gui, Add, Checkbox, x53 y570 w15 h15 gCheckM3 vGui_MagicCheck3
+Gui, Add, Checkbox, x151 y570 w15 h15 gCheckM4 vGui_MagicCheck4
+Gui, Add, Checkbox, x249 y570 w15 h15 gCheckM5 vGui_MagicCheck5
+Gui, Add, Checkbox, x347 y570 w15 h15 gCheckM6 vGui_MagicCheck6
+Gui, Add, Checkbox, x445 y570 w15 h15 gCheckM7 vGui_MagicCheck7
+Gui, Add, Checkbox, x543 y570 w15 h15 gCheckM8 vGui_MagicCheck8
+
+gui, tab, NPC
+Gui, Font, s8  Bold,Arial
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x10 y30 w300 h355 , NPCOID설정
 Gui, Font
-Gui, Font, S8  Bold,Arial
-Gui, Add, GroupBox, x360 y540 w335 h45 c343a40, [그레이드 설정]
+Gui, Font, s8
+Gui, Add, Text, x30 y60 +Left , 알파 리노아   :
+Gui, Add, edit, x150 y50 w120 Disabled va리노아 , 0
+Gui, Add, Text, x30 y80 +Left , 알파 동쪽파수꾼   :
+Gui, Add, edit, x150 y75 w120 Disabled va동파, 0
+Gui, Add, Text, x30 y105 +Left , 알파 서쪽파수꾼   :
+Gui, Add, edit, x150 y100 w120 Disabled vA서파, 0
+Gui, Add, Text, x30 y130 +Left  , 베타 리노아  :
+Gui, Add, edit, x150 y125 w120 Disabled vB리노아, 0
+Gui, Add, Text, x30 y155 +Left  , 베타 동쪽파수꾼  :
+Gui, Add, edit, x150 y150 w120 Disabled vB동파, 0
+Gui, Add, Text, x30 y180 +Left  , 베타 서쪽파수꾼  :
+Gui, Add, edit, x150 y175 w120 Disabled vB서파, 0
+Gui, Add, Text, x30 y205 +Left , 감마 리노아  :
+Gui, Add, edit, x150 y200 w120 Disabled vG리노아, 0
+Gui, Add, Text, x30 y230 +Left  , 감마 동쪽파수꾼  :
+Gui, Add, edit, x150 y225 w120 Disabled vG동파, 0
+Gui, Add, Text, x30 y255 +Left  , 감마 서쪽파수꾼  :
+Gui, Add, edit, x150 y250 w120 Disabled vG서파, 0
+Gui, Add, Text, x30 y280 +Left  , 알파 길잃은파수꾼  :
+Gui, Add, edit, x150 y275 w120 Disabled vA길잃파, 0
+Gui, Add, Text, x30 y305 +Left  , 베타 길잃은파수꾼  :
+Gui, Add, edit, x150 y300 w120 Disabled vB길잃파, 0
+Gui, Add, Text, x30 y330 +Left  , 감마 길잃은파수꾼  :
+Gui, Add, edit, x150 y325 w120 Disabled vG길잃파, 0
+Gui, Add, Button, x150 y350 w120 gOID리셋, NPCOID리셋
+Gui, Add, Text, x30 y350 w100 vTextControl Disabled, OID : %적용날짜%
+GuiControl,, TextControl, OID : %적용날짜%
+Gui, Font, s8  Bold,Arial
+Gui, Font, s8 cGreen Bold
+Gui, Add, GroupBox, x10 y390 w300 h50 , NPC감응 상태
+Gui, Add, Text, x30 y410 +Left , 감응 NPC   :
+Gui, Add, edit, x100 y407 w180 v감응쿨타임 , NPC없음
+Gui, Add, GroupBox, x10 y445 w300 h105, 업데이트 기록  ; 높이를 80으로 조정
 Gui, Font
-Gui, Font, s8 ,Arial
-Gui, Add, Checkbox, x370 y560 +Left Checked vGui_Grade c000000, 자동그레이드 설정
-Gui, Add, Text, x505 y560 +Center, 강제GRADE
-Gui, Add, Button, x651 y556 w40 h21 +Center vGui_FG gforcegrade, 실행
+Gui, Font, s8
+Gui, Add, ListView, x15 y465 w290 h70 vUpdateLogGrid, 날짜|기록  ; 리스트뷰 추가
+LV_ModifyCol(1, 85)  ; 첫 번째 열(날짜) 너비 조정
+LV_ModifyCol(2, 200) ; 두 번째 열(기록) 너비 조정
+LV_Add("", "25.02.09/PM09:58", "배포용 업데이트 시작됨")
+LV_Add("", "25.02.09/PM09:58", "업데이터 로그 제작")
+LV_Add("", "25.02.09/PM10:40", "'엘의축복포션'없이 사냥 시 알람")
+LV_Add("", "25.02.09/PM11:39", "실행 상태로 설정 저장 시 이름모를창 자동끄기")
+LV_Add("", "25.02.10/PM02:20", "무기수리시 메모리오류 1차 수정")
+LV_Add("", "25.02.12/AM07:10", "레이블 정리")
+LV_Add("", "25.02.12/AM07:13", "메모리 정리 부분 일부 수정")
+LV_Add("", "25.02.12/AM07:13", "크롬 팝업창 뜰 경우 확인누름")
+LV_Add("", "25.02.12/AM07:13", "캐릭터 선택 시 인증시간 초과 부분 수정1")
+LV_Add("", "25.02.28/AM08:07", "베이커리 이동중 시 멈추는 부분 수정")
+LV_Add("", "25.03.14/PM10:25", "자주 팅기는 부분 수정")
+LV_Add("", "25.04.11/PM10:25", "그레이드오류, 로그인 오류 약간 조정")
+LV_Add("", "25.06.22/AM01:48", "넥슨플러그 및 자주 팅기는거 1차수정")
+x_coord := 320
+Gui, Font, s8  Bold,Arial
+Gui, Font, s8 cGreen Bold
+Gui, Add, Text, x%x_coord% y30 h15 w80, 플레이어
 Gui, Font
-Gui, Font, s8 ,Arial
-Gui, Add, DropDownList, x568 y556 w80 +Left cblack vGui_forceweapon, 선택|격투|검|단검|도|도끼|거대도끼|대검|대도|창, 특수창|봉, 해머|현금|활|거대검|거대도|양손단검|양손도끼|스태프
+Gui, Font, s8
+Gui, Add, ListView, x%x_coord% y45 h130 w180 v플레이어리스트 +g플레이어리스트실행 +altsubmit, 분류|차원|맵이름|번호|이름|OID|X|Y|Z|주소|삭제카운트
+LV_ModifyCol(1,40)
+LV_ModifyCol(2,0)
+LV_ModifyCol(3,0)
+LV_ModifyCol(4,0)
+LV_ModifyCol(5,50)
+LV_ModifyCol(6,0)
+LV_ModifyCol(7,30)
+LV_ModifyCol(8,30)
+LV_ModifyCol(9,30)
+LV_ModifyCol(10,0)
+LV_ModifyCol(11,0)
+Gui, Font, s8  Bold,Arial
+Gui, Font, s8 cGreen Bold
+Gui, Add, Text, x%x_coord% y179 h15 w80, 신규플레이어
 Gui, Font
-Gui, Font, s15 ,Arial
-Gui, Add, Text, x495 y552 +Center, |
+Gui, Font, s8
+Gui, Add, ListView, x%x_coord% y195 h100 w180 v신규플레이어리스트 +altsubmit, 분류|차원|맵이름|번호|이름|OID|X|Y|Z|주소
+LV_ModifyCol(1,40)
+LV_ModifyCol(2,0)
+LV_ModifyCol(3,0)
+LV_ModifyCol(4,0)
+LV_ModifyCol(5,50)
+LV_ModifyCol(6,0)
+LV_ModifyCol(7,30)
+LV_ModifyCol(8,30)
+LV_ModifyCol(9,30)
+LV_ModifyCol(10,0)
+Gui, Font, s8  Bold,Arial
+Gui, Font, s8 cGreen Bold
+x_coord := 15 + 240*2 + 5 *2
+Gui, Add, Text, x%x_coord% y30 h15 w80, 몬스터
 Gui, Font
-Gui, Show, xCenter yCenter w780 h680, 마개조 똘룸체잠%Program%
-GuiControl, , Name1, 파티원
-GuiControl, , Name2, 파티원
-GuiControl, , Name3, 파티원
-GuiControl, , Name4, 파티원
-GuiControl, , Name5, 파티원
-GuiControl, , Name6, 파티원
+Gui, Font, s8
+Gui, Add, ListView, x%x_coord% y45 h130 w180 v몬스터리스트 +g몬스터리스트실행 +altsubmit, 분류|차원|맵이름|번호|이름|OID|X|Y|Z|주소|삭제카운트|거리|이미지
+LV_ModifyCol(1,40)
+LV_ModifyCol(2,0)
+LV_ModifyCol(3,0)
+LV_ModifyCol(4,0)
+LV_ModifyCol(5,50)
+LV_ModifyCol(6,0)
+LV_ModifyCol(7,30)
+LV_ModifyCol(8,30)
+LV_ModifyCol(9,30)
+LV_ModifyCol(10,0)
+LV_ModifyCol(11,0)
+LV_ModifyCol(12,0)
+LV_ModifyCol(13,0)
+x_coord := 15 + 240*2 + 5 *2
+Gui, Font, s8  Bold,Arial
+Gui, Font, s8 cGreen Bold
+Gui, Add, Text, x%x_coord% y179 h15 w80, 신규몬스터
+Gui, Font
+Gui, Font, s8
+Gui, Add, ListView, x%x_coord% y195 h100 w180 v신규몬스터리스트 +altsubmit, 분류|차원|맵이름|번호|이름|OID|X|Y|Z|주소
+LV_ModifyCol(1,40)
+LV_ModifyCol(2,0)
+LV_ModifyCol(3,0)
+LV_ModifyCol(4,0)
+LV_ModifyCol(5,50)
+LV_ModifyCol(6,0)
+LV_ModifyCol(7,30)
+LV_ModifyCol(8,30)
+LV_ModifyCol(9,30)
+LV_ModifyCol(10,0)
+x_coord := 320
+Gui, Font, s8  Bold,Arial
+Gui, Font, s8 cGreen Bold
+Gui, Add, Text, x%x_coord% y300 h15 w80, 아이템
+Gui, Font
+Gui, Font, s8
+Gui, Add, ListView, x%x_coord% y320 h130 w180 v아이템리스트 +g아이템리스트실행 +altsubmit, 분류|차원|맵이름|번호|이름|OID|X|Y|Z|주소|삭제카운트|거리|이미지
+LV_ModifyCol(1,40)
+LV_ModifyCol(2,0)
+LV_ModifyCol(3,0)
+LV_ModifyCol(4,0)
+LV_ModifyCol(5,50)
+LV_ModifyCol(6,0)
+LV_ModifyCol(7,30)
+LV_ModifyCol(8,30)
+LV_ModifyCol(9,30)
+LV_ModifyCol(10,0)
+LV_ModifyCol(11,0)
+LV_ModifyCol(12,0)
+LV_ModifyCol(13,0)
+Gui, Add, ListView, x%x_coord% y455 h100 w180 v신규아이템리스트 +altsubmit, 분류|차원|맵이름|번호|이름|OID|X|Y|Z|주소
+LV_ModifyCol(1,40)
+LV_ModifyCol(2,0)
+LV_ModifyCol(3,0)
+LV_ModifyCol(4,0)
+LV_ModifyCol(5,50)
+LV_ModifyCol(6,0)
+LV_ModifyCol(7,30)
+LV_ModifyCol(8,30)
+LV_ModifyCol(9,30)
+LV_ModifyCol(10,0)
+
+
+; GUI 창을 생성하고 배경 색상을 흰색으로 설정
+Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
+; GUI 창의 위치와 크기를 설정하고 표시
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 1.00[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -2613,6 +2872,7 @@ RegRead, Reg포탈, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 포탈
 RegRead, RegUseHPExit, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseHPExit
 RegRead, RegUseMagic, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMagic
 RegRead, RegHPExit, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPExit
+RegRead, RegHPHospital, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPHospital
 RegRead, RegUseHPPortal, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseHPPortal
 RegRead, RegHPPortal, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPPortal
 RegRead, RegUseHPLimited, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseHPLimited
@@ -2623,6 +2883,7 @@ RegRead, RegWeapon1, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Weapon1
 RegRead, RegWeapon2, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Weapon2
 RegRead, RegWeapon3, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Weapon3
 RegRead, RegUseParty, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseParty
+RegRead, RegP1, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, TTM
 RegRead, RegP1, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, P1
 RegRead, RegP2, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, P2
 RegRead, RegP3, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, P3
@@ -2635,6 +2896,9 @@ RegRead, RegN3, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, N3
 RegRead, RegN4, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, N4
 RegRead, RegN5, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, N5
 RegRead, RegN6, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, N6
+RegRead, RegChatID, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, ChatID
+RegRead, Reg동파감응시간셋팅, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 동파감응시간셋팅
+RegRead, Reg서파감응시간셋팅, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 서파감응시간셋팅
 RegRead, RegID, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, ID
 RegRead, RegRelog, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, relog
 RegRead, RegUseWC1, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseWC1
@@ -2711,16 +2975,6 @@ RegRead, RegUseMC5, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC5
 RegRead, RegUseMC6, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC6
 RegRead, RegUseMC7, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC7
 RegRead, RegUseMC8, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC8
-RegRead, RegUseMC9, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC9
-RegRead, RegUseMC10, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC10
-RegRead, RegUseMC11, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC11
-RegRead, RegUseMC12, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC12
-RegRead, RegUseMC13, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC13
-RegRead, RegUseMC14, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC14
-RegRead, RegUseMC15, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC15
-RegRead, RegUseMC16, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC16
-RegRead, RegUseMC17, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC17
-RegRead, RegUseMC18, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC18
 RegRead, RegPass, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Pass
 RegRead, RegServer, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Server
 RegRead, RegLogin, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Login
@@ -2729,7 +2983,7 @@ RegRead, RegMNS, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MNS
 RegRead, RegEvade, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Evade
 RegRead, RegDirect, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Direct
 RegRead, RegKONOFF, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, KONOFF
-RegRead, Reg방어구방지ONOFF, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 방어구방지ONOFF
+RegRead, RegProtect_AmorONOFF, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Protect_AmorONOFF
 RegRead, RegjjONOFF, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, jjONOFF
 RegRead, RegMonster, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Monster
 RegRead, RegAllMobLimit, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, AllMobLimit
@@ -2744,11 +2998,12 @@ RegRead, Regloady, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, loady
 RegRead, RegPST, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, StartTime
 RegRead, RegCFH, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, CFH
 RegRead, Reg게임시작x, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 게임시작x
+RegRead, RegMGB, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MGB
 RegRead, Reg게임시작y, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 게임시작y
-RegRead, Reg업데이트체크, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 업데이트체크
-RegRead, Reg서버팅김, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 서버팅김
+RegRead, RegReserver, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Reserver
 RegRead, Reg파라스감지, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 파라스감지
-RegRead, Reg수천감지, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 수천감지
+RegRead, Reg수호천사방지, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 수호천사방지
+RegRead, Reg인연방지, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 인연방지
 RegRead, Reg파라스방해감지, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 파라스방해감지
 RegRead, Reg실행시간, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 실행시간
 RegRead, Reg현혹체크, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 현혹체크
@@ -2771,9 +3026,11 @@ RegRead, Reg퀵슬롯4번, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬�
 RegRead, Reg퀵슬롯5번, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯5번
 RegRead, Reg퀵슬롯6번, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯6번
 RegRead, Reg퀵슬롯7번, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯7번
+RegRead, Reg퀵슬롯8번,HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯8번
 RegRead, Reg포북생콩, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 포북생콩
 RegRead, Reg포남생콩, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 포남생콩
 RegRead, Reg가방, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 가방
+OID읽기()
 if(RegVMRE = 1)
 {
 VMRESET := 1
@@ -2813,6 +3070,14 @@ GuiControl, , 7번사용, 1
 if(Reg퀵슬롯7번 = 0)
 {
 GuiControl, , 7번사용, 0
+}
+if(Reg퀵슬롯8번 = 1)
+{
+GuiControl, , 8번사용, 1
+}
+if(Reg퀵슬롯8번 = 0)
+{
+GuiControl, , 8번사용, 0
 }
 if(Reg현혹체크 = 1)
 {
@@ -2955,11 +3220,11 @@ if(Reg업데이트체크 = 0)
 업데이트체크 := 0
 }
 ttgm = 0
-if(Reg서버팅김 = "" or Reg서버팅김 == 0)
+if(RegReserver = "" or RegReserver == 0)
 {
-서버팅김 := 0
+Reserver := 0
 }else{
-서버팅김 := Reg서버팅김
+Reserver := RegReserver
 }
 if(Reg파라스감지 = "" or Reg파라스감지 == 0)
 {
@@ -2967,19 +3232,29 @@ if(Reg파라스감지 = "" or Reg파라스감지 == 0)
 }else{
 파라스감지 := Reg파라스감지
 }
-if(Reg수천감지 = "" or Reg수천감지 == 0)
+if(Reg인연방지 = "" or Reg인연방지 == 0)
 {
-수천감지 := 0
-}else{
-수천감지 := Reg수천감지
+인연방지 := 0
+}
+else
+{
+인연방지 := Reg인연방지
+}
+if(Reg수호천사방지 = "" or Reg수호천사방지 == 0)
+{
+수호천사방지 := 0
+}
+else
+{
+수호천사방지 := Reg수호천사방지
 }
 if(Reg파라스방해감지 = "" or Reg파라스방해감지 == 0)
 {
 파라스방해감지 := 0
-}else{
+}
+else{
 파라스방해감지 := Reg파라스방해감지
 }
-SB_SetText("섭팅 : " . 서버팅김 . "  파라스방해 : " . 파라스감지 . "  수천방해 : " . 수천감지,3)
 if( Reg포탈 = 0 )
 {
 CountPortal := 0
@@ -3017,25 +3292,28 @@ GuiControl, , 좌표y, Q
 }
 GuiControl, , Gui_NexonID, %RegID%
 GuiControl, , Gui_NexonPassWord, %RegPass%
+GuiControl, , ChatID, %RegChatID%
+GuiControl, , 동파감응시간셋팅, %Reg동파감응시간셋팅%
+GuiControl, , 서파감응시간셋팅, %Reg서파감응시간셋팅%
 GuiControl, Choose, Gui_CharNumber, %RegCharNumber%
 GuiControl, Choose, Gui_Server, %RegServer%
 GuiControl, Choose, Gui_Login, %RegLogin%
 GuiControl, Choose, 포북생콩설정, %Reg포북생콩%
 GuiControl, Choose, 포남생콩설정, %Reg포남생콩%
 GuiControl, Choose, 가방설정, %Reg가방%
-if(Reg포북생콩 = "FP 500이하")
+if(Reg포북생콩 = "FP 500이하에 먹기")
 {
 포북생콩섭취 := 500
 }
-if(Reg포북생콩 = "상시사용")
+if(Reg포북생콩 = "상시사용으로 먹기")
 {
 포북생콩섭취 := 1000
 }
-if(Reg포남생콩 = "FP 500이하")
+if(Reg포남생콩 = "FP 500이하에 먹기")
 {
 포남생콩섭취 := 500
 }
-if(Reg포남생콩 = "상시사용")
+if(Reg포남생콩 = "상시사용으로 먹기")
 {
 포남생콩섭취 := 1000
 }
@@ -3050,13 +3328,13 @@ GuiControl,,Gui_jjON,1
 가방수량체크 := 50
 jelan.write(0x0047B3EC, 0x02, "Char", aOffsets*)
 }
-if(Reg가방 = "40개 초과시")
+if(Reg가방 = "40개 초과시 정지")
 {
 GuiControl,,Gui_jjON,1
 가방수량체크 := 40
 jelan.write(0x0047B3EC, 0x02, "Char", aOffsets*)
 }
-if(Reg가방 = "45개 초과시")
+if(Reg가방 = "45개 초과시 정지")
 {
 GuiControl,,Gui_jjON,1
 가방수량체크 := 45
@@ -3086,23 +3364,50 @@ loady = 2
 }
 if(Reglogin = "넥슨플러그")
 {
+GuiControl, HIDE, Gui_NexonID2
+GuiControl, HIDE, Gui_NexonPassWord2
 GuiControl, HIDE, Gui_NexonID
 GuiControl, HIDE, Gui_NexonPassWord
+GuiControl, HIDE, 설명
+GuiControl, SHOW, 설명2
 GuiControl, SHOW, 넥슨x
 GuiControl, SHOW, 넥슨y
 GuiControl, SHOW, 좌표x
 GuiControl, SHOW, 좌표y
 좌표고정 := 1
 }
-if(Reglogin = "인터넷")
+if(Reglogin = "홈페이지클릭[구글]")
 {
+GuiControl, SHOW, Gui_NexonID2
+GuiControl, SHOW, Gui_NexonPassWord2
 GuiControl, SHOW, Gui_NexonID
 GuiControl, SHOW, Gui_NexonPassWord
+GuiControl, HIDE, 설명
+GuiControl, HIDE, 설명2
 GuiControl, HIDE, 넥슨x
 GuiControl, HIDE, 넥슨y
 GuiControl, HIDE, 좌표x
 GuiControl, HIDE, 좌표y
 좌표고정 := 0
+}
+if(Reglogin = "인터넷")
+{
+GuiControl, SHOW, Gui_NexonID2
+GuiControl, SHOW, Gui_NexonPassWord2
+GuiControl, SHOW, Gui_NexonID
+GuiControl, SHOW, Gui_NexonPassWord
+GuiControl, HIDE, 설명
+GuiControl, HIDE, 설명2
+GuiControl, HIDE, 넥슨x
+GuiControl, HIDE, 넥슨y
+GuiControl, HIDE, 좌표x
+GuiControl, HIDE, 좌표y
+좌표고정 := 0
+}
+if(RegUseHPHospital = 1)
+{
+GuiControl, , Gui_CheckUseHPHospital, 1
+GuiControl, Enable, Gui_HPHospital
 }
 if(RegUseHPExit = 1)
 {
@@ -3150,6 +3455,10 @@ GuiControl, , Gui_HPExit, %RegHPExit%
 if(RegCritHP != "")
 {
 GuiControl, , Gui_CHP, %RegCritHP%
+}
+if(RegHPHospital != "")
+{
+GuiControl, , Gui_HPHospital, %RegHPHospital%
 }
 if(RegHPPortal != "")
 {
@@ -3263,13 +3572,13 @@ if(RegKONOFF = 2)
 {
 GuiControl, , Gui_KOFF, 1
 }
-if(Reg방어구방지ONOFF = 1)
+if(RegProtect_AmorONOFF = 1)
 {
-GuiControl, , 방어구방지ON, 1
+GuiControl, , Protect_AmorON, 1
 }
-if(Reg방어구방지ONOFF = 2)
+if(RegProtect_AmorONOFF = 2)
 {
-GuiControl, , 방어구방지OFF, 1
+GuiControl, , Protect_AmorOFF, 1
 }
 if(RegjjONOFF = 1)
 {
@@ -3357,6 +3666,11 @@ if(RegPlace = 3)
 GuiControl, , Gui_HuntPobuk, 1
 GuiControl, Disable, Gui_LimitAbility1
 }
+if(RegPlace = 4)
+{
+GuiControl, , Gui_HuntMummy, 1
+GuiControl, Enable, Gui_LimitAbility1
+}
 if(RegLimit0 != "")
 {
 GuiControl, , Gui_LimitAbility0, %RegLimit0%
@@ -3375,6 +3689,10 @@ GuiControl, , Gui_PartyOff, 1
 if(RegGrade = 1)
 {
 GuiControl, , Gui_Grade, 1
+}
+if(RegMGB = 1)
+{
+GuiControl, , Gui_MGB, 1
 }
 if(RegP1 != "")
 {
@@ -3906,86 +4224,6 @@ if(RegUseMC8 = 0)
 {
 GuiControl, , Gui_MagicCheck8, 0
 }
-if(RegUseMC9 = 1)
-{
-GuiControl, , Gui_MagicCheck9, 1
-}
-if(RegUseMC9 = 0)
-{
-GuiControl, , Gui_MagicCheck9, 0
-}
-if(RegUseMC10 = 1)
-{
-GuiControl, , Gui_MagicCheck10, 1
-}
-if(RegUseMC10 = 0)
-{
-GuiControl, , Gui_MagicCheck10, 0
-}
-if(RegUseMC11 = 1)
-{
-GuiControl, , Gui_MagicCheck11, 1
-}
-if(RegUseMC11 = 0)
-{
-GuiControl, , Gui_MagicCheck11, 0
-}
-if(RegUseMC12 = 1)
-{
-GuiControl, , Gui_MagicCheck12, 1
-}
-if(RegUseMC12 = 0)
-{
-GuiControl, , Gui_MagicCheck12, 0
-}
-if(RegUseMC13 = 1)
-{
-GuiControl, , Gui_MagicCheck13, 1
-}
-if(RegUseMC13 = 0)
-{
-GuiControl, , Gui_MagicCheck13, 0
-}
-if(RegUseMC14 = 1)
-{
-GuiControl, , Gui_MagicCheck14, 1
-}
-if(RegUseMC14 = 0)
-{
-GuiControl, , Gui_MagicCheck14, 0
-}
-if(RegUseMC15 = 1)
-{
-GuiControl, , Gui_MagicCheck15, 1
-}
-if(RegUseMC15 = 0)
-{
-GuiControl, , Gui_MagicCheck15, 0
-}
-if(RegUseMC16 = 1)
-{
-GuiControl, , Gui_MagicCheck16, 1
-}
-if(RegUseMC16 = 0)
-{
-GuiControl, , Gui_MagicCheck16, 0
-}
-if(RegUseMC17 = 1)
-{
-GuiControl, , Gui_MagicCheck17, 1
-}
-if(RegUseMC17 = 0)
-{
-GuiControl, , Gui_MagicCheck17, 0
-}
-if(RegUseMC18 = 1)
-{
-GuiControl, , Gui_MagicCheck18, 1
-}
-if(RegUseMC18 = 0)
-{
-GuiControl, , Gui_MagicCheck18, 0
-}
 if(RegRelog = 1)
 {
 GuiControl, , Gui_relogerror, 1
@@ -3995,7 +4233,7 @@ if(RegRelog = 0)
 GuiControl, , Gui_relogerror, 0
 }
 Gui, listview, 포프레스네소각
-Loop, Read, %A_ScriptDir%\소각리스트.ini
+Loop, Read, C:\소각리스트.ini
 {
 LV_Add(A_Index, A_LoopReadLine)
 }
@@ -4015,19 +4253,19 @@ Gosub, START
 return
 생콩설정:
 Gui, Submit, NoHide
-if(포북생콩설정 = "FP 500이하")
+if(포북생콩설정 = "FP 500이하에 먹기")
 {
 포북생콩섭취 := 500
 }
-if(포북생콩설정 = "상시사용")
+if(포북생콩설정 = "상시사용으로 먹기")
 {
 포북생콩섭취 := 1000
 }
-if(포남생콩설정 = "FP 500이하")
+if(포남생콩설정 = "FP 500이하에 먹기")
 {
 포남생콩섭취 := 500
 }
-if(포남생콩설정 = "상시사용")
+if(포남생콩설정 = "상시사용으로 먹기")
 {
 포남생콩섭취 := 1000
 }
@@ -4045,18 +4283,28 @@ GuiControl,,Gui_jjON,1
 가방수량체크 := 50
 jelan.write(0x0047B3EC, 0x02, "Char", aOffsets*)
 }
-if(가방설정 = "40개 초과시")
+if(가방설정 = "40개 초과시 정지")
 {
 GuiControl,,Gui_jjON,1
 가방수량체크 := 40
 jelan.write(0x0047B3EC, 0x02, "Char", aOffsets*)
 }
-if(가방설정 = "45개 초과시")
+if(가방설정 = "45개 초과시 정지")
 {
 GuiControl,,Gui_jjON,1
 가방수량체크 := 45
 jelan.write(0x0047B3EC, 0x02, "Char", aOffsets*)
 }
+return
+lagitu: ;라깃업
+Gui, Submit, Nohide
+RasCount := Gui_RasCount+1
+GuiControl, , Gui_RasCount, %RasCount%
+return
+lagitd: ;라깃다운
+Gui, Submit, Nohide
+RasCount := Gui_RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 return
 SelectMuba:
 Gui, Submit, Nohide
@@ -4066,6 +4314,13 @@ GuiControl, Enable, Gui_Weapon1
 GuiControl, Disable, Gui_Weapon2
 GuiControl, Disable, Gui_Weapon3
 if(Gui_HuntAuto = 1)
+{
+GuiControl, Enable, Gui_LimitAbility1
+GuiControl, Disable, Gui_LimitAbility0
+GuiControl, Disable, Gui_LimitAbility2
+GuiControl, Disable, Gui_LimitAbility3
+}
+if(Gui_HuntMummy = 1)
 {
 GuiControl, Enable, Gui_LimitAbility1
 GuiControl, Disable, Gui_LimitAbility0
@@ -4089,6 +4344,13 @@ GuiControl, Enable, Gui_LimitAbility2
 GuiControl, Disable, Gui_LimitAbility0
 GuiControl, Disable, Gui_LimitAbility3
 }
+if(Gui_HuntMummy = 1)
+{
+GuiControl, Enable, Gui_LimitAbility1
+GuiControl, Enable, Gui_LimitAbility0
+GuiControl, Disable, Gui_LimitAbility2
+GuiControl, Disable, Gui_LimitAbility3
+}
 GuiControl,, Gui_BasicWName0
 GuiControl,, Gui_BasicWName1, %Gui_Weapon1%
 GuiControl,, Gui_BasicWName2, %Gui_Weapon2%
@@ -4106,6 +4368,13 @@ GuiControl, Enable, Gui_LimitAbility2
 GuiControl, Enable, Gui_LimitAbility3
 GuiControl, Disable, Gui_LimitAbility0
 }
+if(Gui_HuntMummy = 1)
+{
+GuiControl, Enable, Gui_LimitAbility1
+GuiControl, Enable, Gui_LimitAbility0
+GuiControl, Enable, Gui_LimitAbility2
+GuiControl, Disable, Gui_LimitAbility3
+}
 GuiControl,, Gui_BasicWName0
 GuiControl,, Gui_BasicWName1, %Gui_Weapon1%
 GuiControl,, Gui_BasicWName2, %Gui_Weapon2%
@@ -4117,6 +4386,13 @@ GuiControl, Enable, Gui_Weapon1
 GuiControl, Disable, Gui_Weapon2
 GuiControl, Disable, Gui_Weapon3
 if(Gui_HuntAuto = 1)
+{
+GuiControl, Enable, Gui_LimitAbility0
+GuiControl, Enable, Gui_LimitAbility1
+GuiControl, Disable, Gui_LimitAbility2
+GuiControl, Disable, Gui_LimitAbility3
+}
+if(Gui_HuntMummy = 1)
 {
 GuiControl, Enable, Gui_LimitAbility0
 GuiControl, Enable, Gui_LimitAbility1
@@ -4140,6 +4416,13 @@ GuiControl, Enable, Gui_LimitAbility1
 GuiControl, Enable, Gui_LimitAbility2
 GuiControl, Disable, Gui_LimitAbility3
 }
+if(Gui_HuntMummy = 1)
+{
+GuiControl, Enable, Gui_LimitAbility0
+GuiControl, Enable, Gui_LimitAbility1
+GuiControl, Enable, Gui_LimitAbility2
+GuiControl, Disable, Gui_LimitAbility3
+}
 GuiControl,, Gui_BasicWName0, 격투
 GuiControl,, Gui_BasicWName1, %Gui_Weapon1%
 GuiControl,, Gui_BasicWName2, %Gui_Weapon2%
@@ -4151,6 +4434,13 @@ GuiControl, Enable, Gui_Weapon1
 GuiControl, Enable, Gui_Weapon2
 GuiControl, Enable, Gui_Weapon3
 if(Gui_HuntAuto = 1)
+{
+GuiControl, Enable, Gui_LimitAbility0
+GuiControl, Enable, Gui_LimitAbility1
+GuiControl, Enable, Gui_LimitAbility2
+GuiControl, Enable, Gui_LimitAbility3
+}
+if(Gui_HuntMummy = 1)
 {
 GuiControl, Enable, Gui_LimitAbility0
 GuiControl, Enable, Gui_LimitAbility1
@@ -4261,8 +4551,15 @@ GuiControl, Disable, Gui_LimitAbility0
 GuiControl, Disable, Gui_LimitAbility1
 GuiControl, Disable, Gui_LimitAbility2
 GuiControl, Disable, Gui_LimitAbility3
+if(Gui_huntmummy = 1)
+{
+GuiControl, Enable, Gui_LimitAbility0
+GuiControl, Enable, Gui_LimitAbility1
+GuiControl, Enable, Gui_LimitAbility2
+GuiControl, Enable, Gui_LimitAbility3
 }
-if(Gui_HuntPobuk = 1)
+}
+if(Gui_HuntPobuk = 1 || Gui_huntmummy = 1 )
 {
 GuiControl, Disable, Gui_Ent
 GuiControl, Disable, Gui_Rockey
@@ -4313,6 +4610,24 @@ if( Gui_login = "인터넷" )
 {
 GuiControl, SHOW, Gui_NexonID
 GuiControl, SHOW, Gui_NexonPassWord
+GuiControl, SHOW, Gui_NexonID2
+GuiControl, SHOW, Gui_NexonPassWord2
+GuiControl, HIDE, 설명
+GuiControl, HIDE, 설명2
+GuiControl, HIDE, 넥슨x
+GuiControl, HIDE, 넥슨y
+GuiControl, HIDE, 좌표x
+GuiControl, HIDE, 좌표y
+좌표고정 := 0
+}
+if( Gui_login = "홈페이지클릭[구글]" )
+{
+GuiControl, SHOW, Gui_NexonID
+GuiControl, SHOW, Gui_NexonPassWord
+GuiControl, SHOW, Gui_NexonID2
+GuiControl, SHOW, Gui_NexonPassWord2
+GuiControl, HIDE, 설명
+GuiControl, HIDE, 설명2
 GuiControl, HIDE, 넥슨x
 GuiControl, HIDE, 넥슨y
 GuiControl, HIDE, 좌표x
@@ -4321,14 +4636,22 @@ GuiControl, HIDE, 좌표y
 }
 if( Gui_login = "넥슨플러그" )
 {
+GuiControl, HIDE, Gui_NexonID2
+GuiControl, HIDE, Gui_NexonPassWord2
 GuiControl, HIDE, Gui_NexonID
 GuiControl, HIDE, Gui_NexonPassWord
+GuiControl, HIDE, 설명
+GuiControl, SHOW, 설명2
 GuiControl, SHOW, 넥슨x
 GuiControl, SHOW, 넥슨y
 GuiControl, SHOW, 좌표x
 GuiControl, SHOW, 좌표y
 좌표고정 := 1
 }
+return
+CheckUseHPHospital:
+Gui, Submit, Nohide
+GuiControl, % (Gui_CheckUseHPHospital ? "enable":"disable"), Gui_HPHospital
 return
 CheckUseHPExit:
 Gui, Submit, Nohide
@@ -4790,80 +5113,9 @@ if(Gui_MagicCheck8 = 0)
 GuiControl, , Gui_MagicValue8
 }
 return
-CheckM9:
-Gui, Submit, Nohide
-if(Gui_MagicCheck9 = 0)
-{
-GuiControl, , Gui_MagicValue9
-}
-return
-CheckM10:
-Gui, Submit, Nohide
-if(Gui_MagicCheck10 = 0)
-{
-GuiControl, , Gui_MagicValue10
-}
-return
-CheckM11:
-Gui, Submit, Nohide
-if(Gui_MagicCheck11 = 0)
-{
-GuiControl, , Gui_MagicValue11
-}
-return
-CheckM12:
-Gui, Submit, Nohide
-if(Gui_MagicCheck12 = 0)
-{
-GuiControl, , Gui_MagicValue12
-}
-return
-CheckM13:
-Gui, Submit, Nohide
-if(Gui_MagicCheck13 = 0)
-{
-GuiControl, , Gui_MagicValue13
-}
-return
-CheckM14:
-Gui, Submit, Nohide
-if(Gui_MagicCheck14 = 0)
-{
-GuiControl, , Gui_MagicValue14
-}
-return
-CheckM15:
-Gui, Submit, Nohide
-if(Gui_MagicCheck15 = 0)
-{
-GuiControl, , Gui_MagicValue15
-}
-return
-CheckM16:
-Gui, Submit, Nohide
-if(Gui_MagicCheck16 = 0)
-{
-GuiControl, , Gui_MagicValue16
-}
-return
-CheckM17:
-Gui, Submit, Nohide
-if(Gui_MagicCheck17 = 0)
-{
-GuiControl, , Gui_MagicValue17
-}
-return
-CheckM18:
-Gui, Submit, Nohide
-if(Gui_MagicCheck18 = 0)
-{
-GuiControl, , Gui_MagicValue18
-}
-return
 resetting:
 Gui, Submit, Nohide
-Step = 0
-gosub, 재실행
+step = 0
 return
 forcegrade:
 Gui, Submit, Nohide
@@ -4878,13 +5130,13 @@ if( Gui_PartyON = 1 or Gui_CheckUseParty = 1)
 {
 if( 랜덤차원 = 1 )
 {
+RandomRadio()
 MsgBox,48, 차원설정,
 (
-차원설정이 잘못되었습니다.
 <파티사용시>
-랜덤차원으로 할 수 없습니다.
-파티캐릭이 있는 차원으로 바꿔주세요.
-)
+파티캘이 위치한 차원으로 이동해라 게이야
+일단 내가 따!악 좋은 차원으로 설정 해 줬다!
+),2
 return
 }
 }
@@ -4914,6 +5166,19 @@ if(Gui_CharNumber = "")
 SB_SetText("캐릭터번호를 선택 해 주세요.")
 return
 }
+if(Gui_CheckUseHPHospital = 1)
+{
+if(Gui_HPHospital = "")
+{
+SB_SetText("병원 갈 체력을 정확히 입력 해 주세요.")
+return
+}
+if(Gui_HPHospital = 0)
+{
+SB_SetText("병원 갈 체력은 0보다 높아야 합니다.")
+return
+}
+}
 if(Gui_CheckUseHPExit = 1)
 {
 if(Gui_HPExit = "")
@@ -4937,6 +5202,14 @@ return
 if(Gui_HPPortal = 0)
 {
 SB_SetText("차원이동 체력은 1 이상이여야 합니다.")
+return
+}
+}
+if(Gui_CheckUseHPHospital = 1 and Gui_CheckUseHPPortal)
+{
+if(Gui_HPHospital > Gui_HPPortal)
+{
+SB_SetText("병원이동 체력 설정은 차원이동 체력보다 높아야 합니다.")
 return
 }
 }
@@ -5093,7 +5366,6 @@ WinMove, ahk_id %Gui_ID%, , 670, 0
 }
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, VMRE, 1
 GuiControl,Enable,Gui_StopButton
-GuiControl,Enable,Gui_Resetting
 NexonID := Gui_NexonID
 NexonPassword := Gui_NexonPassword
 GuiControl, Disable, Gui_NexonID
@@ -5101,10 +5373,12 @@ GuiControl, Disable, Gui_NexonPassWord
 GuiControl, Disable, Gui_Server
 GuiControl, Disable, Gui_Login
 GuiControl, Disable, Gui_CharNumber
+GuiControl, Disable, Gui_CheckUseHPHospital
 GuiControl, Disable, Gui_CheckUseHPExit
 GuiControl, Disable, Gui_CheckUseHPPortal
 GuiControl, Disable, Gui_CheckUseHPLimited
 GuiControl, Disable, Gui_HPExit
+GuiControl, Disable, Gui_HPHospital
 GuiControl, Disable, Gui_HPPortal
 GuiControl, Disable, Gui_HPLimited
 GuiControl, Disable, Gui_CHP
@@ -5120,24 +5394,18 @@ GuiControl, Disable, Gui_LimitAbility3
 GuiControl, Disable, Gui_StartButton
 GuiControl, Disable, Gui_WindowSettingButton
 GuiControl, Disable, Gui_Agree
-GuiControl, Disable, Gui_1Muba
-GuiControl, Disable, Gui_2Muba
-GuiControl, Disable, Gui_3Muba
-GuiControl, Disable, Gui_2ButMuba
-GuiControl, Disable, Gui_3ButMuba
-GuiControl, Disable, Gui_4ButMuba
 SB_SetText("로그인 중")
-몸찌체크 := 0
 실행초기화 := 0
+이전스텝 := step
 Step = 0
 FirstCheck = 1
 MagicN = 3
+FirstPortal = 1
 Entrance = 0
 ipmak = 0
 callid = 1
 RCC = 0
 ProgramStartTime = 0
-파라스타이머시작 = 0
 if( Reg실행시간 = 0 )
 {
 지금시각 := A_Now
@@ -5155,30 +5423,39 @@ GuiControl, Choose, Gui_Tab, 상태창
 loady = 1
 SetTimer, Hunt, 50
 SetTimer, AttackCheck, 50
+SetTimer, AttackMGB, 5000
 SetTimer, 타겟팅, 100
 SetTimer, RL, 18000000
 시작탭사이즈 := 1
 return
-RL:
 
-Gui, Submit, Nohide
+RL:
+Gui, Submit, NoHide
 Run, *RunAs %A_ScriptDir%\CashMemory.exe
 Sleep,300
 loady = 2
 IfWinExist,ahk_pid %jPID%
 {
+WinKill, ahk_pid Jelancia.exe
 WinKill, ahk_pid %jPID%
+WinKill, ahk_exe MRMsph.exe
 }
-IfWinExist,ahk_exe MRMSPH.exe
+if(Gui_MGB = 1)
 {
-WinKill, ahk_exe MRMSPH.exe
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MGB, 1
+}
+if(Gui_MGB = 0)
+{
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MGB, 0
 }
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, VMRE, 0
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 실행시간, %지금시각_R%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 서버팅김, %서버팅김%
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Reserver, %Reserver%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 파라스감지,%파라스감지%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 수천감지,%수천감지%
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 수호천사방지,%수호천사방지%
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 인연방지,%인연방지%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 파라스방해감지,%파라스방해감지%
+RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, TTM, %PID%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, P1, %Name1%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, P2, %Name2%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, P3, %Name3%
@@ -5191,7 +5468,15 @@ RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, N3, %Gui_P3CharNu
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, N4, %Gui_P4CharNumber%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, N5, %Gui_P5CharNumber%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, N6, %Gui_P6CharNumber%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 업데이트체크, %업데이트체크%
+;RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 업데이트체크, %업데이트체크%
+if(Gui_CheckUseHPHospital = 1)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseHPHospital, 1
+}
+if(Gui_CheckUseHPHospital = 0)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseHPHospital, 0
+}
 if(Gui_CheckUseHPExit = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseHPExit, 1
@@ -5233,6 +5518,7 @@ if(Gui_CheckUseHPLimited = 0)
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseHPLimited, 0
 }
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPExit, %Gui_HPExit%
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPHospital, %Gui_HPHospital%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPPortal, %Gui_HPPortal%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPLimited, %Gui_HPLimited%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, CrittHP, %Gui_CHP%
@@ -5279,13 +5565,13 @@ if(Gui_KOFF = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, KONOFF, 2
 }
-if(방어구방지ON = 1)
+if(Protect_AmorON = 1)
 {
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 방어구방지ONOFF, 1
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Protect_AmorONOFF, 1
 }
-if(방어구방지OFF = 1)
+if(Protect_AmorOFF = 1)
 {
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 방어구방지ONOFF, 2
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Protect_AmorONOFF, 2
 }
 if(Gui_jjON = 1)
 {
@@ -5352,6 +5638,10 @@ if(Gui_HuntPobuk = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Place, 3
 }
+if(Gui_HuntMummy = 1)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Place, 4
+}
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Limit0, %Gui_LimitAbility0%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Limit1, %Gui_LimitAbility1%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Limit2, %Gui_LimitAbility2%
@@ -5368,9 +5658,13 @@ if(Gui_Grade = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Grade, 1
 }
-if(Gui_Grade = 0)
+if(Gui_MGB = 1)
 {
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Grade, 0
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MGB, 1
+}
+if(Gui_MGB = 0)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MGB, 0
 }
 if(알파차원 = 1)
 {
@@ -5440,6 +5734,14 @@ RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯7번,
 if(7번사용 = 0)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯7번, 0
+}
+if(8번사용 = 1)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯8번, 1
+}
+if(8번사용 = 0)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯8번, 0
 }
 if(현혹사용 = 1)
 {
@@ -6065,86 +6367,6 @@ if(Gui_MagicCheck8 = 0)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC8, 0
 }
-if(Gui_MagicCheck9 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC9, 1
-}
-if(Gui_MagicCheck9 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC9, 0
-}
-if(Gui_MagicCheck10 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC10, 1
-}
-if(Gui_MagicCheck10 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC10, 0
-}
-if(Gui_MagicCheck11 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC11, 1
-}
-if(Gui_MagicCheck11 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC11, 0
-}
-if(Gui_MagicCheck12 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC12, 1
-}
-if(Gui_MagicCheck12 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC12, 0
-}
-if(Gui_MagicCheck13 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC13, 1
-}
-if(Gui_MagicCheck13 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC13, 0
-}
-if(Gui_MagicCheck14 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC14, 1
-}
-if(Gui_MagicCheck14 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC14, 0
-}
-if(Gui_MagicCheck15 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC15, 1
-}
-if(Gui_MagicCheck15 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC15, 0
-}
-if(Gui_MagicCheck16 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC16, 1
-}
-if(Gui_MagicCheck16 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC16, 0
-}
-if(Gui_MagicCheck17 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC17, 1
-}
-if(Gui_MagicCheck17 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC17, 0
-}
-if(Gui_MagicCheck18 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC18, 1
-}
-if(Gui_MagicCheck18 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC18, 0
-}
 if(Gui_relogerror = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, relog, 1
@@ -6161,14 +6383,15 @@ RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, CFH, %CheckFir
 }
 Gui, submit, nohide
 Gui, listview, 포프레스네소각
-FileDelete, %A_ScriptDir%\소각리스트.ini
+FileDelete, C:\소각리스트.ini
 save := LV_GetCount()
 loop, %save%{
 lv_gettext(savefile1,a_index)
-FileAppend, %savefile1%`n, %A_ScriptDir%\소각리스트.ini
-FileSetAttrib, +H, %A_ScriptDir%\소각리스트.ini
+FileAppend, %savefile1%`n, C:\소각리스트.ini
+FileSetAttrib, +H, C:\소각리스트.ini
 }
 Sleep, 100
+;ReloadScript()
 Reload
 return
 Addincinerate:
@@ -6191,9 +6414,9 @@ SelectRowNum := RowNumber
 }
 Lv_Delete(SelectRowNum)
 return
-incineration:
+incineration: ;줍줍 제어 용
 Gui, Submit, Nohide
-if((Step >= 19 and Step < 90) or Step >= 1013 and Step < 1030)
+if((Step >= 19 and Step < 90) || (Step >= 1013 and Step < 1030) || (Step >= 3023 and Step < 3031)) ; 포남 포북 머미면
 {
 IfInString,Location,포프레스네
 {
@@ -6207,10 +6430,36 @@ LastRowNum := A_index
 LV_Modify(inciNumber,"Select")
 LV_Modify(inciNumber, "Vis")
 LV_GetText(inciItem, inciNumber)
+incinerate_item()
 Sleep, 10
 incinerate_item()
 Sleep, 10
 incinerate()
+
+inciNumber += 1
+if(inciNumber > LastRowNum)
+{
+inciNumber = 1
+}
+}
+}
+else IfInString,Location,크로노시스
+{
+Gui, listview, 포프레스네소각
+IfInString,Location,1F
+{
+Loop % LV_GetCount()
+{
+LastRowNum := A_index
+}
+LV_Modify(inciNumber,"Select")
+LV_Modify(inciNumber, "Vis")
+LV_GetText(inciItem, inciNumber)
+Sleep, 10
+incinerate_item()
+Sleep, 10
+incinerate()
+Sleep, 10
 inciNumber += 1
 if(inciNumber > LastRowNum)
 {
@@ -6222,6 +6471,8 @@ inciNumber = 1
 return
 if(Step >= 7 and Step < 10000)
 {
+Get_Location()
+GuiControl, , Gui_NowLocation, %Location%
 Get_inven()
 if(NowInven = 50)
 {
@@ -6229,8 +6480,10 @@ invenstack += 1
 if(invenstack > 150)
 {
 SLEEP, 100
+이전스텝 := step
 invenError += 1
-step = 10000
+이유 := "인벤슬롯 가득참"
+step := 10000
 return
 }
 }
@@ -6239,8 +6492,11 @@ if(invenError > 2)
 {
 IfWinExist,ahk_pid %jPID%
 {
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 인벤칸 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
+sleep,10
 WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
+WINKILL, ahk_exe MRMsph.exe
 }
 GUICONTROL, , Gui_NowState, 인벤토리에 빈공간이 없어 강제 종료 합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -6248,29 +6504,21 @@ SB_SetText("인벤칸 부족")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
+settimer, 감응,off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
 invenError = 0
-return
+Pause
 }
 Hunt:
-Gui, Submit, Nohide
-if(A_WDay = 5)
-{
-if(A_hour = 09)
-{
-if(A_Min = 00)
-{
-GuiControl, , Gui_NowState, 일랜시아 점검 15분 대기.
-WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
-Sleep, 900000
-OID리셋()
-}
-}
-}
+GUI, Submit, Nohide
 if(CheckPN = 1)
 {
 PNnowtime = %A_Now%
@@ -6295,7 +6543,7 @@ if(CheckPB = 1)
 {
 nowtime = %A_Now%
 FormatTime, nowtime1, %nowtime%, yyyyMMddHHmm
-if(nowtime1 > newTime1)
+if(nowtime1 > newTime1 && (Step != 300))
 {
 MobNumber = 1
 SplashImage, 1: off
@@ -6317,7 +6565,7 @@ WinClose
 IfWinExist,ahk_pid %jPID%
 {
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
 }
 IfWinExist,Microsoft Visual C++ Runtime Library
@@ -6326,7 +6574,7 @@ WinClose
 IfWinExist,ahk_pid %jPID%
 {
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
 }
 IfWinExist,ahk_exe WerFault.exe
@@ -6336,7 +6584,7 @@ Process, Close, WerFault.exe
 IfWinExist,ahk_pid %jPID%
 {
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
 }
 IfWinExist, ahk_pid %jPID%
@@ -6351,23 +6599,26 @@ ControlClick, Button1, ahk_class #32770
 IfWinExist,ahk_pid %jPID%
 {
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
 }
 IfWinExist,ahk_pid %jPID%
 {
-SB_SetText("섭팅 : " . 서버팅김 . "  파라스방해 : " . 파라스감지 . "  수천방해 : " . 수천감지,3)
-if((Step >= 11 and Step < 90) or (Step >= 1004 and Step < 1030))
+if((Step >= 11 and Step < 90) or (Step >= 1004 and Step < 1030) or (Step >= 3000 and Step =< 3031)) ;템뿌 파트
 {
-if( 방어구방지ON = 1 )
+if( Protect_AmorON = 1 )
 {
 AmorCheck()
 if( Top = 0 or shoes = 0 or jean = 0 or Cap = 0 )
 {
 IfWinExist,ahk_pid %jPID%
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 캐릭터 템 일부 벗겨짐. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
+sleep,10
 WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
+WINKILL, ahk_exe MRMsph.exe
 }
 GUICONTROL, , Gui_NowState, 캐릭터 사망 방지.
 GuiControl, , 로그인상태정보, 자동정지
@@ -6375,17 +6626,19 @@ SB_SetText("캐릭사망방지, 자동정지")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
 invenError = 0
 MsgBox,48, 캐릭터사망방지, 템이 벗겨졌습니다.
-return
+Pause
 }
 }
 }
-if((Step >= 7 and Step < 507) or (Step >= 512 and Step < 10000))
+if((Step >= 7 and Step < 507) or (Step >= 512 and Step < 10000)) ;수호천사 파트
 {
 Check_FormNumber()
 if(FormNumber = 78)
@@ -6406,9 +6659,11 @@ PostClick(132,93)
 Sleep,500
 }
 }
-수천감지++
+수호천사방지++
 }
 }
+
+
 if(Step >= 7 and Step < 10000)
 {
 Check_NPCMsg()
@@ -6420,14 +6675,54 @@ if(FormNumber = 78)
 SLEEP, 700
 PostClick(132,93)
 SLEEP, 500
-수천감지++
+수호천사방지++
 }
+}
+IfInString,NPCMsg,인연
+{
+SLEEP, 500
+SetFormat, Integer, H
+startAddress := 0x00100000
+endAddress := 0x00200000
+SetFormat, Integer, D
+NPC_MSG_ADR := Check_NPCMsg_address()
+FormNumber := jelan.read(0x0058DAD0, "UInt", 0xC, 0x10, 0x8, 0xA0)
+NPCMsg := jelan.readString(NPC_MSG_ADR, 52, "UTF-16", aOffsets*)
+TMessage := "[ Helancia_Log ]>>" jTitle FormNumber "<<: 애미뒤진 인연버그 발생. " Location "/" "발생 메시지 전문 : " NPCMsg
+텔레그램메시지보내기(TMessage)
+sleep,10
+keyclick("프로세스종료")
+이전스텝 := step
+이유 := 인연벅
+step = 10000
+return
+}
+IfInString,NPCMsg,렉스
+{
+SLEEP, 500
+SetFormat, Integer, H
+startAddress := 0x00100000
+endAddress := 0x00200000
+SetFormat, Integer, D
+NPC_MSG_ADR := Check_NPCMsg_address()
+FormNumber := jelan.read(0x0058DAD0, "UInt", 0xC, 0x10, 0x8, 0xA0)
+NPCMsg := jelan.readString(NPC_MSG_ADR, 52, "UTF-16", aOffsets*)
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle FormNumber "<<: 애미뒤진 길드버그 발생. " Location "/" "발생 메시지 전문 : " NPCMsg
+텔레그램메시지보내기(TMessage)
+sleep,10
+keyclick("프로세스종료")
+이전스텝 := step
+이유 := 길드벅
+step = 10000
+return
 }
 Get_Location()
+GuiControl, , Gui_NowLocation, %Location%
 SB_SetText(Location,2)
 IfInString,Location,포프레스네 마을
 {
-if( 방어구방지ON = 1 )
+if( Protect_AmorON = 1 )
 {
 AmorCheck()
 if( Top = 0 or shoes = 0 or jean = 0 or Cap = 0 )
@@ -6450,6 +6745,37 @@ GuiControl,,Pro_NowMP,%MPPercent%
 Get_FP()
 GuiControl,,Gui_NowFP,%NowFP% / %MaxFP% (%FPPercent%`%)
 GuiControl,,Pro_NowFP,%FPPercent%
+GuiControl,,Gui_NowFP,%NowFP% / %MaxFP% (%FPPercent%`%)
+이전스텝 := Step
+; 이 코드는 타이머나 메인 루프 안에서 반복적으로 실행되어야 합니다.
+if (NowFP = SaveFP)
+{
+    FPreset++
+    if (FPreset >= 50000)
+    {
+        TMessage := "[ Helancia_Log ]>> FP 프리징으로 프로그램 리로드"
+        텔레그램메시지보내기(TMessage)
+        gosub, RL
+    }
+}
+else
+{
+    SaveFP := NowFP
+    FPreset := 0
+}
+GUIDimension := jelan.read(0x0058EB1C, "UInt", 0x10A)
+	if(GUIDimension>20000)
+		GUI차원:="감마"
+	else if(GUIDimension>10000)
+		GUI차원:="베타"
+	else if(GUIDimension<10000)
+		GUI차원:="알파"
+GUI좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
+GUI좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
+GUI좌표Z := jelan.read(0x0058DAD4, "UInt", 0x18)
+GUIStep := step
+GUIMyloute := Myloute
+GuiControl,, 좌표,(%GUI차원%)X:%GUI좌표X%.Y:%GUI좌표Y%.Z:%GUI좌표Z%에 있습니다.[%GUIStep%/%GUIMyloute%/%mapnumber%]
 if(BWValue0 != "")
 {
 SetFormat, Float, 0.2
@@ -6912,76 +7238,6 @@ TempAbility := MagicAbility8
 GuiControl, , Gui_MagicValue8, %TempAbility%
 SetFormat, Float, 0
 }
-if(MagicAbility9 != "")
-{
-SetFormat, Float, 0.2
-TempAbility := MagicAbility9
-GuiControl, , Gui_MagicValue9, %TempAbility%
-SetFormat, Float, 0
-}
-if(MagicAbility10 != "")
-{
-SetFormat, Float, 0.2
-TempAbility := MagicAbility10
-GuiControl, , Gui_MagicValue10, %TempAbility%
-SetFormat, Float, 0
-}
-if(MagicAbility11 != "")
-{
-SetFormat, Float, 0.2
-TempAbility := MagicAbility11
-GuiControl, , Gui_MagicValue11, %TempAbility%
-SetFormat, Float, 0
-}
-if(MagicAbility12 != "")
-{
-SetFormat, Float, 0.2
-TempAbility := MagicAbility12
-GuiControl, , Gui_MagicValue12, %TempAbility%
-SetFormat, Float, 0
-}
-if(MagicAbility13 != "")
-{
-SetFormat, Float, 0.2
-TempAbility := MagicAbility13
-GuiControl, , Gui_MagicValue13, %TempAbility%
-SetFormat, Float, 0
-}
-if(MagicAbility14 != "")
-{
-SetFormat, Float, 0.2
-TempAbility := MagicAbility14
-GuiControl, , Gui_MagicValue14, %TempAbility%
-SetFormat, Float, 0
-}
-if(MagicAbility15 != "")
-{
-SetFormat, Float, 0.2
-TempAbility := MagicAbility15
-GuiControl, , Gui_MagicValue15, %TempAbility%
-SetFormat, Float, 0
-}
-if(MagicAbility16 != "")
-{
-SetFormat, Float, 0.2
-TempAbility := MagicAbility16
-GuiControl, , Gui_MagicValue16, %TempAbility%
-SetFormat, Float, 0
-}
-if(MagicAbility17 != "")
-{
-SetFormat, Float, 0.2
-TempAbility := MagicAbility17
-GuiControl, , Gui_MagicValue17, %TempAbility%
-SetFormat, Float, 0
-}
-if(MagicAbility18 != "")
-{
-SetFormat, Float, 0.2
-TempAbility := MagicAbility18
-GuiControl, , Gui_MagicValue18, %TempAbility%
-SetFormat, Float, 0
-}
 if(Regloady = 0)
 {
 CheckUPHP := MaxHP - CheckFirstHP
@@ -6990,20 +7246,36 @@ if(Regloady = 1)
 {
 CheckUPHP := MaxHP - RCFH
 }
+
 상승체력평균치 := (A_TickCount-ProgramStartTime)/1000
 RunningTime := FormatSeconds((A_TickCount-ProgramStartTime)/1000)
 상승체력평균값 := (CheckUPHP * 60) / (상승체력평균치/60)
 GuiControl,,시작체력,%CheckFirstHP%
 GuiControl,,상승체력,%CheckUPHP% (%상승체력평균값%)
 GuiControl,,경과시간,%RunningTime%
+;if ((A_TickCount - LastMessageTime) >= 3600000)  ; 1시간(3600초 = 3600000밀리초)
+;{
+;    상승체력_1시간 := CheckUPHP - LastCheckUPHP
+;    상승체력평균값_1시간 := (상승체력_1시간 * 60) / 60  ; 1시간 동안의 평균 상승 체력 계산
+
+;    TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 시작 체력 : " . CheckFirstHP . " / 1시간 상승 체력 : " . 상승체력_1시간 . " ( " . 상승체력평균값_1시간 . " ) " . " / 경과 시간 :  " . RunningTime . " 한시간동안 오른 체력 입니다."
+;    텔레그램메시지보내기(TMessage)
+
+    ; 1시간 단위 상승 체력 업데이트 및 LastMessageTime 리셋
+;    LastCheckUPHP := CheckUPHP
+;    LastMessageTime := A_TickCount
+;}
+CheckUPHP := MaxHP - CheckFirstHP
+SB_SetText("시작체력 : " . CheckFirstHP . " / 상승체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과시간 :  " . RunningTime . "[" reserver "]" ,3 )
+}
 if(파라스방해감지 = 1)
 {
-파라스타이머카운트 := FormatSeconds(파라스타이머값 - ((A_TickCount-파라스타이머시작)/1000))
 GuiControl,,파라스타이머,파라스대기 = %파라스타이머카운트%
+파라스타이머카운트 := FormatSeconds(3600-((A_TickCount-파라스타이머시작)/1000))
 }
 else
 {
-GuiControl,,파라스타이머,파라스대기 = 0:00:00
+GuiControl,,파라스타이머, 다시포남까지 = 0:00:00
 }
 if(Gui_CheckUseHPExit = 1)
 {
@@ -7011,8 +7283,15 @@ if(NowHP <= Gui_HPExit and NowHP != "")
 {
 IfWinExist,ahk_pid %jPID%
 {
+Get_Location()
+좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
+좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
+좌표Z := jelan.read(0x0058DAD4, "UInt", 0x18)
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
+TMessage := "[ Helancia_Log ]>>" jTitle  "<< : 체력이" . NowHP . "가 되어 종료 확인 필요. 위치보고: " Location . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ") 시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) / 경과 시간 : " RunningTime
+텔레그램메시지보내기(TMessage)
+sleep,10
 }
 GuiControl, , Gui_NowState, 체력이 %NowHP%가 되어 강제 종료 합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -7020,11 +7299,17 @@ SB_SetText("헬퍼실행. 자동정지")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
+
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
+Pause
 }
 }
 internet := ConnectedToInternet()
@@ -7033,18 +7318,23 @@ if(internet = 0)
 IfWinExist,ahk_pid %jPID%
 {
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
-Step = 10000
+이유 := "인터넷 연결 종료"
+Step := 10000
 return
 }
+WinGet, pid, PID, ahk_pid %jPID%
 ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
-IfInString,ServerMsg,서버와의 연결이
+IfInString,ServerMsg,오랜 시간 아무것도 하지 않으면
 {
 IfWinExist,ahk_pid %jPID%
 {
+TMessage := "[ Helancia_Log ]>>" . jTitle "<<:로그인 시 오랜시간 아무것도 하지 않음."
+텔레그램메시지보내기(TMessage)
+sleep,10
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 SplashImage, 1: off
 SplashImage, 2: off
 SplashImage, 3: off
@@ -7055,6 +7345,30 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
+실행초기화 += 1
+step := 8
+sleep,10000
+return
+}
+}
+IfInString,ServerMsg,서버와의 연결이
+{
+IfWinExist,ahk_pid %jPID%
+{
+WinKill, ahk_pid %jPID%
+WinKill, ahk_exe MRMsph.exe
+SplashImage, 1: off
+SplashImage, 2: off
+SplashImage, 3: off
+SplashImage, 4: off
+SplashImage, 5: off
+SplashImage, 6: off
+SplashImage, 7: off
+SplashImage, 8: off
+SplashImage, 9: off
+SplashImage, 10: off
+IfnotInString,Location,북쪽 필드
+{
 OutTime := A_TickCount
 ParasTime := OutTime - JoinTime
 if(ParasTime < 1200000)
@@ -7065,15 +7379,18 @@ if(ParasTime >= 1200000)
 {
 ParasCount = 0
 }
-if(ParasCount > 3)
+if(ParasCount >= 3)
 {
-GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.
+GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.2
 ParasCount = 3
+TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 포북으로 잠시 이동."
+텔레그램메시지보내기(TMessage)
+sleep,10
 파라스방해감지 := 1
 GuiControl,,Gui_huntpobuk,1
 파라스감지++
 }
-서버팅김++
+}
 실행초기화 += 1
 if(Step = 17 or step = 18)
 {
@@ -7081,14 +7398,18 @@ Entrance += 1
 }
 if(Entrance > 2)
 {
-MsgBox, , 비정상종료감지, 포북으로 이동, 3
-GuiControl, ,Gui_HuntPobuk, 1
-step = 8
-Sleep, 1000
+MsgBox, , 비정상종료감지, OID리셋, 3
+TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 초기 입구 감응 실패. OID 리셋."
+텔레그램메시지보내기(TMessage)
+sleep,10
+OID리셋()
+step := 8
+sleep,1000
 return
 }
 }
-Step = 10000
+이유 := "일랜시아 서버와 연결 종료"
+Step := 10000
 return
 }
 if(Gui_CheckUseHPLimited = 1)
@@ -7099,8 +7420,23 @@ if(MaxHP >= Gui_HPLimited)
 {
 IfWinExist,ahk_pid %jPID%
 {
+		맵이름 := jelan.readString(jelan.getModuleBaseAddress("jelancia_core.dll")+0x44A28, 50, "UTF-16", 0xC)
+		Dimension := mem.read(0x0058EB1C, "UInt", 0x10A)
+		if(Dimension>20000)
+			현재차원 := "감마"
+		else if(Dimension>10000)
+			현재차원 := "베타"
+		else if(Dimension<10000)
+			현재차원 := "알파"
+		좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
+		좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
+		좌표Z := jelan.read(0x0058DAD4, "UInt", 0x18)
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle " <<: 캐릭터 설정된 체력에 도달. 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
+sleep,10
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
 GuiControl, , Gui_NowState, 설정된 체력에 도달하여 강제 종료합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -7108,11 +7444,16 @@ SB_SetText("헬퍼실행. 자동정지")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
+Pause
 }
 }
 }
@@ -7123,11 +7464,12 @@ if(pbtalkcheck2 >= 120000)
 {
 Sleep, 100
 pbtalkcheck = 0
-step = 10000
+이유 := "포북 메세지 시간초과"
+step := 10000
 Sleep, 100
 }
 }
-if((Step >= 19 and Step < 90) or (Step >= 1013 and Step < 1030))
+if((Step >= 19 and Step < 90) or (Step >= 1013 and Step < 1030) or (Step >= 3000 and Step =< 3031))
 {
 callid := jelan.read(0x0058EDB8, "UInt", aOffsets*)
 if(callid > 2500)
@@ -7137,14 +7479,19 @@ SLEEP, 500
 Entrance = 0
 }
 }
-if((Step >= 19 and Step < 90) or (Step >= 1013 and Step < 1030))
+if((Step >= 19 and Step < 90) or (Step >= 1013 and Step < 1030) or (Step >= 3000 and Step =< 3031))
 {
+
 name := jelan.readString(jelan.read(0x0058F058)+0x184,,"UTF-16")
 if( name != "" )
 {
 Loop,
 {
 SB_SetText("거래창 방해감지")
+GuiControl, , jTitle, %jTitle%
+TMessage :="[ Helancia_Log ]>>" jTitle "<<: [거래방지] 이 시벌놈이 거래겁니다 거래건놈 :" name
+텔레그램메시지보내기(TMessage)
+sleep,100
 AltR()
 Sleep,100
 AltR()
@@ -7160,9 +7507,14 @@ break
 }
 if((Step >= 17 and Step < 90) or (Step >= 1006 and Step < 1032))
 {
-GuiControl,,호출대상이름,%호출대상%
+if(Step >= 17 and Step < 90)
+{
+GuiControl,,CallTarget,%호출대상%
+;감응감응 := (A_TickCount -포남입장시간) / 1000
+GuiControl,, 감응쿨타임, [%호출대상%] 호출완료
 }
-if((Step >= 19 and Step < 90) or (Step >= 1013 and Step < 1030))
+}
+if((Step >= 19 and Step < 90) or (Step >= 1013 and Step < 1030) or (Step >= 3023 and Step < 3031)) ; 퀵슬롯 및 체크
 {
 if(4번사용 = 1)
 {
@@ -7184,15 +7536,28 @@ if(7번사용 = 1)
 PostMessage, 0x100, 55, 524289, , ahk_pid %jPID%
 PostMessage, 0x101, 55, 524289, , ahk_pid %jPID%
 }
-if(HuntPlace = 1 and NowFp <= 포남생콩섭취)
+if(HuntPlace = 1 and NowFp <= 포남생콩섭취 and 8번사용 = 0)
 {
 PostMessage, 0x100, 56, 589825, , ahk_pid %jPID%
 PostMessage, 0x101, 56, 589825, , ahk_pid %jPID%
 }
-if(HuntPlace = 2 and NowFp <= 포북생콩섭취)
+if(HuntPlace = 2 and NowFp <= 포남생콩섭취 and 8번사용 = 0)
 {
 PostMessage, 0x100, 56, 589825, , ahk_pid %jPID%
 PostMessage, 0x101, 56, 589825, , ahk_pid %jPID%
+}
+if(8번사용 = 1)
+{
+PostMessage, 0x100, 56, 589825, , ahk_pid %jPID%
+PostMessage, 0x101, 56, 589825, , ahk_pid %jPID%
+}
+if(9번사용 = 1)
+{
+if(NowFP < 1)
+{
+PostMessage, 0x100, 57, 589825, , ahk_pid %jPID%
+PostMessage, 0x101, 57, 589825, , ahk_pid %jPID%
+}
 }
 if(Gui_jjON = 1)
 {
@@ -7204,874 +7569,6 @@ jelan.write(0x0047B3EC, 0x4D, "Char", aOffsets*)
 if(NowInven <= 가방수량체크)
 {
 jelan.write(0x0047B3EC, 0x02, "Char", aOffsets*)
-}
-}
-Check_SAbilityN()
-Check_SAbility()
-if(Slot1AN != "")
-{
-GuiControl, , Gui_WeaponName1, %Slot1AN%
-if(Gui_WeaponCheck1 = 1)
-{
-WeaponAbility1 := Slot1Ability
-}
-if(Gui_WeaponCheck1 = 0)
-{
-WeaponAbility1 =
-}
-}
-if(Slot2AN != "")
-{
-GuiControl, , Gui_WeaponName2, %Slot2AN%
-if(Gui_WeaponCheck2 = 1)
-{
-WeaponAbility2 := Slot2Ability
-}
-if(Gui_WeaponCheck2 = 0)
-{
-WeaponAbility2 =
-}
-}
-if(Slot3AN != "")
-{
-GuiControl, , Gui_WeaponName3, %Slot3AN%
-if(Gui_WeaponCheck3 = 1)
-{
-WeaponAbility3 := Slot3Ability
-}
-if(Gui_WeaponCheck3 = 0)
-{
-WeaponAbility3 =
-}
-}
-if(Slot4AN != "")
-{
-GuiControl, , Gui_WeaponName4, %Slot4AN%
-if(Gui_WeaponCheck4 = 1)
-{
-WeaponAbility4 := Slot4Ability
-}
-if(Gui_WeaponCheck4 = 0)
-{
-WeaponAbility4 =
-}
-}
-if(Slot5AN != "")
-{
-GuiControl, , Gui_WeaponName5, %Slot5AN%
-if(Gui_WeaponCheck5 = 1)
-{
-WeaponAbility5 := Slot5Ability
-}
-if(Gui_WeaponCheck5 = 0)
-{
-WeaponAbility5 =
-}
-}
-if(Slot6AN != "")
-{
-GuiControl, , Gui_WeaponName6, %Slot6AN%
-if(Gui_WeaponCheck6 = 1)
-{
-WeaponAbility6 := Slot6Ability
-}
-if(Gui_WeaponCheck6 = 0)
-{
-WeaponAbility6 =
-}
-}
-if(Slot7AN != "")
-{
-GuiControl, , Gui_WeaponName7, %Slot7AN%
-if(Gui_WeaponCheck7 = 1)
-{
-WeaponAbility7 := Slot7Ability
-}
-if(Gui_WeaponCheck7 = 0)
-{
-WeaponAbility7 =
-}
-}
-if(Slot8AN != "")
-{
-GuiControl, , Gui_WeaponName8, %Slot8AN%
-if(Gui_WeaponCheck8 = 1)
-{
-WeaponAbility8 := Slot8Ability
-}
-if(Gui_WeaponCheck8 = 0)
-{
-WeaponAbility8 =
-}
-}
-if(Slot9AN != "")
-{
-GuiControl, , Gui_WeaponName9, %Slot9AN%
-if(Gui_WeaponCheck9 = 1)
-{
-WeaponAbility9 := Slot9Ability
-}
-if(Gui_WeaponCheck9 = 0)
-{
-WeaponAbility9 =
-}
-}
-if(Slot10AN != "")
-{
-GuiControl, , Gui_WeaponName10, %Slot10AN%
-if(Gui_WeaponCheck10 = 1)
-{
-WeaponAbility10 := Slot10Ability
-}
-if(Gui_WeaponCheck10 = 0)
-{
-WeaponAbility10 =
-}
-}
-if(Slot11AN != "")
-{
-GuiControl, , Gui_WeaponName11, %Slot11AN%
-if(Gui_WeaponCheck11 = 1)
-{
-WeaponAbility11 := Slot11Ability
-}
-if(Gui_WeaponCheck11 = 0)
-{
-WeaponAbility11 =
-}
-}
-if(Slot12AN != "")
-{
-GuiControl, , Gui_WeaponName12, %Slot12AN%
-if(Gui_WeaponCheck12 = 1)
-{
-WeaponAbility12 := Slot12Ability
-}
-if(Gui_WeaponCheck12 = 0)
-{
-WeaponAbility12 =
-}
-}
-if(Slot13AN != "")
-{
-GuiControl, , Gui_WeaponName13, %Slot13AN%
-if(Gui_WeaponCheck13 = 1)
-{
-WeaponAbility13 := Slot13Ability
-}
-if(Gui_WeaponCheck13 = 0)
-{
-WeaponAbility13 =
-}
-}
-if(Slot14AN != "")
-{
-GuiControl, , Gui_WeaponName14, %Slot14AN%
-if(Gui_WeaponCheck14 = 1)
-{
-WeaponAbility14 := Slot14Ability
-}
-if(Gui_WeaponCheck14 = 0)
-{
-WeaponAbility14 =
-}
-}
-if(Slot15AN != "")
-{
-GuiControl, , Gui_WeaponName15, %Slot15AN%
-if(Gui_WeaponCheck15 = 1)
-{
-WeaponAbility15 := Slot15Ability
-}
-if(Gui_WeaponCheck15 = 0)
-{
-WeaponAbility15 =
-}
-}
-if(Slot16AN != "")
-{
-GuiControl, , Gui_WeaponName16, %Slot16AN%
-if(Gui_WeaponCheck16 = 1)
-{
-WeaponAbility16 := Slot16Ability
-}
-if(Gui_WeaponCheck16 = 0)
-{
-WeaponAbility16 =
-}
-}
-if(Slot17AN != "")
-{
-GuiControl, , Gui_WeaponName17, %Slot17AN%
-if(Gui_WeaponCheck17 = 1)
-{
-WeaponAbility17 := Slot17Ability
-}
-if(Gui_WeaponCheck17 = 0)
-{
-WeaponAbility17 =
-}
-}
-if(Slot18AN != "")
-{
-GuiControl, , Gui_WeaponName18, %Slot18AN%
-if(Gui_WeaponCheck18 = 1)
-{
-WeaponAbility18 := Slot18Ability
-}
-if(Gui_WeaponCheck18 = 0)
-{
-WeaponAbility18 =
-}
-}
-if(Slot19AN != "")
-{
-GuiControl, , Gui_WeaponName19, %Slot19AN%
-if(Gui_WeaponCheck19 = 1)
-{
-WeaponAbility19 := Slot19Ability
-}
-if(Gui_WeaponCheck19 = 0)
-{
-WeaponAbility19 =
-}
-}
-if(Slot20AN != "")
-{
-GuiControl, , Gui_WeaponName20, %Slot20AN%
-if(Gui_WeaponCheck20 = 1)
-{
-WeaponAbility20 := Slot20Ability
-}
-if(Gui_WeaponCheck20 = 0)
-{
-WeaponAbility20 =
-}
-}
-if(Slot21AN != "")
-{
-GuiControl, , Gui_WeaponName21, %Slot21AN%
-if(Gui_WeaponCheck21 = 1)
-{
-WeaponAbility21 := Slot21Ability
-}
-if(Gui_WeaponCheck21 = 0)
-{
-WeaponAbility21 =
-}
-}
-if(Slot22AN != "")
-{
-GuiControl, , Gui_WeaponName22, %Slot22AN%
-if(Gui_WeaponCheck22 = 1)
-{
-WeaponAbility22 := Slot22Ability
-}
-if(Gui_WeaponCheck22 = 0)
-{
-WeaponAbility22 =
-}
-}
-if(Slot23AN != "")
-{
-GuiControl, , Gui_WeaponName23, %Slot23AN%
-if(Gui_WeaponCheck23 = 1)
-{
-WeaponAbility23 := Slot23Ability
-}
-if(Gui_WeaponCheck23 = 0)
-{
-WeaponAbility23 =
-}
-}
-if(Slot24AN != "")
-{
-GuiControl, , Gui_WeaponName24, %Slot24AN%
-if(Gui_WeaponCheck24 = 1)
-{
-WeaponAbility24 := Slot24Ability
-}
-if(Gui_WeaponCheck24 = 0)
-{
-WeaponAbility24 =
-}
-}
-if(Slot25AN != "")
-{
-GuiControl, , Gui_WeaponName25, %Slot25AN%
-if(Gui_WeaponCheck25 = 1)
-{
-WeaponAbility25 := Slot25Ability
-}
-if(Gui_WeaponCheck25 = 0)
-{
-WeaponAbility25 =
-}
-}
-if(Slot26AN != "")
-{
-GuiControl, , Gui_WeaponName26, %Slot26AN%
-if(Gui_WeaponCheck26 = 1)
-{
-WeaponAbility26 := Slot26Ability
-}
-if(Gui_WeaponCheck26 = 0)
-{
-WeaponAbility26 =
-}
-}
-if(Slot27AN != "")
-{
-GuiControl, , Gui_WeaponName27, %Slot27AN%
-if(Gui_WeaponCheck27 = 1)
-{
-WeaponAbility27 := Slot27Ability
-}
-if(Gui_WeaponCheck27 = 0)
-{
-WeaponAbility27 =
-}
-}
-if(Slot28AN != "")
-{
-GuiControl, , Gui_WeaponName28, %Slot28AN%
-if(Gui_WeaponCheck28 = 1)
-{
-WeaponAbility28 := Slot28Ability
-}
-if(Gui_WeaponCheck28 = 0)
-{
-WeaponAbility28 =
-}
-}
-if(Slot29AN != "")
-{
-GuiControl, , Gui_WeaponName29, %Slot29AN%
-if(Gui_WeaponCheck29 = 1)
-{
-WeaponAbility29 := Slot29Ability
-}
-if(Gui_WeaponCheck29 = 0)
-{
-WeaponAbility29 =
-}
-}
-if(Slot30AN != "")
-{
-GuiControl, , Gui_WeaponName30, %Slot30AN%
-if(Gui_WeaponCheck30 = 1)
-{
-WeaponAbility30 := Slot30Ability
-}
-if(Gui_WeaponCheck30 = 0)
-{
-WeaponAbility30 =
-}
-}
-if(Slot31AN != "")
-{
-GuiControl, , Gui_WeaponName31, %Slot31AN%
-if(Gui_WeaponCheck31 = 1)
-{
-WeaponAbility31 := Slot31Ability
-}
-if(Gui_WeaponCheck31 = 0)
-{
-WeaponAbility31 =
-}
-}
-if(Slot32AN != "")
-{
-GuiControl, , Gui_WeaponName32, %Slot32AN%
-if(Gui_WeaponCheck32 = 1)
-{
-WeaponAbility32 := Slot32Ability
-}
-if(Gui_WeaponCheck32 = 0)
-{
-WeaponAbility32 =
-}
-}
-if(Slot33AN != "")
-{
-GuiControl, , Gui_WeaponName33, %Slot33AN%
-if(Gui_WeaponCheck33 = 1)
-{
-WeaponAbility33 := Slot33Ability
-}
-if(Gui_WeaponCheck33 = 0)
-{
-WeaponAbility33 =
-}
-}
-if(Slot34AN != "")
-{
-GuiControl, , Gui_WeaponName34, %Slot34AN%
-if(Gui_WeaponCheck34 = 1)
-{
-WeaponAbility34 := Slot34Ability
-}
-if(Gui_WeaponCheck34 = 0)
-{
-WeaponAbility34 =
-}
-}
-if(Slot35AN != "")
-{
-GuiControl, , Gui_WeaponName35, %Slot35AN%
-if(Gui_WeaponCheck35 = 1)
-{
-WeaponAbility35 := Slot35Ability
-}
-if(Gui_WeaponCheck35 = 0)
-{
-WeaponAbility35 =
-}
-}
-if(Slot36AN != "")
-{
-GuiControl, , Gui_WeaponName36, %Slot36AN%
-if(Gui_WeaponCheck36 = 1)
-{
-WeaponAbility36 := Slot36Ability
-}
-if(Gui_WeaponCheck36 = 0)
-{
-WeaponAbility36 =
-}
-}
-if(Slot37AN != "")
-{
-GuiControl, , Gui_WeaponName37, %Slot37AN%
-if(Gui_WeaponCheck37 = 1)
-{
-WeaponAbility37 := Slot37Ability
-}
-if(Gui_WeaponCheck37 = 0)
-{
-WeaponAbility37 =
-}
-}
-if(Slot38AN != "")
-{
-GuiControl, , Gui_WeaponName38, %Slot38AN%
-if(Gui_WeaponCheck38 = 1)
-{
-WeaponAbility38 := Slot38Ability
-}
-if(Gui_WeaponCheck38 = 0)
-{
-WeaponAbility38 =
-}
-}
-if(Slot39AN != "")
-{
-GuiControl, , Gui_WeaponName39, %Slot39AN%
-if(Gui_WeaponCheck39 = 1)
-{
-WeaponAbility39 := Slot39Ability
-}
-if(Gui_WeaponCheck39 = 0)
-{
-WeaponAbility39 =
-}
-}
-if(Slot40AN != "")
-{
-GuiControl, , Gui_WeaponName40, %Slot40AN%
-if(Gui_WeaponCheck40 = 1)
-{
-WeaponAbility40 := Slot40Ability
-}
-if(Gui_WeaponCheck40 = 0)
-{
-WeaponAbility40 =
-}
-}
-if(Slot41AN != "")
-{
-GuiControl, , Gui_WeaponName41, %Slot41AN%
-if(Gui_WeaponCheck41 = 1)
-{
-WeaponAbility41 := Slot41Ability
-}
-if(Gui_WeaponCheck41 = 0)
-{
-WeaponAbility41 =
-}
-}
-if(Slot42AN != "")
-{
-GuiControl, , Gui_WeaponName42, %Slot42AN%
-if(Gui_WeaponCheck42 = 1)
-{
-WeaponAbility42 := Slot42Ability
-}
-if(Gui_WeaponCheck42 = 0)
-{
-WeaponAbility42 =
-}
-}
-if(Slot43AN != "")
-{
-GuiControl, , Gui_WeaponName43, %Slot43AN%
-if(Gui_WeaponCheck43 = 1)
-{
-WeaponAbility43 := Slot43Ability
-}
-if(Gui_WeaponCheck43 = 0)
-{
-WeaponAbility43 =
-}
-}
-if(Slot44AN != "")
-{
-GuiControl, , Gui_WeaponName44, %Slot44AN%
-if(Gui_WeaponCheck44 = 1)
-{
-WeaponAbility44 := Slot44Ability
-}
-if(Gui_WeaponCheck44 = 0)
-{
-WeaponAbility44 =
-}
-}
-if(Slot45AN != "")
-{
-GuiControl, , Gui_WeaponName45, %Slot45AN%
-if(Gui_WeaponCheck45 = 1)
-{
-WeaponAbility45 := Slot45Ability
-}
-if(Gui_WeaponCheck45 = 0)
-{
-WeaponAbility45 =
-}
-}
-if(Slot46AN != "")
-{
-GuiControl, , Gui_WeaponName46, %Slot46AN%
-if(Gui_WeaponCheck46 = 1)
-{
-WeaponAbility46 := Slot46Ability
-}
-if(Gui_WeaponCheck46 = 0)
-{
-WeaponAbility46 =
-}
-}
-if(Slot47AN != "")
-{
-GuiControl, , Gui_WeaponName47, %Slot47AN%
-if(Gui_WeaponCheck47 = 1)
-{
-WeaponAbility47 := Slot47Ability
-}
-if(Gui_WeaponCheck47 = 0)
-{
-WeaponAbility47 =
-}
-}
-if(Slot48AN != "")
-{
-GuiControl, , Gui_WeaponName48, %Slot48AN%
-if(Gui_WeaponCheck48 = 1)
-{
-WeaponAbility48 := Slot48Ability
-}
-if(Gui_WeaponCheck48 = 0)
-{
-WeaponAbility48 =
-}
-}
-if(Slot49AN != "")
-{
-GuiControl, , Gui_WeaponName49, %Slot49AN%
-if(Gui_WeaponCheck49 = 1)
-{
-WeaponAbility49 := Slot49Ability
-}
-if(Gui_WeaponCheck49 = 0)
-{
-WeaponAbility49 =
-}
-}
-if(Slot50AN != "")
-{
-GuiControl, , Gui_WeaponName50, %Slot50AN%
-if(Gui_WeaponCheck50 = 1)
-{
-WeaponAbility50 := Slot50Ability
-}
-if(Gui_WeaponCheck50 = 0)
-{
-WeaponAbility50 =
-}
-}
-if(Slot51AN != "")
-{
-GuiControl, , Gui_WeaponName51, %Slot51AN%
-if(Gui_WeaponCheck51 = 1)
-{
-WeaponAbility51 := Slot51Ability
-}
-if(Gui_WeaponCheck51 = 0)
-{
-WeaponAbility51 =
-}
-}
-if(Slot52AN != "")
-{
-GuiControl, , Gui_WeaponName52, %Slot52AN%
-if(Gui_WeaponCheck52 = 1)
-{
-WeaponAbility52 := Slot52Ability
-}
-if(Gui_WeaponCheck52 = 0)
-{
-WeaponAbility52 =
-}
-}
-if(Slot53AN != "")
-{
-GuiControl, , Gui_WeaponName53, %Slot53AN%
-if(Gui_WeaponCheck53 = 1)
-{
-WeaponAbility53 := Slot53Ability
-}
-if(Gui_WeaponCheck53 = 0)
-{
-WeaponAbility53 =
-}
-}
-if(Slot54AN != "")
-{
-GuiControl, , Gui_WeaponName54, %Slot54AN%
-if(Gui_WeaponCheck54 = 1)
-{
-WeaponAbility54 := Slot54Ability
-}
-if(Gui_WeaponCheck54 = 0)
-{
-WeaponAbility54 =
-}
-}
-if(Slot55AN != "")
-{
-GuiControl, , Gui_WeaponName55, %Slot55AN%
-if(Gui_WeaponCheck55 = 1)
-{
-WeaponAbility55 := Slot55Ability
-}
-if(Gui_WeaponCheck55 = 0)
-{
-WeaponAbility55 =
-}
-}
-if(Slot56AN != "")
-{
-GuiControl, , Gui_WeaponName56, %Slot56AN%
-if(Gui_WeaponCheck56 = 1)
-{
-WeaponAbility56 := Slot56Ability
-}
-if(Gui_WeaponCheck56 = 0)
-{
-WeaponAbility56 =
-}
-}
-Check_SMagicN()
-Check_SMagic()
-if(Slot3MN != "")
-{
-GuiControl, , Gui_MagicName3, %Slot3MN%
-if(Gui_MagicCheck3 = 1)
-{
-MagicAbility3 := Slot3Magic
-}
-if(Gui_MagicCheck3 = 0)
-{
-MagicAbility3 =
-}
-}
-if(Slot4MN != "")
-{
-GuiControl, , Gui_MagicName4, %Slot4MN%
-if(Gui_MagicCheck4 = 1)
-{
-MagicAbility4 := Slot4Magic
-}
-if(Gui_MagicCheck4 = 0)
-{
-MagicAbility4 =
-}
-}
-if(Slot5MN != "")
-{
-GuiControl, , Gui_MagicName5, %Slot5MN%
-if(Gui_MagicCheck5 = 1)
-{
-MagicAbility5 := Slot5Magic
-}
-if(Gui_MagicCheck5 = 0)
-{
-MagicAbility5 =
-}
-}
-if(Slot6MN != "")
-{
-GuiControl, , Gui_MagicName6, %Slot6MN%
-if(Gui_MagicCheck6 = 1)
-{
-MagicAbility6 := Slot6Magic
-}
-if(Gui_MagicCheck6 =0)
-{
-MagicAbility6 =
-}
-}
-if(Slot7MN != "")
-{
-GuiControl, , Gui_MagicName7, %Slot7MN%
-if(Gui_MagicCheck7 = 1)
-{
-MagicAbility7 := Slot7Magic
-}
-if(Gui_MagicCheck7 = 0)
-{
-MagicAbility7 =
-}
-}
-if(Slot8MN != "")
-{
-GuiControl, , Gui_MagicName8, %Slot8MN%
-if(Gui_MagicCheck8 = 1)
-{
-MagicAbility8 := Slot8Magic
-}
-if(Gui_MagicCheck8 = 0)
-{
-MagicAbility8 =
-}
-}
-if(Slot9MN != "")
-{
-GuiControl, , Gui_MagicName9, %Slot9MN%
-if(Gui_MagicCheck9 = 1)
-{
-MagicAbility9 := Slot9Magic
-}
-if(Gui_MagicCheck9 = 0)
-{
-MagicAbility9 =
-}
-}
-if(Slot10MN != "")
-{
-GuiControl, , Gui_MagicName10, %Slot10MN%
-if(Gui_MagicCheck10 = 1)
-{
-MagicAbility10 := Slot10Magic
-}
-if(Gui_MagicCheck10 = 0)
-{
-MagicAbility10 =
-}
-}
-if(Slot11MN != "")
-{
-GuiControl, , Gui_MagicName11, %Slot11MN%
-if(Gui_MagicCheck11 = 1)
-{
-MagicAbility11 := Slot11Magic
-}
-if(Gui_MagicCheck11 = 0)
-{
-MagicAbility11 =
-}
-}
-if(Slot12MN != "")
-{
-GuiControl, , Gui_MagicName12, %Slot12MN%
-if(Gui_MagicCheck12 = 1)
-{
-MagicAbility12 := Slot12Magic
-}
-if(Gui_MagicCheck12 =0)
-{
-MagicAbility12 =
-}
-}
-if(Slot13MN != "")
-{
-GuiControl, , Gui_MagicName13, %Slot13MN%
-if(Gui_MagicCheck13 = 1)
-{
-MagicAbility13 := Slot13Magic
-}
-if(Gui_MagicCheck13 = 0)
-{
-MagicAbility13 =
-}
-}
-if(Slot14MN != "")
-{
-GuiControl, , Gui_MagicName14, %Slot14MN%
-if(Gui_MagicCheck14 = 1)
-{
-MagicAbility14 := Slot14Magic
-}
-if(Gui_MagicCheck14 = 0)
-{
-MagicAbility14 =
-}
-}
-if(Slot15MN != "")
-{
-GuiControl, , Gui_MagicName15, %Slot15MN%
-if(Gui_MagicCheck15 = 1)
-{
-MagicAbility15 := Slot15Magic
-}
-if(Gui_MagicCheck15 = 0)
-{
-MagicAbility15 =
-}
-}
-if(Slot16MN != "")
-{
-GuiControl, , Gui_MagicName16, %Slot16MN%
-if(Gui_MagicCheck16 = 1)
-{
-MagicAbility16 := Slot16Magic
-}
-if(Gui_MagicCheck16 =0)
-{
-MagicAbility16 =
-}
-}
-if(Slot17MN != "")
-{
-GuiControl, , Gui_MagicName17, %Slot17MN%
-if(Gui_MagicCheck17 = 1)
-{
-MagicAbility17 := Slot17Magic
-}
-if(Gui_MagicCheck17 = 0)
-{
-MagicAbility17 =
-}
-}
-if(Slot18MN != "")
-{
-GuiControl, , Gui_MagicName18, %Slot18MN%
-if(Gui_MagicCheck18 = 1)
-{
-MagicAbility18 := Slot18Magic
-}
-if(Gui_MagicCheck18 = 0)
-{
-MagicAbility18 =
 }
 }
 그레이드읽어오기()
@@ -8136,7 +7633,7 @@ jelan.write(0x0058D6B3, 마력방어번호, "Char")
 AA12()
 }
 }
-if((Step >= 19 and Step < 90) or Step >= 1008)
+if((Step >= 19 and Step < 90) or (Step > 1013 and step < 1030) or (Step >= 3023 and Step < 3031)) ; 조정 부분
 {
 if(Gui_CheckUseHPPortal = 1)
 {
@@ -8144,6 +7641,7 @@ if(NowHP <= Gui_HPPortal and NowHP != "")
 {
 if(HuntPlace = 1)
 {
+타겟number := 0
 MapNumber = 1
 MobNumber = 1
 MoveWaitCount = 0
@@ -8161,16 +7659,27 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
+settimer, 감응,off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
 GuiControl, , Gui_NowState, 체력이 %NowHP%가 되어 차원이동 합니다.
+GuiControl, , jTitle, %jTitle%
+TMessage :="[ Helancia_Log ]>>" jTitle "<<: 체력:" NowHP "입니다. 차원이동해서 정상 진행 합니다."
+텔레그램메시지보내기(TMessage)
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
 Step = 9
 return
 }
-if(HuntPlace = 2)
+if(HuntPlace = 3)
 {
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
+타겟number := 0
 MapNumber = 1
 MoveWaitCount = 0
 CenterStartY = 150
@@ -8188,7 +7697,47 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
+settimer, 감응,off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 GuiControl, , Gui_NowState, 체력이 %NowHP%가 되어 차원이동 합니다.
+TMessage :="[ Helancia_Log ]>>" jTitle "<<: 체력:" NowHP "입니다. 차원이동해서 정상 진행 합니다."
+텔레그램메시지보내기(TMessage)
+Step = 3000
+return
+}
+if(HuntPlace = 2)
+{
+CheckPB = 0
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
+타겟number := 0
+MapNumber = 1
+MoveWaitCount = 0
+CenterStartY = 150
+SuinAStartX = 364
+SuinAEndX = 430
+SuinBStartY = 158
+SuinBEndY = 227
+SplashImage, 1: off
+SplashImage, 2: off
+SplashImage, 3: off
+SplashImage, 4: off
+SplashImage, 5: off
+SplashImage, 6: off
+SplashImage, 7: off
+SplashImage, 8: off
+SplashImage, 9: off
+SplashImage, 10: off
+settimer, 감응,off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
+GuiControl, , Gui_NowState, 체력이 %NowHP%가 되어 차원이동 합니다.
+TMessage :="[ Helancia_Log ]>>" jTitle "<<: 체력:" NowHP "입니다. 차원이동해서 정상 진행 합니다."
+텔레그램메시지보내기(TMessage)
 Step = 1000
 return
 }
@@ -8199,29 +7748,37 @@ if(WeaponAbility1 = 10000 or WeaponAbility2 = 10000 or WeaponAbility3 = 10000 or
 if(Gui_Grade = 1)
 {
 CheckPB = 0
-CheckPN = 0
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
+keyclick("tab")
 Step = 600
 }
 }
-if(MagicAbility3 = 100 or MagicAbility4 = 100 or MagicAbility5 = 100 or MagicAbility6 = 100 or MagicAbility7 = 100 or MagicAbility8 = 100 or MagicAbility9 = 100 or MagicAbility10 = 100 or MagicAbility11 = 100 or MagicAbility12 = 100 or MagicAbility13 = 100 or MagicAbility14 = 100 or MagicAbility15 = 100 or MagicAbility16 = 100 or MagicAbility17 = 100 or MagicAbility18 = 100)
+if(MagicAbility3 = 100 or MagicAbility4 = 100 or MagicAbility5 = 100 or MagicAbility6 = 100 or MagicAbility7 = 100 or MagicAbility8 = 100)
 {
 if(Gui_Grade = 1)
 {
 CheckPB = 0
-CheckPN = 0
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
+keyclick("tab")
 Step = 650
 }
 }
-if(NowFP < 10)
+get_FP()
+if(NowFP = 0)
 {
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-CheckPB = 0
-CheckPN = 0
+FPcount ++
+if(nowFP = 0 && FPcount >= 20)
+{
+keyclick("tab")
+FPcount := 0
+CheckPB := 0
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
 MapNumber = 1
 MobNumber = 1
 MoveWaitCount = 0
@@ -8245,7 +7802,52 @@ Step = 200
 return
 }
 }
-if(Step >= 19 and Step < 90)
+else
+{
+    FPcount := 0
+}
+if(Gui_CheckUseHPhospital = 1) ;병원가기 함수
+{
+if(NowHP <= Gui_HPHospital and NowHP != "")
+{
+keyclick("tab")
+CheckPB = 0
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
+MapNumber = 1
+MobNumber = 1
+MoveWaitCount = 0
+CenterStartY = 150
+SuinAStartX = 364
+SuinAEndX = 430
+SuinBStartY = 158
+SuinBEndY = 227
+SplashImage, 1: off
+SplashImage, 2: off
+SplashImage, 3: off
+SplashImage, 4: off
+SplashImage, 5: off
+SplashImage, 6: off
+SplashImage, 7: off
+SplashImage, 8: off
+SplashImage, 9: off
+SplashImage, 10: off
+GuiControl, , Gui_NowState, 체력이 %NowHP%가 되어 병원에 갑니다.
+SB_SetText("병원이동")
+step = 750
+return
+}
+}
+}
+Check_Chat()
+if(Chat = 1)
+{
+PostMessage, 0x100, 13, 1835009, , ahk_pid %jPID%
+PostMessage, 0x101, 13, 1835009, , ahk_pid %jPID%
+}
+}
+if((Step >= 19 and Step < 90) || (step >= 1061 && step <= 1067))
 {
 IfNotInString,Location,남쪽 필드
 {
@@ -8259,15 +7861,20 @@ if(ParasTime >= 1200000)
 {
 ParasCount = 0
 }
-if(ParasCount > 3)
+if(ParasCount >= 3)
 {
 GuiControl, , Gui_NowState, [포남] 파라스를 감지하여 포북 이동.
 ParasCount = 3
+TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 파라스로 잠시 포북 이동 "
+텔레그램메시지보내기(TMessage)
+sleep,10
 파라스방해감지 := 1
 Settimer, 파라스대기, %파라스대기값%
 파라스타이머시작 := A_TickCount
 GuiControl,,Gui_huntpobuk,1
 파라스감지++
+step := 8
+return
 }
 MapNumber = 1
 MobNumber = 1
@@ -8286,34 +7893,7 @@ Step = 9
 return
 }
 }
-if(Step >= 1013 and Step < 1030)
-{
-IfNotInString,Location,북쪽 필드
-{
-MapNumber = 1
-MobNumber = 1
-MoveWaitCount = 0
-SplashImage, 1: off
-SplashImage, 2: off
-SplashImage, 3: off
-SplashImage, 4: off
-SplashImage, 5: off
-SplashImage, 6: off
-SplashImage, 7: off
-SplashImage, 8: off
-SplashImage, 9: off
-SplashImage, 10: off
-Step = 1000
-return
-}
-}
-Check_Chat()
-if(Chat = 1)
-{
-PostMessage, 0x100, 13, 1835009, , ahk_pid %jPID%
-PostMessage, 0x101, 13, 1835009, , ahk_pid %jPID%
-}
-if(Step = 27 or Step = 1026)
+if(Step = 27 or Step = 1026 or step = 3030)
 {
 if(Step = 27)
 {
@@ -8326,6 +7906,11 @@ WinActivate, ahk_pid %jPID%
 PixelSearch, MandX, MandY, 0, 0, 775, 460, 0x4A044A, , *fast
 if(ErrorLevel = 0)
 {
+GUICONTROL, , Gui_NowState, [포남] 헉 만드다. . . !
+GuiControl, , jTitle, %jTitle%
+;TMessage :="[ Helancia_Log ]>>" jTitle "<<: X:" .  MandX . "와 Y : " . MandY . "에"  . "만드발견. 튑니다. "
+;텔레그램메시지보내기(TMessage)
+;sleep,10
 AttackLoopCount = 0
 AttackCount = 0
 Step = 19
@@ -8392,6 +7977,122 @@ Step = 1000
 }
 }
 }
+if(HuntPlace = 3)
+{
+if(Gui_1Muba = 1)
+{
+if(BWValue1 >= Gui_LimitAbility1)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+if(Gui_2Muba = 1)
+{
+if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+if(Gui_3Muba = 1)
+{
+if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility3)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+if(Gui_2ButMuba = 1)
+{
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+if(Gui_3ButMuba = 1)
+{
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or  BWValue2 >= Gui_LimitAbility2)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+if(Gui_4ButMuba = 1)
+{
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or  BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility3)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+}
+}
+}
+
+if(Gui_HuntMummy = 1)
+{
+if(HuntPlace = 3)
+{
+if(Gui_1Muba = 1)
+{
+if(BWValue1 >= Gui_LimitAbility1)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+if(Gui_2Muba = 1)
+{
+if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+if(Gui_3Muba = 1)
+{
+if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility3)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+if(Gui_2ButMuba = 1)
+{
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+if(Gui_3ButMuba = 1)
+{
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or  BWValue2 >= Gui_LimitAbility2)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
+}
+}
+if(Gui_4ButMuba = 1)
+{
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or  BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility3)
+{
+HuntPlace = 2
+MapNumber = 1
+Step = 1000
 }
 }
 }
@@ -8400,22 +8101,24 @@ IfWinNotExist,ahk_pid %jPID%
 {
 if(Step >= 5 and Step < 10000)
 {
-GuiControl, , 로그인상태정보, 오류로 인해 재접속 합니다.
-Step = 0
+GUICONTROL, , Gui_NowState, 오류로 인해 재접속 합니다.
+Step = 10000
 }
 }
-재실행:
 if(Step = 0)
 {
 GuiControl, , 로그인상태정보, 초기 세팅 중 입니다.
+settimer, 감응,off
 SetTimer, incineration, off
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
 WinKill, ahk_pid %jPID%
 GroupAdd, ie_gruop, ahk_exe iexplore.exe
 WinKill, ahk_exe iexplore.exe
 WinKill, ahk_group ie_gruop
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 countsignal = 0
 MapNumber = 1
 MoveWaitCount = 0
@@ -8424,13 +8127,10 @@ AttackLoopCount = 0
 AttackCount = 0
 pbtalkcheck = 0
 RunDirect = 0
-초기마을이동 := 0
+Run타겟 := 0
+gui_Startmap := 0
 getidc = 1
 callid = 1
-ipmak = 0
-실행초기화 := 0
-Entrance = 0
-RCC = 0
 inciNumber = 1
 MLimit := Gui_AllMobLimit/100
 MubaStep = 1
@@ -8450,11 +8150,15 @@ WinKill, ahk_pid %jPID%
 GroupAdd, ie_gruop, ahk_exe iexplore.exe
 WinKill, ahk_exe iexplore.exe
 WinKill, ahk_group ie_gruop
-WinKill, ahk_exe MRMSPH.exe
-FileDelete, Mlog.txt
+WinKill, ahk_exe MRMsph.exe
 if(실행초기화 = 0)
 {
-SB_SetText("프로그램 구동 초기설정중")
+SB_SetText("프로그램 구동중")
+WinKill, ahk_pid %jPID%
+GroupAdd, ie_gruop, ahk_exe iexplore.exe
+WinKill, ahk_exe iexplore.exe
+WinKill, ahk_group ie_gruop
+WinKill, ahk_exe MRMsph.exe
 SplashImage, 1: off
 SplashImage, 2: off
 SplashImage, 3: off
@@ -8466,9 +8170,10 @@ SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
 Sleep, 2000
-}else
+}
+else
 {
-SB_SetText("서버연결끊킴. 재접속 설정중")
+SB_SetText("서버연결종료. 재접속 설정중")
 SplashImage, 1: off
 SplashImage, 2: off
 SplashImage, 3: off
@@ -8479,8 +8184,9 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
-Sleep, 15000
+Sleep, 5000
 실행초기화 := 0
+return
 }
 if( 파라스방해감지 = 1 )
 {
@@ -8515,7 +8221,6 @@ if (Step = 1)
     if (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
     {
         reason := "접속불량"
-		SB_SetText("이유 : " reason)
         Gosub, TryLoginFail
         step = 0
         return
@@ -8538,9 +8243,7 @@ if (Step = 1)
         IfInString, LoginURL, errorcode=1
         {
             reason := "ID,비번 틀림"
-			SB_SetText("이유 : " reason)
             Gosub, TryLoginFail
-			step = 0
             return
         }
     }
@@ -8553,9 +8256,7 @@ if (Step = 1)
         if (TryCount > 100)
         {
             reason := "게임 시작 버튼 없음"
-			SB_SetText("이유 : " reason)
             Gosub, TryLoginFail
-			step = 0
             return
         }
     }
@@ -8581,26 +8282,34 @@ if(Gui_Login = "넥슨플러그")
 if(Step = 1)
 {
 GuiControl, , 로그인상태정보, [로그인] - 접속 중
-SetTitleMatchMode,3
+SB_SetText("넥슨플러그 구동중")
+Winshow, ahk_exe NexonPlug.exe
+WinActivate, ahk_exe NexonPlug.exe
 IfWinNotExist ahk_exe NexonPlug.exe
 {
 SB_SetText("넥슨플러그를 확인해 주세요.")
 GuiControl, , 로그인상태정보, [로그인] - 시작실패 ( 넥슨플러그를 실행해주세요. )
 Gui_Enable()
+TMessage :="[ Helancia_Log ] [플러그]로그인 실패, 확인 필요." Location
+텔레그램메시지보내기(TMessage)
+sleep,100
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
+CheckPN := 0
 CheckPB = 0
-CheckPN = 0
+countsignal := 0
+랜덤감응 = 0
 return
 }
 else
 {
-WinShow, ahk_exe NexonPlug.exe
-sleep,1000
 WinActivate, ahk_exe NexonPlug.exe
-Sleep, 500
+Sleep, 1500
 IfWinActive ahk_exe NexonPlug.exe
 {
 CoordMode,mouse,Screen
@@ -8612,36 +8321,187 @@ if ErrorLevel
 step = 0
 return
 }
-Sleep,500
+Sleep,2000
 IfWinExist ahk_exe Jelancia.exe
 {
-WinHide, ahk_exe NexonPlug.exe
 Step = 2
 }
 }
 }
 }
+if( Gui_Login = "홈페이지클릭[구글]" )
+{
+if(Step = 1)
+{
+GUICONTROL, , 로그인상태정보, [로그인] - 접속 중
+FileCreateDir, ChromeProfile
+ProfilePath := A_ScriptDir . "\ChromeProfile" ; 사용자 프로파일 경로 지정
+ChromeInst := new Chrome(ProfilePath, , , , , False) ; Headless 모드를 끔(False)
+    ; 새로운 페이지 탭 가져오기
+PageInst := ChromeInst.GetPage()
+PageInst.Call("Page.enable")  ; 페이지 로드 기능 활성화
+PageInst.Call("Page.navigate", {"url": "https://elancia.nexon.com/"})
+while (PageInst.Evaluate("document.readyState").value != "complete")
+{
+    sleep, 100  ; 0.5초 대기 후 다시 확인
+}
+sleep,1000
+PageInst.Evaluate("PS.game.startGame({ gameCode:74276 });")
+sleep,500
+SB_SetText("크롬 실행")
+while (PageInst.Evaluate("document.readyState").value != "complete")
+{
+    sleep, 500  ; 0.5초 대기 후 다시 확인
+}
+LoginURL := PageInst.Evaluate("window.location.href").value
+if (InStr(LoginURL, "https://elancia.nexon.com/"))
+{
+SB_SetText("일랜시아 확인1")
+sleep,4000 ; 만약 그대로면 클라 켜진거니 그냥 step = 2진행
+;PageInst.Evaluate("inface.auth.gotoSignOut();")
+    ; 테스트 종료: 크롬 브라우저 닫기
+PageInst.Evaluate("inface.auth.gotoSignOut();")
+; JavaScript 실행
+sleep,2000
+PageInst.Evaluate(removeCookiesScript)
+PageInst.Call("Browser.close")
+PageInst.Disconnect()
+ChromeInst.Close() ; 크롬 인스턴스 종료
+
+step = 2
+return
+}
+else if (InStr(LoginURL, "https://nxlogin.nexon.com/"))
+{
+SB_SetText("일랜시아 확인2")
+PageInst.Evaluate("document.querySelector('.btGoogle').click();") ; 넥슨 로그인 창이면 구글 로그인 버튼 클릭
+SB_SetText("구글 로그인 버튼")
+while (PageInst.Evaluate("document.readyState").value != "complete")
+{
+    sleep, 500  ; 0.5초 대기 후 다시 확인
+}
+LoginURL := PageInst.Evaluate("window.location.href").value
+if (InStr(LoginURL, "https://accounts.google.com/")) ;구글 계정선택 창이면?
+{
+SB_SetText("일랜시아 확인3")
+sleep,2000
+PageInst.WaitForLoad() ;기다렸다가
+PageInst.Evaluate("document.querySelector('[data-email=""" Gui_NexonID """').click();") ; 아이디 누르고
+sleep,5000
+PageInst.Evaluate("document.querySelector('[data-initial-value]').value = '" Gui_NexonPassWord "';")
+sleep, 2000
+    PageInst.Evaluate("document.querySelector('#passwordNext').click();") ; 다음 버튼 클릭
+while (PageInst.Evaluate("document.readyState").value != "complete")
+{
+    sleep, 500  ; 0.5초 대기 후 다시 확인
+}
+LoginURL := PageInst.Evaluate("window.location.href").value ; URL 바뀌었는지 체크
+if (InStr(LoginURL, "https://elancia.nexon.com/")) ;만약 일랜시아로 바뀌었으면
+{
+SB_SetText("일랜시아 확인4")
+PageInst.Evaluate("document.querySelector('.game_start').click();") ; 넥슨 로그인 창이면 구글 로그인 버튼 클릭
+CDP := ChromeInst.CDP
+CDP.Call("Page.enable")  ; Page 이벤트 활성화
+CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
+sleep,3000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게임실행하고 진행
+PageInst.Evaluate("inface.auth.gotoSignOut();")
+; JavaScript 실행
+sleep,2000
+PageInst.Evaluate(removeCookiesScript)
+PageInst.Call("Browser.close")
+PageInst.Disconnect() ;꺼
+ChromeInst.Close() ; 크롬 인스턴스 종료
+step = 2
+return
+}
+else
+{
+GuiControl, , 로그인상태정보, [로그인] - 실패 ( 접속오류 )
+PageInst.Evaluate("inface.auth.gotoSignOut();")
+; JavaScript 실행
+PageInst.Evaluate(removeCookiesScript)
+sleep,2000
+PageInst.Call("Browser.close")
+PageInst.Disconnect() ;꺼
+ChromeInst.Close() ; 크롬 인스턴스 종료
+Gui_Enable()
+SetTimer, Hunt, Off
+SetTimer, AttackCheck, Off
+SetTimer, 타겟팅, Off
+SetTimer, incineration, off
+CheckPB = 0
+}
+}
+else if (InStr(LoginURL, "https://elancia.nexon.com/"))
+{
+SB_SetText("구글 로그인 완료")
+sleep,4000
+PageInst.Evaluate("document.querySelector('.game_start').click();") ; 넥슨 로그인 창이면 구글 로그인 버튼 클릭
+CDP := ChromeInst.CDP
+CDP.Call("Page.enable")  ; Page 이벤트 활성화
+CDP.On("Page.javascriptDialogOpening", "HandleDialog")  ; 팝업 감지 핸들러 등록
+sleep, 6000 ; 만약 일랜시아로 가면 자동로그인 된거니 그냥 게임실행하고 진행
+PageInst.Evaluate("inface.auth.gotoSignOut();")
+; JavaScript 실행
+PageInst.Evaluate(removeCookiesScript)
+sleep,2000
+PageInst.Call("Browser.close")
+PageInst.Disconnect() ;꺼
+ChromeInst.Close() ; 크롬 인스턴스 종료
+step = 2
+return
+}
+}
+Step = 2
+}
+}
 if(Step = 2)
 {
-Sleep,3000
+Sleep, 5000
+SB_SetText("로그인 상태 체크")
 GuiControl, , 로그인상태정보, [로그인] - 실행중
-WinKill, ahk_exe MRMSPH.exe
-pwb.document.querySelector("[alt='게임시작']").click()
-pwb.quit
+WinKill, ahk_exe MRMsph.exe
+WinMinimize, ahk_exe NexonPlug.exe
+WinActivate, ahk_exe Jelancia.exe
 Step = 3
 }
 if(Step = 3)
 {
-WINWAIT, ahk_exe jElancia.exe, , 15
-Sleep, 1000
-ControlGetText, Patch, Static2, Elancia
-Sleep, 1000
-IfInString,Patch,일랜시아 서버에 연결할 수 없습니다.
+Loop, 30  ; 최대 30초까지 대기
 {
-WinKill, Elancia
-WinKill, ahk_exe MRMSPH.exe
-Step = 10000
-return
+    ControlGetText, Patch, Static2, Elancia
+    sb_settext("패치 찾는 중 : " . Patch, 2)
+    if (Patch != "")
+        break
+    Sleep, 1000
+}
+
+sb_settext("서버메시지 - " . Patch, 2)
+
+if !InStr(Patch, "최신 버전입니다.")
+{
+    SetTitleMatchMode, 1
+    WinGet, WinList, List
+Loop, %WinList%
+{
+    hwnd := WinList%A_Index%
+    WinGetTitle, title, ahk_id %hwnd%
+    WinGet, exe, ProcessName, ahk_id %hwnd%
+    ; 프로그램 이름이 "일랜시아"인 경우
+    if (title = "Elancia")
+    {
+        ; 확인 로그 (선택사항)
+        ; MsgBox, 종료할 창: %title% (%exe%)
+        WinClose, ahk_id %hwnd%
+        Sleep, 300
+        WinKill, ahk_id %hwnd%
+    }
+}
+    WinKill, ahk_exe MRMsph.exe
+    Sleep, 2000
+    이유 := "패치못읽어옴"
+    Step := 1
+    return
 }
 ControlGet, GameStartButton, Visible, , Button1, Elancia
 Sleep, 1000
@@ -8897,14 +8757,9 @@ Step = 4
 }
 if(Step = 4)
 {
-Sleep, 2000
+Sleep, 1000
 GuiControl, , 로그인상태정보, [로그인] - 서버 선택 중
 WinGetTitle, jTitle, ahk_pid %jPID%
-IfWinNotExist,ahk_pid %jPID%
-{
-GuiControl, , 로그인상태정보, 오류로 인해 재접속 합니다.
-Step = 0
-}
 if(jTitle = "일랜시아")
 {
 WinMove, ahk_pid %jPID%, , 0,0
@@ -8917,7 +8772,7 @@ if(Gui_Server = "엘")
 PostMessage, 0x200, 0, 16187689, , ahk_pid %jPID%
 PostMessage, 0x201, 1, 16187689, , ahk_pid %jPID%
 PostMessage, 0x202, 0, 16187689, , ahk_pid %jPID%
-Sleep, 100
+Sleep, 10
 PostMessage, 0x100, 13, 1835009, , ahk_pid %jPID%
 PostMessage, 0x101, 13, 1835009, , ahk_pid %jPID%
 }
@@ -8926,7 +8781,7 @@ if(Gui_Server = "테스")
 PostMessage, 0x200, 0, 17826096, , ahk_pid %jPID%
 PostMessage, 0x201, 1, 17826096, , ahk_pid %jPID%
 PostMessage, 0x202, 0, 17826096, , ahk_pid %jPID%
-Sleep, 100
+Sleep, 10
 PostMessage, 0x100, 13, 1835009, , ahk_pid %jPID%
 PostMessage, 0x101, 13, 1835009, , ahk_pid %jPID%
 }
@@ -9021,18 +8876,35 @@ Step = 6
 if(Step = 6)
 {
 GuiControl, , 로그인상태정보, [로그인] - 접속 대기 중
-Sleep, 7000
+Sleep, 10000
 Server := jelan.read(0x0058DAD0, "UChar", 0xC, 0x10, 0x8, 0x36C)
 if(Server = 1)
 {
 IfWinExist,ahk_pid %jPID%
 {
+TMessage :="[ Helancia_Log ]>>" jTitle "<<: 접속 오류로 인한 재시작 및 기존 젤랜시아 종료"
+텔레그램메시지보내기(TMessage)
+sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMSPH.exe
 }
 GuiControl, , 로그인상태정보, 접속 오류로 대기 후 재시작 합니다.
 Sleep, 60000
-Step = 10000
+이유 := "서버오류"
+Step := 10000
+return
+}
+ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
+IfInString,ServerMsg,일랜시아 서버에
+{
+TMessage := "[ Helancia_Log ]" ServerMsg
+텔레그램메시지보내기(TMessage)
+sleep,10
+WinKill, ahk_pid %jPID%
+WinKill, ahk_exe MRMsph.exe
+이유 := "로그인오류"
+Step := 10000
+sleep,50000
 return
 }
 ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
@@ -9040,32 +8912,86 @@ IfInString,ServerMsg,서버와의 연결이
 {
 IfWinExist,ahk_pid %jPID%
 {
+TMessage := "[ Helancia_Log ]" ServerMsg
+텔레그램메시지보내기(TMessage)
+sleep,10
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
-Step = 10000
+이유 := "로그인 중간 서버와의 연결이 끊어짐"
+Step := 10000
+return
+}
+IfInString,ServerMsg,인증시간이
+{
+IfWinExist,ahk_pid %jPID%
+{
+TMessage := "[ Helancia_Log ]" ServerMsg
+텔레그램메시지보내기(TMessage)
+sleep,10
+WinKill, ahk_pid %jPID%
+WinKill, ahk_exe MRMsph.exe
+}
+이유 := "로그인중간인증시간이초과"
+Step := 10000
 return
 }
 WinGetTitle, jTitle, ahk_pid %jPID%
-if(jTitle != "일랜시아" and jTitle != "일랜시아 - 엘" and jTitle != "일랜시아 - 테스")
+if(jTitle != "일랜시아" and jTitle != "일랜시아 - 엘" and jTitle != "일랜시아 - 테스" )
 {
 GuiControl, , 로그인상태정보, [로그인] - 접속 완료
 GuiControl, , Gui_CharName, %jTitle%
 GuiControl,Show,Gui_StopButton
 SB_SetText("접속 완료")
 Sleep, 100
-초기마을이동 := 1
+PostRClick(371,301)
+step =7
+gui_Startmap := 1
 Sleep, 300
-Step = 7
 }
 }
-if(Step = 7 and 초기마을이동 = 1)
+if(Step = 7 and gui_Startmap = 1)
 {
 GuiControl, , Gui_NowState, 마을로 이동.
 SB_SetText("마을로 라깃이동")
-Gosub, 차원체크
+차원체크()
+Move_NPCTalkForm()
+if( 현재차원 = CountPortal )
+{
+if(Gui_huntMummy = 1)
+{
+Get_Location()
+if InStr(Location, "1F Cell")
+{
+현재차원 := CountPortal
+gui_Startmap := 2
+return
+}
+else if InStr(Location, "2F")
+{
+현재차원 := CountPortal
+gui_Startmap := 2
+return
+}
+else if InStr(Location, "1F Cell2")
+{
+현재차원 := CountPortal
+gui_Startmap := 2
+return
+}
+else
+{
+    Sleep, 10
+}
+}
+}
+else
+{
+    sleep,10
+    현재차원 := CountPortal
+}
 Check_Map()
-sleep,500
+sleep,300
 if(Map = 1)
 {
 OpenMap()
@@ -9074,67 +9000,53 @@ Sleep, 100
 Check_Ras()
 if(Ras = 0)
 {
-Sleep, 250
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Sleep, 250
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Sleep, 500
-PostMessage, 0x100, 48, 720897, , ahk_pid %jPID%
-PostMessage, 0x101, 48, 720897, , ahk_pid %jPID%
-Sleep, 800
+GuiControl, , Gui_NowState, 라깃 사용. . .
+WriteExecutableMemory("퀵슬롯사용")
+KeyClick(0)
 }
 if(Ras = 1 and SelectRas = 0)
 {
 PostClick(625,365)
-Sleep, 500
+Sleep, 300
 }
 if(Ras = 1 and SelectRas = 1)
 {
 if(CountPortal = 0)
 {
 PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
-초기마을이동 := 2
-Sleep,5000
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
+gui_Startmap := 2
+Sleep,2000
 return
 }
 if(CountPortal = 1)
 {
 PostClick(645,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
-초기마을이동 := 2
-Sleep,5000
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
+gui_Startmap := 2
+Sleep,2000
 return
 }
 if(CountPortal = 2)
 {
 PostClick(660,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
-초기마을이동 := 2
-Sleep,5000
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
+gui_Startmap := 2
+Sleep,2000
 return
 }
 }
 }
-if(Step = 7 and 초기마을이동 = 2)
+if(Step = 7 and gui_Startmap = 2)
 {
-ime_status := % IME_CHECK("A")
-if (ime_status = "0")
-{
-Send, {vk15sc138}
-Sleep, 100
-}
-WinActivate,ahk_pid %jPID%
-GuiControl, , Gui_NowState, 구동을 위한 메모리 적용 중.
-SB_SetText("초기 세팅 중")
+GuiControl, , Gui_NowState, 초기 메모리CT 적용 중. . .
+SB_SetText("메모리 적용")
 빵 := 0
-포북시작 := 0
-초기마을이동 := 3
+몸찌이동방지 := 0
+gui_Startmap := 3
 ActiveAscript1()
 ActiveAscript2()
 ActiveAscript3()
@@ -9147,7 +9059,59 @@ ActiveAscript9()
 ActiveAscript10()
 ActiveAscript11()
 ActiveAscript12()
+Sleep,500
+Run,*RunAs %A_ScriptDir%\MRMSPH.exe
+WinWait, ahk_exe MRMSPH.exe,,15
+Sleep, 3000
+IfWinExist, ahk_exe MRMSPH.exe
+{
+WinHide, ahk_exe MRMSPH.exe
+}
+if(Gui_1Muba = 1)
+{
+WriteExecutableMemory("1무바")
+무바활성화()
+sleep,100
+}
+if(Gui_2Muba = 1)
+{
+WriteExecutableMemory("2무바")
+무바활성화()
+sleep,100
+}
+if(Gui_3Muba = 1)
+{
+WriteExecutableMemory("3무바")
+무바활성화()
+sleep,100
+}
+if(Gui_2butMuba = 1)
+{
+WriteExecutableMemory("2벗무바")
+무바활성화()
+sleep,100
+}
+if(Gui_3butMuba = 1)
+{
+WriteExecutableMemory("3벗무바")
+무바활성화()
+sleep,100
+}
+if (Gui_4butMuba = 1)
+{
+;WriteExecutableMemory("4벗무바")
+;무바활성화()
+;sleep,100
+SendInput, {F21}
+sleep,100
+}
 WriteExecutableMemory("좌표이동")
+sleep,1
+WriteExecutableMemory("몬스터주소기록함수")
+sleep,1
+WriteExecutableMemory("몬스터주소기록켜기")
+sleep,1
+WriteExecutableMemory("공격하기")
 sleep,1
 WriteExecutableMemory("퀵슬롯사용")
 sleep,1
@@ -9161,20 +9125,33 @@ sleep,1
 WriteExecutableMemory("마법모션제거")
 sleep,1
 WriteExecutableMemory("공속")
-sleep,1
-Run,*RunAs %A_ScriptDir%\MRMSPH.exe
-WinWait, ahk_exe MRMSPH.exe,,15
-Sleep, 1000
-IfWinExist, ahk_exe MRMSPH.exe
-{
-WinHide, ahk_exe MRMSPH.exe
-}
+sleep,100
+Set_MoveSpeed()
+sleep,100
+WriteExecutableMemory("게임내시간제어")
+	if ( jelan.read(0x0040FB07,"Uint", aOffsets*) != 402945257 ) ; 0x180474E9
+	{
+		jelan.write(0x0040FB07,0xE9,"Char", aOffsets*)
+		jelan.write(0x0040FB08,0x74,"Char", aOffsets*)
+		jelan.write(0x0040FB09,0x04,"Char", aOffsets*)
+		jelan.write(0x0040FB0A,0x18,"Char", aOffsets*)
+		jelan.write(0x0040FB0B,0x00,"Char", aOffsets*)
+	}
 if(Gui_jjOn = 1)
 {
-JJscript()
+GuiControl, , Gui_NowState, 줍줍이 적용 중. . .
+JJscript() ;MRMSPH영향 줍줍메모리적용스크립트
 SetTimer, incineration, 250
 }
-Gosub, 어빌리티탭확인
+;핫키 적용
+SendInput, {F19}
+sleep, 100
+if(Gui_KON = 1)
+{
+OID읽기()
+Sleep,1
+}
+gosub, 어빌리티탭확인
 Sleep,200
 아이템읽어오기()
 Sleep,200
@@ -9184,16 +9161,20 @@ Sleep,200
 Sleep,200
 기술읽어오기()
 Sleep,200
-포프OID()
+gosub, Check_좌표
 Sleep,200
-WPdisablescript()
-incineratescript()
+GuiControl, , Gui_NowState, 기본 메모리 적용 중. . .
+Sleep,100
+WinHide, ahk_exe MRMSPH.exe
+WPdisablescript() ;무기탈거
+incineratescript() ;MRMSPH영향 줍줍
 SetFormat, integer, h
 AbilityADD := jelan.processPatternScan(, 0x7FFFFFFF, 0xB0, 0x62, 0x53, 0x00, 0x01, 0x03, 0x00)
 AbilityNameADD := AbilityADD + 0x64
 AbilityValueADD := AbilityADD + 0x264
 SetFormat, integer, d
 Sleep, 100
+GuiControl, , Gui_NowState, 어빌리티 인식 중. . .
 if(Gui_1Muba = 1 or Gui_2ButMuba = 1)
 {
 if(Gui_2ButMuba = 1)
@@ -9227,12 +9208,15 @@ WinActivate, ahk_pid %jPID%
 }
 if(FirstCheck = 1)
 {
+GuiControl, , Gui_NowState, 캐릭터상태 인식 중. . .
 if(Regloady = 0)
 {
 Get_HP()
 CheckFirstHP := MaxHP
 ProgramStartTime := A_TickCount
+LastMessageTime := A_TickCount ;추가분
 }
+GuiControl, , Gui_NowState, 대화 설정 중 움직이지 마세요. . .
 if(Regloady = 1)
 {
 CheckFirstHP := RCFH
@@ -9241,17 +9225,24 @@ ProgramStartTime := RPST
 FirstCheck = 0
 }
 Send, !m
-Sleep, 1000
+Sleep, 200
 ime_status := % IME_CHECK("A")
-if (ime_status = "0")
+if (ime_status = "0")  ; IME가 꺼져 있을 경우
 {
-Send, {vk15sc138}
-Sleep, 100
+    Send, {vk15sc138}  ; 한/영 키를 강제로 눌러 IME를 켭니다
+    Sleep, 200          ; 전환을 위한 대기 시간 추가
+    ime_status := IME_CHECK("A")  ; 다시 IME 상태 확인
+    if (ime_status = "0")  ; 그래도 IME가 꺼져 있으면 다시 한/영 키를 눌러 강제 전환
+    {
+        Send, {vk15sc138}
+        Sleep, 200
+    }
 }
 WinActivate,ahk_pid %jPID%
+Sleep, 150
+Send, flshdk{Space}apsb{Space}{Tab}zldk{Space}apsb{Space}{Tab}znzl{Space}apsb{Space}{Tab}zmfhfltm{Space}apsb{Space}{Tab}flshtm{Space}apsb{Space}{Tab}emrhf{Space}apsb{Space}{Tab}wlrdjq{Space} {Tab}rlfdlfgdmstntoreo{Space}apsb{Space}{Enter}
 Sleep, 100
-Send, flshdk{Space}apsb{Tab}zldk{Space}apsb{Tab}znzl{Space}apsb{Tab}zmfhfltm{Space}apsb{Tab}flshtm{Space}apsb{Tab}emrhf{Space}apsb{Tab}wlrdjq{Tab}dlxm{Space}apsb{Enter}
-Sleep, 300
+GuiControl, , Gui_NowState, 인벤토리 인식 중. . .
 Check_Inven()
 if(Inven = 1)
 {
@@ -9285,18 +9276,20 @@ Sleep, 100
 Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
-Send, {F13 Down}
-Sleep, 30
-Send, {F13 Up}
-Send, {F13 Down}
-Sleep, 30
-Send, {F13 Up}
+
+if (아이템갯수["엘의축복포션(30일)"] = 0 && 아이템갯수["엘의축복포션(7일)"] = 0 && 아이템갯수["엘의축복포션(1일)"] = 0)
+{
+    TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없습니다. 채워주세요."
+    텔레그램메시지보내기(TMessage)
+    sleep,10
+}
+
 Step = 8
 }
 if(Step = 8)
 {
-GuiControl, , Gui_NowState, 구동 초기 세팅 중. ( 체잠장소 설정 )
-SB_SetText("체작장소 세팅 중")
+GuiControl, , Gui_NowState, 인식한 어빌에 맞춰 체잠 초기 장소 세팅 중...
+SB_SetText("체작장소 세팅")
 if(Gui_CheckUseMagic = 1)
 {
 Send, {F17 Down}
@@ -9478,32 +9471,1308 @@ BWValue3 := ReadAbility(Gui_Weapon3)
 HuntPlace = 2
 Step = 1000
 }
-sleep,500
+if(Gui_HuntMummy = 1)
+{
+if(Gui_1Muba = 1)
+{
+BWValue1 := ReadAbility(Gui_Weapon1)
+if(BWValue1 >= Gui_LimitAbility1)
+{
+HuntPlace = 2
+Step = 1000
 }
-if(Step = 9 and 초기마을이동 = 3)
+if(BWValue1 < Gui_LimitAbility1)
+{
+HuntPlace = 3
+Step = 3000
+}
+}
+if(Gui_2Muba = 1)
+{
+BWValue1 := ReadAbility(Gui_Weapon1)
+BWValue2 := ReadAbility(Gui_Weapon2)
+if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2)
+{
+HuntPlace = 2
+Step = 1000
+}
+if(BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2)
+{
+HuntPlace = 3
+Step = 3000
+}
+}
+if(Gui_3Muba = 1)
+{
+BWValue1 := ReadAbility(Gui_Weapon1)
+BWValue2 := ReadAbility(Gui_Weapon2)
+BWValue3 := ReadAbility(Gui_Weapon3)
+if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility3)
+{
+HuntPlace = 2
+Step = 1000
+}
+if(BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2 and BWValue3 < Gui_LimitAbility3)
+{
+HuntPlace = 3
+Step = 3000
+}
+}
+if(Gui_2ButMuba = 1)
+{
+BWValue0 := ReadAbility("격투")
+BWValue1 := ReadAbility(Gui_Weapon1)
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1)
+{
+HuntPlace = 2
+Step = 1000
+}
+if(BWValue0 < Gui_LimitAbility0 and BWValue1 < Gui_LimitAbility1)
+{
+HuntPlace = 3
+Step = 3000
+}
+}
+if(Gui_3ButMuba = 1)
+{
+BWValue0 := ReadAbility("격투")
+BWValue1 := ReadAbility(Gui_Weapon1)
+BWValue2 := ReadAbility(Gui_Weapon2)
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or  BWValue2 >= Gui_LimitAbility2)
+{
+HuntPlace = 2
+Step = 1000
+}
+if(BWValue0 < Gui_LimitAbility0 and BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2)
+{
+HuntPlace = 3
+Step = 3000
+}
+}
+if(Gui_4ButMuba = 1)
+{
+BWValue0 := ReadAbility("격투")
+BWValue1 := ReadAbility(Gui_Weapon1)
+BWValue2 := ReadAbility(Gui_Weapon2)
+BWValue3 := ReadAbility(Gui_Weapon3)
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or  BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility3)
+{
+HuntPlace = 2
+Step = 1000
+}
+if(BWValue0 < Gui_LimitAbility0 and BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2 and BWValue3 < Gui_LimitAbility3)
+{
+HuntPlace = 3
+Step = 3000
+}
+}
+}
+sleep,200
+}
+;=====크로노시스 체잠 파트=============
+if(Step = 3000) ;머미시작
+{
+GuiControl, , Gui_NowState, [머미] 크로노시스로 가기
+SB_SetText("차원체크" )
+sleep,100
+상승체력평균치 := (A_TickCount-ProgramStartTime)/1000
+RunningTime := FormatSeconds((A_TickCount-ProgramStartTime)/1000)
+상승체력평균값 := (CheckUPHP * 60) / (상승체력평균치/60)
+GuiControl,,시작체력,%CheckFirstHP%
+GuiControl,,상승체력,%CheckUPHP% (%상승체력평균값%)
+GuiControl,,경과시간,%RunningTime%
+CheckPN := 0
+countsignal := 0
+CheckPB = 0
+MapNumber := 1
+차원체크()
+Check_Dimension()
+if(차원체크 = "알파")
+{
+    현재차원 := 0
+}
+else if(차원체크 = "베타")
+{
+    현재차원 := 1
+}
+else if(차원체크 = "감마")
+{
+    현재차원 := 2
+}
+if( 현재차원 == CountPortal )
+{
+머미시작 := 1
+MapNumber := 1
+현재차원 := CountPortal
+Get_Location()
+if InStr(Location, "1F Cell")
+{
+Step = 3001
+return
+}
+else if InStr(Location, "2F")
+{
+Step = 3001
+return
+}
+else if InStr(Location, "1F Cell2")
+{
+Step = 3001
+return
+}
+else
+{
+    sleep,100
+}
+}
+else
+{
+머미시작 := 0
+MapNumber := 1
+현재차원 := CountPortal
+}
+Check_Map()
+if(Map = 1)
+{
+OpenMap()
+Sleep, 100
+}
+Check_Ras()
+if(Ras = 0)
+{
+GuiControl, , Gui_NowState, [머미] 크로노시스 라깃 사용
+WriteExecutableMemory("퀵슬롯사용")
+sleep,100
+KeyClick(0)
+}
+if(Ras = 1 and SelectRas = 0) ;라깃열렸으면
+{
+PostClick(428,406) ;크로노시스 클릭하는 곳
+Sleep, 500
+SelectRas = 1
+}
+if(Ras = 1 and SelectRas = 1) ;라깃열리고 크로노시스 눌렀으면
+{
+if(CountPortal = 0) ;알파면
+{
+PostClick(432,389) ;크로노시스 [ 알파 ]클릭하는 곳
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
+Step = 3001
+Sleep,500
+}
+if(CountPortal = 1) ;베타면
+{
+PostClick(447,384) ;크로노시스 [ 베타 ]클릭하는 곳 [수정해야하는 부분]
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
+Step = 3001
+Sleep,500
+}
+if(CountPortal = 2) ;감마면
+{
+PostClick(462,386)  ;크로노시스 [ 감마 ]클릭하는 곳 [수정해야하는 부분]
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
+Step = 3001
+Sleep,500
+}
+}
+}
+if(Step = 3001) ;위치확인
+{
+GuiControl, , Gui_NowState, [머미] 사냥터로 가기.
+SB_SetText("차원 및 위치 확인 중")
+keyclick("AltR")
+if(Gui_CheckUseMagic = 1) ;마법이면
+{
+Send, {F17 Down}
+Sleep, 200
+Send, {F17 UP}
+Send, {F17 Down}
+Sleep, 200
+Send, {F17 UP}
+} ;아니면
+Send, {F13 Down}
+Sleep, 30
+Send, {F13 Up}
+Get_Location()
+if(Gui_HuntMummy = 1)
+{
+Get_Location()
+if InStr(Location, "1F Cell")
+{
+Step = 3055
+return
+}
+else if InStr(Location, "2F")
+{
+Step = 3055
+return
+}
+else if InStr(Location, "1F Cell2")
+{
+Step = 3055
+return
+}
+else
+{
+    Sleep, 100
+}
+}
+IfInString,Location,[알파차원] 크로노시스 마을 ;크로노시스 마을 맞는지 확인하는 부분 [체크필요]
+{
+Step = 3002
+}
+Send, {F13 Down}
+Sleep, 30
+Send, {F13 Up}
+IfInString,Location,[베타차원] 크로노시스 마을
+{
+Step = 3002
+}
+Send, {F13 Down}
+Sleep, 30
+Send, {F13 Up}
+IfInString,Location,[감마차원] 크로노시스 마을
+{
+Step = 3002
+}
+}
+if(Step = 3002) ;도착한 크로노시스에서 라깃 및 설정 체크
+{
+SB_SetText("라깃 갯수 체크 중")
+if(Gui_CheckUseMagic = 1) ;마법이면
+{
+Send, {F17 Down}
+Sleep, 200
+Send, {F17 UP}
+Send, {F17 Down}
+Sleep, 200
+Send, {F17 UP}
+}
+Get_MsgM()
+Get_Perfect()
+if(RasCount <= 5) ; 라깃사러가기
+{
+Step = 100 ;[템뿌나 광피 때매 혹시몰라 포프로 사러 감] [ 마지막 체크필요 ]
+}
+if(RasCount > 5)
+{
+Step = 3055 ;메모리 체크
+}
+}
+if(Step = 3055)
+{
+SB_SetText("메모리 점유율 체크 중")
+Step = 3003
+
+GetPrivateWorkingSet(jPID)
+if(TotalPhy > 2000000)
+{
+if(byte > 1000000) ;초과시 끄기 [마지막 체크필요]
+{
+이유 := "메모리부족"
+step := 10000
+}
+if(byte <= 1000000)
+{
+step = 3003
+}
+}
+if(TotalPhy <= 2000000)
+{
+if(byte > 620000)
+{
+이유 := "메모리부족"
+step := 10000  ;초과시 끄기 [마지막 체크필요]
+}
+if(byte <= 620000)
+{
+step = 3003
+}
+}
+}
+if(Step = 3003) ;파티 설정
+{
+SB_SetText("파티 설정 중")
+Check_State()
+if(State = 1)
+{
+PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
+PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+Sleep, 100
+}
+if(Gui_PartyON = 1)
+{
+Move_StateForMount()
+Sleep, 100
+PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
+PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+SLEEP, 100
+PostClick(190,310)
+SLEEP, 100
+PostDClick(225,310)
+Sleep, 100
+PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
+PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+Sleep, 100
+}
+else if(Gui_PartyOff = 1)
+{
+Move_StateForMount()
+Sleep, 100
+PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
+PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+Sleep, 100
+PostDClick(225,310)
+Sleep, 100
+PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
+PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+Sleep, 100
+}
+Move_State() ;상태창
+Sleep, 100
+PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
+PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+Sleep, 500
+Check_State()
+Check_StatePos()
+if(StatePosX = 565 and StatePosY = 655 and State = 1)
+{
+if(Gui_CheckUseParty = 1)
+{
+Step = 910 ;파티하는 step [마지막 체크 필요]
+}
+if(Gui_CheckUseParty = 0)
+{
+Step = 3004  ;파티하는 step
+}
+}
+}
+if(Step = 3004) ; 소지품 체크하는 step
+{
+아이템읽어오기()
+if( Gui_Grade = 1 )
+{
+if( Gold <= 1000000 )
+{
+if(아이템갯수["골드바"] = ""  || 아이템갯수["정령의보석"] = "")
+{
+GuiControl, , Gui_NowState, [자동그렐]골드바 or 정보 부족
+MsgBox,48,자동정지, "골드바 or 정보를 채운 후 재시작 버튼을 눌러주세요." ,
+SB_SetText("자동그레이드 [ 골드바 or 정보를 채워주세요. ]")
+gosub, 일시정지
+return
+}
+Step = 500  ; 식빵체크 부분 광피 어떨지 몰라서 포프감 [체크 필요]
+return
+}
+}
+get_FP()
+if(NowFP = 0)
+{
+FPcount ++
+if(nowFP = 0 && FPcount >= 20)
+{
+SB_SetText("FP 확인 중")
+Sleep, 200
+Step = 201 ; 식빵체크 부분 광피 어떨지 몰라서 포프감 [체크 필요]
+return
+}
+}
+if(Gui_CheckUseParty = 1)
+{
+party()
+}
+SB_SetText("[머미] 현재 위치 체크 중") ; 크로노시스 사냥터 초입 함수
+if(BWValue0 = 9999) ;어빌리티 체크
+{
+BWValue0 := ReadAbility("격투")
+SetFormat, Float, 0.2
+TempAbility := BWValue0 / 100
+GuiControl, , Gui_BasicWValue0, %TempAbility%
+SetFormat, Float, 0
+}
+if(BWValue1 = 9999)
+{
+BWValue1 := ReadAbility(Gui_Weapon1)
+SetFormat, Float, 0.2
+TempAbility := BWValue1 / 100
+GuiControl, , Gui_BasicWValue1, %TempAbility%
+SetFormat, Float, 0
+}
+if(BWValue2 = 9999)
+{
+BWValue2 := ReadAbility(Gui_Weapon2)
+SetFormat, Float, 0.2
+TempAbility := BWValue2 / 100
+GuiControl, , Gui_BasicWValue2, %TempAbility%
+SetFormat, Float, 0
+}
+if(BWValue3 = 9999)
+{
+BWValue3 := ReadAbility(Gui_Weapon3)
+SetFormat, Float, 0.2
+TempAbility := BWValue3 / 100
+GuiControl, , Gui_WeaponValue3, %TempAbility%
+SetFormat, Float, 0
+}
+sleep, 100
+if(Gui_huntMummy = 1)
+{
+Get_Location()
+if InStr(Location, "1F Cell")
+{
+Step = 3023
+return
+}
+else if InStr(Location, "2F")
+{
+Step = 3023
+return
+}
+else if InStr(Location, "1F Cell2")
+{
+Step = 3023
+return
+}
+else
+{
+    Sleep, 1000
+}
+}
+Step = 3005
+sleep,100
+}
+if(Step = 3005) ;도착한 맵에서 정확히 멈춰있는지, 그리고 현재 맵이 크로노시스남동쪽인지 체크
+{
+GuiControl, , Gui_NowState, [머미] 남쪽 사냥터로 가기.
+SB_SetText("남쪽 사냥터로 이동 중")
+Check_Map()
+if(Map = 1)
+{
+OpenMap()
+}
+Move_Map()
+Sleep, 100
+OpenMap()
+PostClick(479,203)
+PostClick(562,105)
+PostClick(272,485)
+OpenMap()
+Sleep, 100
+Check_Map()
+if(Map = 1)
+{
+OpenMap()
+Sleep, 100
+}
+sleep,2000
+Step = 3006
+}
+if(Step = 3006)
+{
+Check_Moving()
+if(Moving = 0)
+{
+Sleep, 1000
+Check_Moving()
+if(Moving = 0)
+{
+keyclick("AltR")
+Step = 3007
+}
+}
+}
+if(Step = 3007)
+{
+SB_SetText("[머미] 현재위치가 크로노시스 남쪽인지 확인 중")
+Get_Location()
+if InStr(Location, "크로노시스 남쪽")
+{
+Step = 3008
+}
+else if InStr(Location, "크로노시스 남서쪽")
+{
+Step = 3011
+return
+}
+else if InStr(Location, "크로노시스 마을") ; 좌표이동 함수 다시
+{
+Step = 3005
+return
+}
+else if InStr(Location, "크로노시스 서쪽")
+{
+Step = 3000
+return
+}
+}
+if(STep = 3008)
+{
+GuiControl, , Gui_NowState, [머미] 남서쪽 사냥터로 가기.
+Get_Location()
+SB_SetText("남서쪽 사냥터로 이동 중")
+if InStr(Location, "남쪽")
+{
+XX := 16
+YY := 28
+Z := 0
+; XX값을 -1에서 1 사이의 무작위 값으로 변동
+Random, randomY, -15, 3
+YY := YY + randomY
+; 좌표 입력
+좌표입력(XX, YY, Z)
+RunMemory("좌표이동")
+sleep,100
+Step = 3009
+}
+}
+if(Step = 3009)
+{
+Check_Moving()
+if(Moving = 0)
+{
+Sleep, 100
+Check_Moving()
+if(Moving = 0)
+{
+keyclick("AltR")
+Step = 3010
+}
+}
+}
+if(Step = 3010)
+{
+SB_SetText("[머미] 현재위치가 남서쪽인지 확인 중")
+Get_Location()
+if InStr(Location, "크로노시스 남서쪽")
+{
+Step = 3011
+}
+else if InStr(Location, "크로노시스 남쪽")
+{
+Step = 3008
+}
+else
+{
+Step = 3000
+}
+}
+if(Step = 3011)
+{
+GuiControl, , Gui_NowState, [머미] 피라미드로 가기.
+SB_SetText("피라미드로 이동 중")
+XX := 43
+YY := 92
+Z := 0
+; XX값을 -1에서 1 사이의 무작위 값으로 변동
+Random, randomX, -1, 1
+XX := XX + randomX
+; 좌표 입력
+좌표입력(XX, YY, Z)
+RunMemory("좌표이동")
+sleep,100
+Step = 3012
+}
+if(Step = 3012)
+{
+Check_Moving()
+if(Moving = 0)
+{
+Sleep, 100
+Check_Moving()
+if(Moving = 0)
+{
+keyclick("AltR")
+Step = 3013
+}
+}
+}
+if(Step = 3013)
+{
+SB_SetText("[머미] 현재위치가 피라미드B2인지 확인 중")
+Get_Location()
+IfInString,Location,B2
+{
+Step = 3014
+}
+else IfInString,Location,남서쪽
+{
+Step = 3011
+}
+else
+{
+Step = 3000
+}
+}
+if(Step = 3014)
+{
+GuiControl, , Gui_NowState, [머미] 피라미드 B1로 가기.
+;RandomMummy1()
+;if(SelectedMummy1 = "왼쪽")
+;{
+SB_SetText("피라미드 B1 왼쪽 이동")
+XX := 26
+YY := 14
+Z := 0
+; XX값을 -1에서 1 사이의 무작위 값으로 변동
+Random, randomX, -1, 1
+XX := XX + randomX
+좌표입력(XX, YY, Z)
+RunMemory("좌표이동")
+sleep,100
+Step = 3015
+;}
+;else if(SelectedMummy1 = "오른쪽")
+;{
+;SB_SetText("피라미드 B1 오른쪽 이동")
+;좌표입력(122,14,0)
+;RunMemory("좌표이동")
+;sleep,5000
+;Step = 3015
+}
+if(Step = 3015)
+{
+Check_Moving()
+if(Moving = 0)
+{
+Sleep, 100
+Check_Moving()
+if(Moving = 0)
+{
+Sleep, 200
+keyclick("AltR")
+Step = 3016
+}
+}
+}
+if(Step = 3016)
+{
+SB_SetText("[머미] 현재위치가 피라미드B1인지 확인 중")
+Get_Location()
+IfInString,Location,피라미드 B1
+{
+Step = 3017
+}
+else IfInString,Location,피라미드 B2
+{
+Step = 3014
+}
+else
+{
+Step = 3000
+}
+}
+if(Step = 3017)
+{
+Check_Moving()
+if(Moving = 0)
+{
+Sleep, 100
+Check_Moving()
+if(Moving = 0)
+{
+keyclick("AltR")
+Step = 3018
+}
+}
+}
+if(Step = 3018)
+{
+GuiControl, , Gui_NowState, [머미] 피라미드 1층으로 가기.
+SB_SetText("피라미드 1층 이동")
+; 좌표
+XX := 26
+YY := 14
+Z := 0
+; XX값을 -1에서 1 사이의 무작위 값으로 변동
+Random, randomX, -1, 1
+XX := XX + randomX
+; 좌표 입력
+좌표입력(XX, YY, Z)
+RunMemory("좌표이동")
+sleep,100
+Step = 3019
+}
+if(Step = 3019)
+{
+Check_Moving()
+if(Moving = 0)
+{
+Sleep, 100
+Check_Moving()
+if(Moving = 0)
+{
+keyclick("AltR")
+Step = 3020
+}
+}
+}
+if(Step = 3020)
+{
+SB_SetText("[머미] 현재위치가 피라미드 1F인지 확인 중")
+Get_Location()
+IfInString,Location,피라미드 1F
+{
+Step = 3021
+}
+else IfInString,Location,피라미드 B1
+{
+Step = 3018
+}
+else
+{
+Step = 3000
+}
+}
+if (Step = 3021)
+{
+    keyclick("AltR")
+    if ( SelectedMummy2 = "" || SelectedMummy2 = 0 )
+    {
+    RandomMummy2()  ; 무작위 선택된 값 설정
+    }
+    GuiControl, , Gui_NowState, [머미] 피라미드 1층 %SelectedMummy2% 이동.
+    if (SelectedMummy2 = "왼쪽")
+    {
+        SB_SetText("피라미드 1층 왼쪽 이동")
+        XX := 32
+        YY := 15
+        Z := 0
+        ; XX값을 -1에서 1 사이의 무작위 값으로 변동
+        Random, randomX, -1, 1
+        XX := XX + randomX
+        ; 좌표 입력
+        좌표입력(XX, YY, Z)
+        RunMemory("좌표이동")
+        Sleep, 100
+        Step = 3022
+    }
+    else if (SelectedMummy2 = "중앙")  ; "가운데" 대신 "중앙"으로 변경
+    {
+        SB_SetText("피라미드 1층 중앙 이동")
+        XX := 77
+        YY := 15
+        Z := 0
+        ; XX값을 -1에서 1 사이의 무작위 값으로 변동
+        Random, randomX, -1, 1
+        XX := XX + randomX
+        ; 좌표 입력
+        좌표입력(XX, YY, Z)
+        RunMemory("좌표이동")
+        Sleep, 100
+        Step = 3022
+    }
+    else if (SelectedMummy2 = "오른쪽")
+    {
+        SB_SetText("피라미드 1층 오른쪽 이동")
+        XX := 118
+        YY := 15
+        Z := 0
+        ; XX값을 -1에서 1 사이의 무작위 값으로 변동
+        Random, randomX, -1, 1
+        XX := XX + randomX
+        ; 좌표 입력
+        좌표입력(XX, YY, Z)
+        RunMemory("좌표이동")
+        Sleep, 100
+        Step = 3022
+    }
+}
+if(Step = 3022)
+{
+Check_Moving()
+if(Moving = 0)
+{
+Sleep, 100
+Check_Moving()
+if(Moving = 0)
+{
+keyclick("AltR")
+Step = 3023
+}
+}
+}
+if(Step = 3023)
+{
+SB_SetText("[머미] 머미체잠장소 도착 확인 중")
+Get_Location()
+if InStr(Location, "1F Cell")
+{
+Step = 3024
+return
+}
+else if InStr(Location, "1F") && InStr(Location, "2F")
+{
+Step = 3024
+return
+}
+else if InStr(Location, "1F Cell2")
+{
+Step = 3024
+return
+}
+else if InStr(Location, "1F")
+{
+Step = 3021
+return
+}
+else
+{
+Step = 3000
+}
+}
+if(Step = 3024)
+{
+GuiControl, , Gui_NowState, [머미] 체잠 시작.
+SB_SetText("맵 이동 중")
+머미캐릭()
+if(Gui_CheckWPDMagic = 1)
+{
+WPD()
+}
+Get_Location()
+if InStr(Location, "1F Cell")
+{
+머미맵선택 := 0 ; 왼쪽
+if(MapNumber >= 79)
+{
+MapNumber = 1
+Step = 3000
+return
+}
+}
+else if InStr(Location, "1F") && InStr(Location, "2F")
+{
+머미맵선택 := 1 ; 중앙
+if(MapNumber >= 177)
+{
+MapNumber = 1
+Step = 3000
+return
+}
+}
+else if InStr(Location, "1F Cell2")
+{
+머미맵선택 := 2 ; 오른쪽
+if(MapNumber >= 92)
+{
+MapNumber = 1
+Step = 3000
+return
+}
+}
+else if InStr(Location, "1F")
+{
+Step = 3021
+return
+}
+CharMoveMummy()
+Step = 3025
+}
+if(Step = 3025)
+{
+SB_SetText("움직임 체크 중")
+Check_Moving()
+if(Moving = 0)
+{
+Sleep, 10
+Check_Moving()
+if(Moving = 0)
+{
+keyclick("AltR")
+Step = 3027
+}
+}
+Get_Pos()
+Get_MovePos()
+거리범위 := 5
+if (Abs(PosX - MovePosX) <= 거리범위 && Abs(PosY - MovePosY) <= 거리범위)
+{
+    MoveWaitCount := 0
+    Step := 3027
+}
+if((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY))
+{
+MoveWaitCount = 0
+Step = 3027
+}
+}
+if(Step = 3026)
+{
+Get_Pos()
+Get_MovePos()
+if((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY))
+{
+MoveWaitCount = 0
+Step = 3027
+}
+if(!((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY)))
+{
+if(MoveWaitCount >= 2)
+{
+MoveWaitCount = 0
+Step = 3000
+}
+else
+{
+Step = 3027
+}
+}
+}
+if(Step = 3027)
+{
+SB_SetText("몬스터 찾는 중")
+IfWinNotActive, ahk_pid %jPID%
+{
+WinActivate, ahk_pid %jPID%
+}
+주황색 := 0xDE7D29
+주황색2 := 0xC65D08
+갈색 := 0xC6A6A5
+갈색2 := 0x634142
+AttackingCount3 := 0
+PixelSearch, MobX, MobY, 350, 160, 410, 260, 주황색, 5, *ScanBR *Fast  *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 350, 160, 410, 260, 갈색, 5, *ScanBR *Fast  *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 350, 160, 410, 260, 갈색2, 5, *ScanBR *Fast  *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 350, 160, 410, 260, 주황색2, 5, *ScanBR *Fast  *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 360, 209, 437, 260, 주황색, 5, *ScanLB *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 360, 209, 437, 260, 갈색, 5, *ScanLB *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 360, 209, 437, 260, 주황색2, 5, *ScanLB *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 360, 209, 437, 260, 갈색2, 5, *ScanLB *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 362, 186, 432, 255, 갈색, 5, *ScanLT *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 362, 186, 432, 255, 주황색, 5, *ScanLT *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 362, 186, 432, 255, 갈색2, 5, *ScanLT *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 362, 186, 432, 255, 주황색2, 5, *ScanLT *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 333, 161, 460, 281, 갈색, 5, *ScanRT *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 333, 161, 460, 281, 주황색, 5, *ScanRT *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 333, 161, 460, 281, 주황색2, 5, *ScanRT *Fast *RGB
+if(ErrorLevel = 1)
+{
+PixelSearch, MobX, MobY, 333, 161, 460, 281, 갈색2, 5, *ScanRT *Fast *RGB
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+if(ErrorLevel = 0)
+{
+PostClick(MobX,MobY)
+Monster_OID()
+WinGetPos, ElanciaClientX, ElanciaClientY, Width, Height, ahk_pid %jPID%
+SplashX := MobX + ElanciaClientX - 13
+SplashY := MobY + ElanciaClientY + 15
+SplashImage, %MobNumber%:, b X%SplashX% Y%SplashY% W60 H80 CW000000
+MobNumber += 1
+if(MobNumber >= 11)
+{
+MobNumber = 1
+SplashImage, 1: off
+SplashImage, 2: off
+SplashImage, 3: off
+SplashImage, 4: off
+SplashImage, 5: off
+SplashImage, 6: off
+SplashImage, 7: off
+SplashImage, 8: off
+SplashImage, 9: off
+SplashImage, 10: off
+Step = 3024
+return
+}
+AttackLoopCount = 0
+AttackCount = 0
+Sleep, 10
+movmob := A_TickCount
+Step = 3029
+return
+}
+if(ErrorLevel = 1)
+{
+MobNumber = 1
+SplashImage, 1: off
+SplashImage, 2: off
+SplashImage, 3: off
+SplashImage, 4: off
+SplashImage, 5: off
+SplashImage, 6: off
+SplashImage, 7: off
+SplashImage, 8: off
+SplashImage, 9: off
+SplashImage, 10: off
+Step = 3024
+return
+}
+}
+if(Step = 3028)
+{
+SB_SetText("몹 공격 체크 중")
+AttackLoopCount += 1
+Check_Attack()
+if(Attack = 0)
+{
+AttackCount += 1
+}
+if(Attack = 1 or Attack = 2)
+{
+AttackCount = 0
+}
+if(AttackLoopCount >= 10)
+{
+if(AttackCount > 5)
+{
+AttackLoopCount = 0
+AttackCount = 0
+Step = 3027
+return
+}
+else
+{
+MobNumber = 1
+AttackLoopCount = 0
+AttackCount = 0
+SplashImage, 1: off
+SplashImage, 2: off
+SplashImage, 3: off
+SplashImage, 4: off
+SplashImage, 5: off
+SplashImage, 6: off
+SplashImage, 7: off
+SplashImage, 8: off
+SplashImage, 9: off
+SplashImage, 10: off
+Step = 3030
+AttackingCount := A_TickCount
+AttackingCount2 := A_TickCount
+return
+}
+}
+}
+if(Step = 3029)
+{
+SB_SetText("몬스터가 가까이 있는지 확인 중")
+Check_Moving()
+if(Moving = 0)
+{
+sleep,100
+Check_Moving()
+if(Moving = 0)
+{
+keyclick("AltR")
+Step = 3028
+return
+}
+}
+movmob2 := A_TickCount - movmob
+if(movmob2 >= 2000)
+{
+SB_SetText("거리가 멉니다.")
+Sleep, 50
+PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
+PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
+Step = 3027
+}
+}
+if(Step = 3030) ;무바파트
+{
+GUICONTROL, , Gui_NowState, [머미] 무바 중
+SB_SetText("머미 무바 중" , 1)
+if(Gui_1Muba = 1||Gui_2Muba = 1||Gui_3Muba = 1||Gui_2ButMuba = 1||Gui_3ButMuba = 1||Gui_4ButMuba = 1) ; 무바 수정
+{
+ReadAbilityNameValue()
+if(AbilityName = "격투")
+{
+BWValue0 := AbilityValue
+}
+if(AbilityName = Gui_Weapon1 &&(Gui_1Muba = 1 || Gui_2butMuba = 1))
+{
+BWValue1 := AbilityValue
+}
+if(AbilityName = Gui_Weapon2&&(Gui_2Muba = 1 || Gui_3butMuba = 1))
+{
+BWValue2 := AbilityValue
+}
+if(AbilityName = Gui_Weapon3&&(Gui_3Muba = 1 || Gui_4butMuba = 1))
+{
+BWValue3 := AbilityValue
+}
+}
+if(Gui_CheckUseMagic = 1)
+{
+if(BWValue0 = "격투" or Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프" || Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프" || Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
+{
+RemoteM()
+}
+}
+현재무기 := jelan.read(0x0058DAD4, "UInt", 0x121)
+if (현재무기 != 0) ;4벗무바무기수리로직
+{
+    if(Gui_2Muba = 1 || Gui_3butMuba = 1||Gui_3Muba = 1 || Gui_4butMuba = 1)
+    {
+    TrackWeaponChange(현재무기)
+    }
+    if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+    {
+    RepairWeaponCount = 0
+    }
+}
+if (현재무기 = 0)
+{
+    if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+    {
+    RepairWeaponCount += 1
+    }
+    else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
+    {
+    RecentWeapons.RemoveAt(2)
+    }
+    else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
+    {
+    RecentWeapons.RemoveAt(3)
+    }
+}
+무바여부 := CheckTrackedWeapons()
+if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+{
+사용할무기수량 := 1
+}
+else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
+{
+사용할무기수량 := 2
+}
+else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
+{
+사용할무기수량 := 3
+}
+if (무바여부 = 사용할무기수량)
+{
+RepairWeaponCount := 0
+}
+if (무바여부 != 사용할무기수량)
+{
+RepairWeaponCount += 1
+sleep,100
+}
+else
+{
+  RepairWeaponCount := 0
+}
+if (RepairWeaponCount >= 150)
+{
+RepairWeaponCount = 0
+MapNumber = 1
+Keyclick("tab")
+step = 300
+return
+}
+}
+if(Step = 9 and gui_Startmap = 3)
 {
 GuiControl, , Gui_NowState, [포남] 사냥터로 가기.
-SB_SetText("사냥터로 이동 시작")
+sleep,100
+;포북캐릭()
+;value := jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
+;value := jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
+;value := jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
+;value := jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
+;value := jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
+CheckPN := 0
+countsignal := 0
 CheckPB = 0
-CheckPN = 0
+랜덤감응 = 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
 Send, {F16 Up}
+Get_Location()
+if(Gui_huntPonam = 1 || Gui_HuntAuto = 1)
+{
+Get_Location()
+if InStr(Location, "포프레스네 남쪽")
+{
 Step = 10
-초기마을이동 := 4
+gui_Startmap := 4
+return
 }
-if(Step = 9 and 초기마을이동 = 4)
+else
+{
+    Sleep, 100
+}
+}
+Step = 10
+gui_Startmap := 4
+}
+if(Step = 9 and gui_Startmap = 4)
 {
 GuiControl, , Gui_NowState, [포남] 사냥터로 가기.
-SB_SetText("사냥터로 이동 시작")
+sleep,100
+;value := jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
+;value := jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
+;value := jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
+;value := jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
+;value := jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
+;포북캐릭()
+CheckPN := 0
+countsignal := 0
 CheckPB = 0
-CheckPN = 0
+랜덤감응 = 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
 Send, {F16 Up}
-Gosub, 차원체크
+차원체크()
 Check_Map()
 sleep,500
 if(Map = 1)
@@ -9514,10 +10783,8 @@ Sleep, 100
 Check_Ras()
 if(Ras = 0)
 {
-Sleep, 250
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Sleep, 250
+GuiControl, , Gui_NowState, 라깃 사용. . .
+Sleep, 500
 PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
 PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
 Sleep, 500
@@ -9529,34 +10796,35 @@ if(Ras = 1 and SelectRas = 0)
 {
 PostClick(625,365)
 Sleep, 500
+SelectRas = 1
 }
 if(Ras = 1 and SelectRas = 1)
 {
 if(CountPortal = 0)
 {
 PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 10
-Sleep,1000
+Sleep,500
 return
 }
 if(CountPortal = 1)
 {
 PostClick(645,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 10
-Sleep,1000
+Sleep,500
 return
 }
 if(CountPortal = 2)
 {
 PostClick(660,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 10
-Sleep,1000
+Sleep,500
 return
 }
 }
@@ -9601,6 +10869,7 @@ Step = 11
 }
 if(Step = 11)
 {
+타겟number := 0
 Mapnumber = 1
 GuiControl, , Gui_NowState, [포남] 사냥터로 가기.
 SB_SetText("라스의깃 갯수 체크 중")
@@ -9615,11 +10884,11 @@ Send, {F17 UP}
 }
 Get_MsgM()
 Get_Perfect()
-if(라깃카운트 <= 5)
+if(RasCount <= 5)
 {
 Step = 100
 }
-if(라깃카운트 > 5)
+if(RasCount > 5)
 {
 Step = 12
 }
@@ -9636,7 +10905,7 @@ PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
 PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
 Sleep, 100
 }
-if(Gui_PartyOff = 1)
+if(Gui_PartyON = 1)
 {
 Move_StateForMount()
 Sleep, 100
@@ -9644,8 +10913,25 @@ PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
 PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
 PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
 PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+SLEEP, 100
+PostClick(190,310)
+SLEEP, 100
+PostDClick(225,310)
 Sleep, 100
-PostDClick(190,310)
+PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
+PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+Sleep, 100
+}
+else if(Gui_PartyOff = 1)
+{
+Move_StateForMount()
+Sleep, 100
+PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
+PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
 Sleep, 100
 PostDClick(225,310)
 Sleep, 100
@@ -9664,7 +10950,7 @@ PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
 Sleep, 500
 Check_State()
 Check_StatePos()
-if(StatePosX = 549 and StatePosY = 644 and State = 1)
+if(StatePosX = 565 and StatePosY = 655 and State = 1)
 {
 if(Gui_CheckUseParty = 1)
 {
@@ -9697,13 +10983,16 @@ return
 }
 GuiControl, , Gui_NowState, [포남] FP체크 중
 Get_FP()
-절반FP := MaxFP/2
-if(NowFP < 절반FP)
+if(NowFP = 0)
+{
+FPcount ++
+if(nowFP = 0 && FPcount >= 20)
 {
 SB_SetText("FP 확인 중")
 Sleep, 200
 Step = 201
 return
+}
 }
 if(Gui_CheckUseParty = 1)
 {
@@ -9712,18 +11001,41 @@ party()
 if(Gui_KON = 1)
 {
 GuiControl, , Gui_NowState, [포남] 사냥터로 가기.
-SB_SetText("원격대화 시도 중")
-Sleep, 1000
+SB_SetText("메모리 점유율 체크 중")
+GetPrivateWorkingSet(jPID)
+if(TotalPhy > 2000000)
+{
+if(byte > 1000000)
+{
+이유 := "포남이동중메모리정리2"
+step := 10000
+return
+}
+;if(byte <= 1000000)
+;{
+;}
+}
+if(TotalPhy <= 2000000)
+{
+if(byte > 620000)
+{
+이유 := "포남이동중메모리정리"
+step := 10000
+return
+}
+;if(byte <= 620000)
+;{
+;}
+}
 }
 if(Gui_KON = 0 || 차원이동감응 = 1)
 {
-GuiControl, , Gui_NowState, [포남] 사냥터로 가기.
 IfInString,Location,남쪽
 {
     SB_SetText("현재 남쪽 위치함. 마을로 가기")
     keyclick("tab")
     Step = 9
-    초기마을이동 = 4
+    gui_Startmap = 4
     return
 }
 GuiControl, , Gui_NowState, [포남] 사냥터로 가기.
@@ -9809,9 +11121,11 @@ Step = 17
 }
 if(Step = 17)
 {
-캐릭제거()
+머미캐릭()
 Get_Location()
 SB_SetText("원격대화 시도 중")
+keyclick("tab")
+sleep,400
 Move_NPCTalkForm()
 callid = 1
 if(Gui_KON = 1)
@@ -9977,6 +11291,9 @@ if (FormNumber = 85)
         G리노아 := NPCOID
         GuiControl,, G리노아, %G리노아%
         SB_SETTEXT(차원 . G리노아 "입력완료", 2)
+        GuiControl, , jTitle, %jTitle%
+        TMessage := "[ Helancia_Log ]>>" . jTitle "<<:" . 차원 . G리노아 "감마 리노아 감응 완료. "
+        텔레그램메시지보내기(TMessage)
         NPCOID := 0x0
         sleep,100
         Step := 18
@@ -9987,6 +11304,9 @@ if (FormNumber = 85)
         B리노아 := NPCOID
         GuiControl,, B리노아, %B리노아%
         SB_SETTEXT(차원 . B리노아 "입력완료", 2)
+        GuiControl, , jTitle, %jTitle%
+        TMessage := "[ Helancia_Log ]>>" jTitle "<<:" . 차원 . B리노아 "베타 리노아 감응 완료. "
+        텔레그램메시지보내기(TMessage)
         NPCOID := 0x0
         sleep,100
         Step := 18
@@ -9997,6 +11317,9 @@ if (FormNumber = 85)
         A리노아 := NPCOID
         GuiControl,, A리노아, %A리노아%
         SB_SETTEXT(차원 . A리노아 "입력완료", 2)
+        GuiControl, , jTitle, %jTitle%
+        TMessage := "[ Helancia_Log ]>>" jTitle "<<:" . 차원 . A리노아 "알파 리노아 감응 완료. "
+        텔레그램메시지보내기(TMessage)
         NPCOID := 0x0
         sleep,100
         Step := 18
@@ -10010,6 +11333,8 @@ if(ipmak >= 5)
 {
 GUICONTROL, , Gui_NowState, 리노아 호출오류 감응 OFF
 SLEEP, 500
+        TMessage := "[ Helancia_Log ]>>" jTitle "<<:알파 리노아 호출 오류"
+        텔레그램메시지보내기(TMessage)
 OID리셋()
 GUICONTROL, , Gui_KOFF, 1
 }
@@ -10056,7 +11381,7 @@ NPCTalkTime := A_TickCount - NPCTalkedTime
 if(NPCTalkTime >= 5000)
 {
 AltR()
-Sleep, 1000
+Sleep, 500
 ipmak += 1
 Step = 13
 return
@@ -10069,431 +11394,7 @@ Sleep, 400
 if(FormNumber = 97)
 {
 IfInString,NPCMsg,100
-{if (Gui_KON = 0 || 차원이동감응 = 1)
 {
-    Sleep, 100
-    Get_Location()
-    IfInString, Location, 남쪽
-    {
-        XX := 126
-        YY := 36
-        Z := 1
-        ; XX값을 -1에서 1 사이의 무작위 값으로 변동
-        Random, randomY, -1, 1
-        YY := YY + randomY
-        좌표입력(XX, YY, Z)
-        RunMemory("좌표이동")
-        Sleep, 2000
-        GuiControl, , Gui_NowState, [포남] 파수꾼 감응 위치 확인 중입니다.
-        Sleep, 2000
-        step = 1061
-        SB_SetText("포남 동파 감응 이동.") ;수정 필요
-        if (step = 1061)
-        {
-            ;Get_Location()
-            SB_SetText("포남 동파 감응 장소로 이동.")
-            if InStr(Location, "남쪽")
-            {
-            XX := 188
-            YY := 35
-            Z := 1
-            좌표입력(XX, YY, Z)
-            RunMemory("좌표이동")
-            Sleep, 10000
-            step = 1062
-            포남대화시도 := A_TickCount
-            }
-            else
-            {
-            ParasCount:=3
-            step = 8
-            return
-            }
-        }
-        while (step = 1062)
-        {
-            Get_Location()
-            if InStr(Location, "남쪽")
-            {
-            GuiControl, , Gui_NowState, [포남] 동파 감응 위치확인
-            SB_SetText("포남 동파 감응 위치 확인.")
-            Sleep, 1000
-            WinActivate, ahk_pid %jPID%
-            WinWaitActive, ahk_pid %jPID%, , 3
-            PixelSearch, MobX, MobY, 390, 99, 750, 420, 0xB56900, 10, Fast RGB
-            if(ErrorLevel = 1)
-            {
-            WinMinimize, ahk_exe NexonPlug.exe
-            keyclick("tab")
-            sleep,400
-            AltR()
-            sleep,300
-            PixelSearch, MobX, MobY, 200, 100, 750, 420, 0xB56900, 10, Fast RGB
-            }
-            if(ErrorLevel = 0)
-            {
-                Sleep, 200
-                keyclick("tab")
-                Sleep, 500
-                PostClick(MobX,MobY)
-                sleep, 200
-                step := 1063
-                break
-            }
-            XX := 188
-            YY := 35
-            Z := 1
-            좌표입력(XX, YY, Z)
-            RunMemory("좌표이동")
-            Sleep, 1500
-            ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16",         aOffsets*)
-            if InStr(ServerMsg, "서버와의 연결이")
- || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
- || InStr(ServerMsg, "인증시간이")
-            {
-                이유 := "step18서버연결종료3"
-                step := 10000
-                return
-            }
-            }
-            else
-            {
-            ParasCount:=3
-            step = 8
-            return
-            }
-        }
-        if (step = 1063)
-        {
-            Get_Location()
-            if InStr(Location, "남쪽")
-            {
-            GuiControl, , Gui_NowState, [포남] 동파 감응 시도
-            SB_SetText("포남 동쪽파수꾼 감응.")
-            Sleep, 2000
-            Loop, 10
-            {
-                Sleep, 200
-                SetFormat, integer, H
-                NPCOID2 := jelan.read(0x00584C2C, "UInt", aOffsets*)
-                SetFormat, integer, D
-                WriteExecutableMemory("NPC호출용1")
-                WriteExecutableMemory("NPC호출용2")
-                Sleep, 10
-                jelan.write(0x00527b54, NPCOID2, "UInt", aOffset*)
-                Sleep, 200
-                RunMemory("NPC호출")
-                Sleep, 200
-                SB_SETTEXT(NPCOID2 "호출", 2)
-                if (NPCOID2 != "0x0")
-                {
-                    sleep, 300
-                    break  ; 루프를 멈추고 정상적으로 진행
-                }
-            }
-            if (NPCOID2 != "0x0")
-            {
-                Dimension := jelan.read(0x0058EB1C, "UInt", 0x10A)
-                if (Dimension > 20000)
-                {
-                    차원 := "감마"
-                    G동파 := NPCOID2
-                    GuiControl,, G동파, %G동파%
-                    SB_SETTEXT(차원 . G동파 "입력완료", 2)
-                    호출대상 := "감마 - 동파"
-                    Sleep, 1000
-                    NPCOID2 := 0
-                    step := 1064
-                    서파실패 := 1
-                }
-                else if (Dimension > 10000)
-                {
-                    차원 := "베타"
-                    B동파 := NPCOID2
-                    GuiControl,, B동파, %B동파%
-                    SB_SETTEXT(차원 . B동파 "입력완료", 2)
-                    호출대상 := "베타 - 동파"
-                    Sleep, 1000
-                    NPCOID2 := 0
-                    step := 1064
-                    서파실패 := 1
-                }
-                else if (Dimension < 10000)
-                {
-                    차원 := "알파"
-                    A동파 := NPCOID2
-                    GuiControl,, A동파, %A동파%
-                    SB_SETTEXT(차원 . A동파 "입력완료", 2)
-                    호출대상 := "알파 - 동파"
-                    Sleep, 1000
-                    NPCOID2 := 0
-                    step := 1064
-                    서파실패 := 1
-                }
-            }
-            }
-            else
-            {
-            Keyclick("tab")
-            ParasCount:=3
-            step = 8
-            return
-            }
-            ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16",         aOffsets*)
-            if InStr(ServerMsg, "서버와의 연결이")
- || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
- || InStr(ServerMsg, "인증시간이")
-            {
-                이유 := "step18서버연결종료3"
-                step := 10000
-                return
-            }
-        }
-        if (step = 1064)
-        {
-            Get_Location()
-            if InStr(Location, "남쪽")
-            {
-            GuiControl, , Gui_NowState, [포남] 서파 감응 이동
-            Sleep, 500
-            SB_SetText("포남 서파 감응 이동.")
-            좌표입력(45, 174, 1)
-            RunMemory("좌표이동")
-            Sleep, 10000
-            step = 1065
-            서파실패 := 1
-            }
-            else
-            {
-            Keyclick("tab")
-            ParasCount:=3
-            step = 8
-            return
-            }
-                    ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16",         aOffsets*)
-            if InStr(ServerMsg, "서버와의 연결이")
- || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
- || InStr(ServerMsg, "인증시간이")
-            {
-                이유 := "step18서버연결종료2"
-                step := 10000
-                return
-            }
-        }
-        while (step = 1065)
-        {
-            Get_Location()
-            ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16",         aOffsets*)
-        if InStr(ServerMsg, "서버와의 연결이")
- || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
- || InStr(ServerMsg, "인증시간이")
-        {
-            break
-        }
-        if InStr(Location, "남쪽")
-        {
-            GuiControl, , Gui_NowState, [포남] 서파 감응 위치확인
-            SB_SetText("포남 서파 감응 위치 확인.")
-            Sleep, 5000
-            keyclick("AltR")
-            좌표X := jelan.read(s0x0058DAD4, "UInt", 0x10)
-            좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
-            좌표Z := jelan.read(0x0058DAD4, "UInt", 0x18)
-            if (Abs(좌표X - 45) <= 1 && Abs(좌표Y - 174) <= 1 && 좌표Z = 1)
-            {
-            SB_SetText("포남 서파 감응 장소 도착.")
-            step := 1066
-            keyclick("tab")
-            sleep, 200
-            }
-            else
-            {
-            GuiControl, , Gui_NowState, [포남] 서파 감응이동
-            SB_SetText("포남 서파 감응 이동.")
-            좌표입력(45, 174, 1)
-            RunMemory("좌표이동")
-            Sleep, 5000
-            }
-        }
-        else
-        {
-        Keyclick("tab")
-        ParasCount:=3
-        step = 8
-        }
-        }
-        if (step = 1066)
-        {
-            Get_Location()
-            if InStr(Location, "남쪽")
-            {
-            GuiControl, , Gui_NowState, [포남] 서파 감응 시도
-            SB_SetText("포남 서쪽파수꾼 감응.")
-                IfWinNotActive, ahk_pid %jPID%
-                {
-                    WinActivate, ahk_pid %jPID%
-                }
-                    PixelSearch, MobX, MobY,  200, 100, 370, 450, 0xEF8AFF, 1, Fast
-                    if(ErrorLevel = 1)
-                    {
-                    WinMinimize, ahk_exe NexonPlug.exe
-                    AltR()
-                    Sleep,200
-                    PixelSearch, MobX, MobY,  200, 100, 370, 450, 0xEF8AFF, 1, Fast
-                    }
-                    if(ErrorLevel = 0)
-                    {
-                    PostClick(MobX,MobY)
-                    Sleep, 200
-                    }
-            Loop, 10
-            {
-                Sleep, 100
-                SetFormat, integer, H
-                NPCOID3 := jelan.read(0x00584C2C, "UInt", aOffsets*)
-                SetFormat, integer, D
-                WriteExecutableMemory("NPC호출용1")
-                WriteExecutableMemory("NPC호출용2")
-                Sleep, 10
-                jelan.write(0x00527b54, NPCOID3, "UInt", aOffset*)
-                Sleep, 100
-                RunMemory("NPC호출")
-                Sleep, 100
-                SB_SETTEXT(NPCOID3 "호출", 2)
-                if (NPCOID3 != "0x0000")
-                {
-                    sleep,500
-                    break  ; 루프를 멈추고 정상적으로 진행
-                }
-                else if ( NPCOID3 = NPCOID2 )
-                {
-                    step = 1065
-                    NPCOID3 := 0
-                    break
-                }
-            }
-            if (NPCOID3 != "0x0000")
-            {
-                Dimension := jelan.read(0x0058EB1C, "UInt", 0x10A)
-                if (Dimension > 20000)
-                {
-                    차원 := "감마"
-                    G서파 := NPCOID3
-                    GuiControl,, G서파, %G서파%
-                    SB_SETTEXT(차원 . G서파 "입력완료", 2)
-                    GuiControl, , Gui_KON, 1
-                    SB_SETTEXT("해당" 차원 "감응 입력완료", 1)
-                    NPCOID3 := 0
-                    sleep,1000
-                    step := 1067
-                }
-                else if (Dimension > 10000)
-                {
-                    차원 := "베타"
-                    B서파 := NPCOID3
-                    GuiControl,, B서파, %B서파%
-                    SB_SETTEXT(차원 . B서파 "입력완료", 2)
-                    GuiControl, , Gui_KON, 1
-                    SB_SETTEXT("해당" 차원 "감응 입력완료", 1)
-                    NPCOID3 := 0
-                    sleep,1000
-                    step := 1067
-                }
-                else if (Dimension < 10000)
-                {
-                    차원 := "알파"
-                    A서파 := NPCOID3
-                    GuiControl,, A서파, %A서파%
-                    GuiControl, , Gui_KON, 1
-                    SB_SETTEXT("해당" 차원 "감응 입력완료", 1)
-                    NPCOID3 := 0
-                    sleep,1000
-                    step := 1067
-                }
-            }
-        }
-        else
-            {
-            Keyclick("tab")
-            ParasCount:=3
-            step = 8
-            return
-            }
-            ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16",         aOffsets*)
-            if InStr(ServerMsg, "서버와의 연결이")
- || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
- || InStr(ServerMsg, "인증시간이")
-            {
-                이유 := "step18서버연결종료"
-                step := 10000
-                ipmak += 1
-                return
-            }
-        }
-         if (step = 1067)
-        {
-            Get_Location()
-            if InStr(Location, "남쪽")
-            {
-            GuiControl, , Gui_NowState, [포남] 감응 저장 중
-            업데이트체크 := 1
-            차원이동감응 = 0
-            서파실패 := 0
-            동파실패 := 0
-            포북가자 := 0
-            sleep,300
-            if(Gui_MoveLoute1 = 1)
-            {
-            if(Aloute = 1)
-            {
-            MapNumber := 125
-            }
-            if(Bloute = 1)
-            {
-            MapNumber := 5
-            }
-            if(Cloute = 1)
-            {
-            MapNumber := 266
-            }
-            }
-            else
-            {
-            MapNumber := 5
-            }
-            step = 20
-            CheckPN := 1
-            OID저장()
-            }
-            else
-            {
-            Keyclick("tab")
-            저장완료 := 1
-            업데이트체크 := 1
-            차원이동감응 = 0
-            포북가자 := 1
-            step = 11
-            if(Gui_CheckWPDMagic = 1)
-            {
-            WPD()
-            }
-            OID저장()
-            return
-            }
-            ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16",aOffsets*)
-            if InStr(ServerMsg, "서버와의 연결이")
- || InStr(ServerMsg, "오랜 시간 아무것도 하지 않으면")
- || InStr(ServerMsg, "인증시간이")
-            {
-                이유 := "step18감응실패"
-                step := 10000
-                ipmak += 1
-                return
-            }
-        }
-    }
-}
-}
 Entrance = 0
 Sleep, 400
 PostClick(90,80)
@@ -10507,19 +11408,19 @@ JoinTime := A_TickCount
 Sleep, 400
 if(Gui_jjOn = 1)
 {
-Send, {F15 Down}
+Send, {F18 Down}
 Sleep, 40
-Send, {F15 Up}
+Send, {F18 Up}
 Sleep, 10
-Send, {F15 Down}
+Send, {F18 Down}
 Sleep, 40
-Send, {F15 Up}
+Send, {F18 Up}
 PickUp_itemsetPS()
 }
 Step = 19
 if(Gui_KON = 1)
 {
-Sleep, 500
+Sleep, 300
 Get_Location()
 IfInString,Location,남쪽
 {
@@ -10527,11 +11428,23 @@ Send, {F14}
 Sleep, 100
 Send, {F14}
 Sleep, 100
-}
+SB_SetText("좌표 이동")
+XX := 127
+YY := 27
+Z := 1
+; XX값을 -1에서 1 사이의 무작위 값으로 변동
+Random, randomY, -3, 3
+YY := YY + randomY
+좌표입력(XX, YY, Z)
+RunMemory("좌표이동")
+Sleep, 2000
+GuiControl, , jTitle, %jTitle%
 GuiControl,,시작체력,%CheckFirstHP%
 GuiControl,,상승체력,%CheckUPHP% (%상승체력평균값%)
 GuiControl,,경과시간,%RunningTime%
 CheckPN = 1
+Sleep, 1000
+}
 }
 if (Gui_KON = 0 || 차원이동감응 = 1)
 {
@@ -10665,6 +11578,9 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
                     GuiControl,, G동파, %G동파%
                     SB_SETTEXT(차원 . G동파 "입력완료", 2)
                     호출대상 := "감마 - 동파"
+                    GuiControl, , jTitle, %jTitle%
+                    TMessage :=  "[ Helancia_Log ]>>" jTitle "<<:" . 차원 . G동파 "감마 동쪽파수꾼 감응 완료. "
+                    텔레그램메시지보내기(TMessage)
                     Sleep, 1000
                     NPCOID2 := 0
                     step := 1064
@@ -10677,6 +11593,9 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
                     GuiControl,, B동파, %B동파%
                     SB_SETTEXT(차원 . B동파 "입력완료", 2)
                     호출대상 := "베타 - 동파"
+                    GuiControl, , jTitle, %jTitle%
+                    TMessage := "[ Helancia_Log ]>>" jTitle "<<:" 차원 . B동파 "베타 동쪽파수꾼 감응 완료. "
+                    텔레그램메시지보내기(TMessage)
                     Sleep, 1000
                     NPCOID2 := 0
                     step := 1064
@@ -10688,6 +11607,9 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
                     A동파 := NPCOID2
                     GuiControl,, A동파, %A동파%
                     SB_SETTEXT(차원 . A동파 "입력완료", 2)
+                    GuiControl, , jTitle, %jTitle%
+                    TMessage := "[ Helancia_Log ]>>" jTitle "<<:" . 차원 . A동파 "알파 동쪽파수꾼 감응 완료. "
+                    텔레그램메시지보내기(TMessage)
                     호출대상 := "알파 - 동파"
                     Sleep, 1000
                     NPCOID2 := 0
@@ -10848,7 +11770,10 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
                     GuiControl, , Gui_KON, 1
                     SB_SETTEXT("해당" 차원 "감응 입력완료", 1)
                     NPCOID3 := 0
-                    sleep,100
+                    GuiControl, , jTitle, %jTitle%
+                    TMessage := "[ Helancia_Log ]>>" jTitle "<<:" 차원 . G서파 "감마 서쪽파수꾼 감응 완료. "
+                    텔레그램메시지보내기(TMessage)
+                    sleep,1000
                     step := 1067
                 }
                 else if (Dimension > 10000)
@@ -10860,7 +11785,10 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
                     GuiControl, , Gui_KON, 1
                     SB_SETTEXT("해당" 차원 "감응 입력완료", 1)
                     NPCOID3 := 0
-                    sleep,100
+                    GuiControl, , jTitle, %jTitle%
+                    TMessage := "[ Helancia_Log ]>>" jTitle "<<:" 차원 . B서파 "알파 서쪽파수꾼 감응 완료. "
+                    텔레그램메시지보내기(TMessage)
+                    sleep,1000
                     step := 1067
                 }
                 else if (Dimension < 10000)
@@ -10871,7 +11799,10 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
                     GuiControl, , Gui_KON, 1
                     SB_SETTEXT("해당" 차원 "감응 입력완료", 1)
                     NPCOID3 := 0
-                    sleep,100
+                    GuiControl, , jTitle, %jTitle%
+                    TMessage := "[ Helancia_Log ]>>" jTitle "<<:" 차원 . A서파 "알파 서쪽파수꾼 감응 완료. "
+                    텔레그램메시지보내기(TMessage)
+                    sleep,1000
                     step := 1067
                 }
             }
@@ -10935,6 +11866,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
             저장완료 := 1
             업데이트체크 := 1
             차원이동감응 = 0
+            포북가자 := 1
             step = 11
             if(Gui_CheckWPDMagic = 1)
             {
@@ -10958,42 +11890,119 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
 }
 }
 }
+}
 if(Step = 19)
 {
-GuiControl, , Gui_NowState, [포남] 체잠 시작.
 SB_SetText("맵 이동 중")
 if(Gui_CheckWPDMagic = 1)
 {
 WPD()
 }
-ipmak = 0
-if(MapNumber >= 143)
+if(Gui_MoveLoute1 = 1)
+{
+if(Aloute = 1)
+{
+if(MapNumber >= 159) ; 똘룸체잠 원래 루트 -> 가로세로 루트
 {
 MapNumber = 1
 Step = 9
 return
 }
-CharMovePonam()
+}
+if(Bloute = 1)
+{
+if(MapNumber >= 285) ;수정한거
+{
+MapNumber = 1
+Step = 9
+return
+}
+}
+if(Cloute = 1)
+{
+if(MapNumber >= 256) ;수정한거 2
+{
+MapNumber = 1
+Step = 9
+return
+}
+}
+}
+if(Gui_MoveLoute2 = 1) ;구석구석만 돌아다니는 방향
+{
+if(MapNumber >= 55)
+{
+MapNumber = 1
+Step = 9
+return
+}
+}
+if(Gui_MoveLoute3 = 1) ; 세로 지그재그 방향
+{
+if(MapNumber >= 160)
+{
+MapNumber = 1
+Step = 9
+return
+}
+}
+if(Gui_MoveLoute4 = 1) ; 아래쪽만 공략하는 방향
+{
+if(MapNumber >= 86)
+{
+MapNumber = 1
+Step = 9
+return
+}
+}
+CharMovePonam(Gui_MoveLoute1,Gui_MoveLoute2,Gui_MoveLoute3,Gui_MoveLoute4)
+sleep,500
 Step = 20
 }
 if(Step = 20)
 {
 SB_SetText("움직임 체크 중")
+OID이상 = 0
+ipmak = 0
 Check_Moving()
 Get_Pos()
 Get_MovePos()
+if(Gui_MoveLoute1 = 1)
+{
+거리범위 := 5
+}
+if(Gui_MoveLoute2 = 1) ;구석구석만 돌아다니는 방향
+{
+거리범위 := 10
+}
+if(Gui_MoveLoute3 = 1) ; 세로 지그재그 방향
+{
+거리범위 := 6
+}
+if(Gui_MoveLoute4 = 1) ; 아래쪽만 공략하는 방향
+{
+거리범위 := 10
+}
 if(Moving = 0)
 {
-Sleep, 200
+SLEEP, 200
 Check_Moving()
 if(Moving = 0)
 {
 Step = 21
+한번만 := 1
 }
+}
+if (Abs(PosX - MovePosX) <= 거리범위 && Abs(PosY - MovePosY) <= 거리범위)
+{
+    MoveWaitCount := 0
+    한번만 := 1
+    Step := 24
 }
 if((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY))
 {
 MoveWaitCount = 0
+한번만 := 1
 Step = 24
 }
 }
@@ -11004,6 +12013,7 @@ Get_MovePos()
 if((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY))
 {
 MoveWaitCount = 0
+한번만 := 1
 Step = 24
 }
 if(!((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY)))
@@ -11015,6 +12025,7 @@ Step = 9
 }
 else
 {
+한번만 := 1
 Step = 24
 }
 }
@@ -11489,6 +12500,7 @@ return
 }
 if(Step = 25)
 {
+GUICONTROL, , Gui_NowState, [포남] 몹 공격 체크 중
 SB_SetText("몹 공격 체크 중")
 AttackLoopCount += 1
 Check_Attack()
@@ -11525,6 +12537,8 @@ SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
 Step = 26
+AttackMissCount := 0
+한번만 := 1
 }
 }
 }
@@ -11534,75 +12548,48 @@ SB_SetText("몹 근접 체크 중")
 Check_Moving()
 if(Moving = 0)
 {
-Sleep, 200
+Sleep, 100
+AltR()
 Check_Moving()
 if(Moving = 0)
 {
-AltR()
+Sleep, 100
 Step = 27
 }
 }
 movmob2 := A_TickCount - movmob
-if(movmob2 >= 2300)
+SB_SetText("거리가 멉니다.")
+if(movmob2 >= 2500)
 {
-Sleep, 100
+sleep, 100
 PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
 PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
 Step = 24
-}
-}
-if(Step = 27)
-{
-SB_SetText("무바를 시작하였습니다")
-if(Gui_1Muba = 1)
-{
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(RepairWeaponCount1 >= 5)
-{
-RepairWeaponCount1 = 0
-MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
 return
 }
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
 }
+if(Step = 27) ;포남 무바 파트
+{
+GUICONTROL, , Gui_NowState, [포남] 무바 중
+SB_SetText("포남 메모리 무바 중", 1)
+sleep,100
+AttackMissCount ++
+if(AttackMissCount >= 300 and 한번만 = 1)
+{
+    keyclick("AltR")
+    sleep,300
+    AttackMissCount := 0
+    한번만 :=0
 }
-Sleep, %무바딜레이%
+if(gui_1muba = 1)
+{
 ReadAbilityNameValue()
 if(AbilityName = Gui_Weapon1)
 {
 BWValue1 := AbilityValue
 }
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
 }
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount1 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount1 = 0
-}
-}
-if(Gui_2Muba = 1)
+if(gui_2muba = 1)
 {
 ReadAbilityNameValue()
 if(AbilityName = Gui_Weapon1)
@@ -11613,94 +12600,8 @@ if(AbilityName = Gui_Weapon2)
 {
 BWValue2 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5 or RepairWeaponCount2 >= 5)
-{
-RepairWeaponCount1 = 0
-RepairWeaponCount2 = 0
-MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
-return
 }
-if(MubaStep = 1)
-{
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(TempWeapon = Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount1 += 1
-}
-if(TempWeapon != Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount1 = 0
-}
-MubaStep = 2
-return
-}
-if(MubaStep = 2)
-{
-keyclick(2)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(TempWeapon = Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount2 += 1
-}
-if(TempWeapon != Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount2 = 0
-}
-MubaStep = 1
-return
-}
-}
-if(Gui_3Muba = 1)
+if(gui_3muba = 1)
 {
 ReadAbilityNameValue()
 if(AbilityName = Gui_Weapon1)
@@ -11715,133 +12616,8 @@ if(AbilityName = Gui_Weapon3)
 {
 BWValue3 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5 or RepairWeaponCount2 >= 5 or RepairWeaponCount3 >= 5)
-{
-RepairWeaponCount1 = 0
-RepairWeaponCount2 = 0
-RepairWeaponCount3 = 0
-MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
-return
 }
-if(MubaStep = 1)
-{
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(TempWeapon = Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount1 += 1
-}
-if(TempWeapon != Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount1 = 0
-}
-MubaStep = 2
-return
-}
-if(MubaStep = 2)
-{
-keyclick(2)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(TempWeapon = Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount2 += 1
-}
-if(TempWeapon != Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount2 = 0
-}
-MubaStep = 3
-return
-}
-if(MubaStep = 3)
-{
-keyclick(3)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon3)
-{
-BWValue3 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(TempWeapon = Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount3 += 1
-}
-if(TempWeapon != Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount3 = 0
-}
-MubaStep = 1
-return
-}
-}
-if(Gui_2ButMuba = 1)
+if(Gui_2butmuba = 1)
 {
 ReadAbilityNameValue()
 if(AbilityName = "격투")
@@ -11852,69 +12628,8 @@ if(AbilityName = Gui_Weapon1)
 {
 BWValue1 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5)
-{
-RepairWeaponCount1 = 0
-MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
-return
 }
-if(MubaStep = 1)
-{
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount1 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount1 = 0
-}
-MubaStep = 2
-return
-}
-if(MubaStep = 2)
-{
-WPD()
-Sleep, 100
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 1
-return
-}
-}
-if(Gui_3ButMuba = 1)
+if(Gui_3butmuba = 1)
 {
 ReadAbilityNameValue()
 if(AbilityName = "격투")
@@ -11929,123 +12644,10 @@ if(AbilityName = Gui_Weapon2)
 {
 BWValue2 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5 or RepairWeaponCount2 >= 5)
-{
-RepairWeaponCount1 = 0
-RepairWeaponCount2 = 0
-MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
-return
 }
-if(MubaStep = 1)
+if(Gui_4butMuba = 1)
 {
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
 ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount1 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount1 = 0
-}
-MubaStep = 2
-return
-}
-if(MubaStep = 2)
-{
-WPD()
-Sleep, 100
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 3
-return
-}
-if(MubaStep = 3)
-{
-keyclick(2)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount2 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount2 = 0
-}
-MubaStep = 4
-return
-}
-if(MubaStep = 4)
-{
-WPD()
-Sleep, 100
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 1
-return
-}
-}
-if(Gui_4ButMuba = 1)
-{
 if(AbilityName = "격투")
 {
 BWValue0 := AbilityValue
@@ -12062,173 +12664,76 @@ if(AbilityName = Gui_Weapon3)
 {
 BWValue3 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5 or RepairWeaponCount2 >= 5 or RepairWeaponCount3 >= 5)
+}
+if(Gui_CheckUseMagic = 1)
 {
-RepairWeaponCount1 = 0
-RepairWeaponCount2 = 0
-RepairWeaponCount3 = 0
+if(BWValue0 = "격투" or Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프" || Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프" || Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
+{
+RemoteM()
+}
+}
+현재무기 := jelan.read(0x0058DAD4, "UInt", 0x121)
+if (현재무기 != 0) ;4벗무바무기수리로직
+{
+    if(Gui_2Muba = 1 || Gui_3butMuba = 1||Gui_3Muba = 1 || Gui_4butMuba = 1)
+    {
+    TrackWeaponChange(현재무기)
+    }
+    if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+    {
+    RepairWeaponCount = 0
+    }
+}
+if (현재무기 = 0)
+{
+    if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+    {
+    RepairWeaponCount += 1
+    }
+    else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
+    {
+    RecentWeapons.RemoveAt(2)
+    }
+    else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
+    {
+    RecentWeapons.RemoveAt(3)
+    }
+}
+무바여부 := CheckTrackedWeapons()
+if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+{
+사용할무기수량 := 1
+}
+else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
+{
+사용할무기수량 := 2
+}
+else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
+{
+사용할무기수량 := 3
+}
+if (무바여부 = 사용할무기수량)
+{
+RepairWeaponCount := 0
+}
+if (무바여부 != 사용할무기수량)
+{
+RepairWeaponCount += 1
+sleep,100
+}
+else
+{
+  RepairWeaponCount := 0
+}
+if (RepairWeaponCount >= 200)
+{
+CheckPN := 0
+keyclick("tab")
+sleep,400
+RepairWeaponCount = 0
 MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
+step = 300
 return
-}
-if(MubaStep = 1)
-{
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount1 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount1 = 0
-}
-MubaStep = 2
-return
-}
-if(MubaStep = 2)
-{
-WPD()
-Sleep, 100
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 3
-return
-}
-if(MubaStep = 3)
-{
-keyclick(2)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount2 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount2 = 0
-}
-MubaStep = 4
-return
-}
-if(MubaStep = 4)
-{
-WPD()
-Sleep, 100
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 5
-return
-}
-if(MubaStep = 5)
-{
-keyclick(3)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon3)
-{
-BWValue3 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount3 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount3 = 0
-}
-MubaStep = 6
-return
-}
-if(MubaStep = 6)
-{
-WPD()
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-Sleep, 100
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 1
-return
-}
 }
 }
 if(Step = 30)
@@ -12237,11 +12742,15 @@ SB_SetText("감응 버프 받는 중")
 CheckPN := 0
 RepairWeaponCount := 0
 countsignal := 0
+Sleep, 400
+Keyclick("tab")
+Sleep, 400
 Step = 31
 }
 if(step = 31)
 {
 GuiControl, , Gui_NowState, [포남] 감응 전 메모리 점유율 확인
+
 SB_SetText("메모리 점유율 체크 중")
 GetPrivateWorkingSet(jPID)
 if(TotalPhy > 2000000)
@@ -12279,11 +12788,12 @@ if(Step = 32) ;포남 무바 중 감응 파트
     {
     WINACTIVATE, ahk_pid %jPID%
     }
-	Keyclick("tab")
-	sleep,100
     감응()
     sleep,500
     감응 += 1
+    TMessage := "[ Helancia_Log ]>>" jTitle "<<:" 감응 "회차 [원격] 감응 성공.[" 호출대상 ":" countsignal "]"  Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
+    텔레그램메시지보내기(TMessage)
+    sleep,200
     PNnewTime = %A_Now%
     EnvAdd, PNnewTime, 18, Minutes
     FormatTime, PNnewTime1, %PNnewTime%, yyyyMMddHHmm
@@ -12380,10 +12890,318 @@ RCC = 0
 Step = 13
 }
 }
+if(step = 750)
+{
+GuiControl, , Gui_NowState, [병원] 체력회복을 위한 이동 중.
+SB_SetText("병원이동 - 회복하러 이동 중")
+CheckPB := 0
+CheckPN := 0
+countsignal := 0
+Check_Map()
+if(Map = 1)
+{
+OpenMap()
+Sleep, 100
+}
+Check_Ras()
+if(Ras = 0)
+{
+PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
+PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
+Sleep, 100
+PostMessage, 0x100, 48, 720897, , ahk_pid %jPID%
+PostMessage, 0x101, 48, 720897, , ahk_pid %jPID%
+Sleep, 100
+}
+if(Ras = 1 and SelectRas = 0)
+{
+PostClick(625,365)
+Sleep, 100
+}
+if(Ras = 1 and SelectRas = 1)
+{
+if(CountPortal = 0)
+{
+PostClick(630,345)
+라깃카운트 := 라깃카운트-1
+GuiControl, , Gui_RasCount, %라깃카운트%
+Step = 751
+return
+}
+if(CountPortal = 1)
+{
+PostClick(645,345)
+라깃카운트 := 라깃카운트-1
+GuiControl, , Gui_RasCount, %라깃카운트%
+Step = 751
+return
+}
+if(CountPortal = 2)
+{
+PostClick(660,345)
+라깃카운트 := 라깃카운트-1
+GuiControl, , Gui_RasCount, %라깃카운트%
+Step = 751
+return
+}
+}
+IfInString,Location,신전
+{
+keyclick("프로세스종료")
+이유 := "신전이라 위치 종료"
+step = 10000
+}
+IfInString,Location,길드
+{
+이유 := "길드집이라 위치 종료"
+keyclick("프로세스종료")
+step = 10000
+}
+IfInString,Location,병원
+{
+step = 751
+}
+}
+if(Step = 751)
+{
+Check_NPCMsg()
+IfInString,NPCMsg,라스의깃
+{
+IfWinExist,ahk_pid %jPID%
+{
+WINKILL, ahk_pid %jPID%
+WINKILL, ahk_exe MRMsph.exe
+}
+GUICONTROL, , Gui_NowState, 라스의깃이 없어 강제 종료 합니다.
+GuiControl, , 로그인상태정보, 자동정지
+SB_SetText("라깃 부족")
+Gui_Enable()
+SetTimer, Hunt, Off
+SetTimer, AttackCheck, Off
+SetTimer, AttackMGB, off
+SetTimer, 타겟팅, Off
+SetTimer, incineration, off
+SetTimer, RL, OFF
+CheckPB = 0
+CheckPN := 0
+countsignal := 0
+Pause
+}
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle  "<<: 체력이" . NowHP . "가 되어 병원 회복"
+텔레그램메시지보내기(TMessage)
+Get_Location()
+IfInString,Location,[알파차원] 포프레스네 마을
+{
+Step = 752
+}
+IfInString,Location,[베타차원] 포프레스네 마을
+{
+Step = 752
+}
+IfInString,Location,[감마차원] 포프레스네 마을
+{
+Step = 752
+}
+IfInString,Location,병원
+{
+Step = 754
+}
+IfInString,Location,신전
+{
+keyclick("프로세스종료")
+step = 751
+return
+}
+}
+if(Step = 752)
+{
+Check_Map()
+if(Map = 1)
+{
+OpenMap()
+Sleep, 100
+}
+Move_Map()
+Sleep, 100
+OpenMap()
+PostClick(480,205)
+PostClick(465,400)
+OpenMap()
+Sleep, 500
+Check_Map()
+Sleep, 5000
+Step = 753
+}
+if(Step = 753)
+{
+Check_Moving()
+if(Moving = 0)
+{
+Sleep, 200
+Check_Moving()
+if(Moving = 0)
+{
+Step = 754
+}
+}
+}
+if(Step = 754)
+{
+SB_SetText("현재위치가 병원인지 확인 중")
+Get_Location()
+IfInString,Location,포프레스네 병원
+{
+Step = 755
+}
+IfNotInString,Location,포프레스네 병원
+{
+AltR()
+Step = 751
+}
+}
+if(Step = 755)
+{
+GuiControl, , Gui_NowState, [병원] 병원 도착.
+SB_SetText("병원 - 현재소지 갈리드 체크 중")
+Get_Gold()
+
+if(Gold <= 100000)
+{
+Step = 500
+}
+else
+{
+Step = 756
+}
+}
+if(Step = 756)
+{
+GuiControl, , Gui_NowState, [병원] 병원 위치 이동
+SB_SetText("자리이동 중")
+좌표입력(26,24,0)
+RunMemory("좌표이동")
+Sleep, 1500
+Step = 757
+}
+if(Step = 757)
+{
+좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
+좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
+GuiControl, , Gui_NowState, [병원] 위치 확인 중 . .
+SB_SetText("몸찌방지 자리확인 중")
+Sleep,500
+if((좌표X = 26 and 좌표Y = 24))
+{
+Step = 758
+Sleep, 100
+}
+else
+{
+Step = 756
+Sleep, 100
+}
+}
+if(Step = 758)
+{
+GuiControl, , Gui_NowState, [병원] 치료 대화 중 . .
+SB_SetText("치료 시작")
+PostClick(324,133)
+Sleep, 200
+PostClick(358,91)
+Sleep, 500
+PostClick(386,319)
+Sleep, 500
+keyclick("K6")
+Sleep, 200
+step = 759
+}
+if(Step = 759)
+{
+Get_HP()
+if(NowHP != MaxHP)
+{
+Sleep, 200
+Step = 756
+}
+if(NowHP = MaxHP)
+{
+GuiControl, , Gui_NowState, [병원] 치료 완료 . .
+SB_SetText("HP채우기 완료")
+Sleep, 200
+Step = 760
+}
+}
+if(Step = 760)
+{
+SB_SetText("병원 밖으로 이동 중")
+좌표입력(32,31,0)
+RunMemory("좌표이동")
+Sleep,1500
+step = 761
+AltR()
+}
+if(Step = 761)
+{
+SB_SetText("병원을 나왔는지 체크 중")
+Get_Location()
+IfInString,Location,병원
+{
+AltR()
+Step = 760
+}
+IfNotInString,Location,병원
+{
+Step = 762
+}
+}
+if(Step = 762)
+{
+TMessage := "[ Helancia_Log ]>>" jTitle  "<<: 체력 회복 완료, 다시 사냥하러 갑니다."
+텔레그램메시지보내기(TMessage)
+sleep,500
+Check_Map()
+if(Map = 1)
+{
+OpenMap()
+Sleep, 100
+}
+Move_Map()
+Sleep, 100
+OpenMap()
+PostClick(480,205)
+PostClick(370,310)
+OpenMap()
+Sleep, 500
+Check_Map()
+if(Map = 1)
+{
+OpenMap()
+Sleep, 100
+}
+Sleep, 500
+Step = 763
+}
+if(Step = 763)
+{
+if(HuntPlace = 1)
+{
+Step = 11
+}
+if(HuntPlace = 2)
+{
+Step = 1002
+}
+if(HuntPlace = 3)
+{
+Step = 3000
+}
+}
 if(Step = 100)
 {
 GuiControl, , Gui_NowState, [잡화점] 상점으로 이동 중.
 SB_SetText("라깃구매 - 잡화점으로 이동 중")
+Get_Location()
 Check_Map()
 if(Map = 1)
 {
@@ -12447,7 +13265,7 @@ Step = 1115
 }
 if(Step = 1115)
 {
-SB_SetText("몸찌방지 자리이동 중")
+GuiControl, , Gui_NowState, [잡화점] 몸찌방지 이동. . .
 좌표입력(41,30,0)
 RunMemory("좌표이동")
 Sleep, 3500
@@ -12455,11 +13273,10 @@ Step = 1116
 }
 if(Step = 1116)
 {
-AltR()
 좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
 좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
 좌표Z := jelan.read(0x0058DAD4, "UInt", 0x18)
-SB_SetText("몸찌방지 자리확인 중")
+GuiControl, , Gui_NowState, [잡화점] 몸찌방지 자리 확인 중. . .
 if( 좌표X = 41 && 좌표Y = 30 && 좌표Z = 0)
 {
 Step = 104
@@ -12556,8 +13373,8 @@ Step = 109
 }
 if(Step = 109)
 {
-라깃카운트 := 라깃카운트+55
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount+55
+GuiControl, , Gui_RasCount, %RasCount%
 Check_Shop()
 if(Buy = 0)
 {
@@ -12571,6 +13388,7 @@ Step = 108
 if(Step = 110)
 {
 SB_SetText("상점 밖으로 이동 중")
+
 좌표입력(33,31,0)
 RunMemory("좌표이동")
 Sleep, 3500
@@ -12624,6 +13442,10 @@ if(HuntPlace = 2)
 {
 Step = 1002
 }
+if(HuntPlace = 3)
+{
+Step = 3000
+}
 }
 if(STEP = 200)
 {
@@ -12642,7 +13464,8 @@ value := jelan.write(0x0042304C, 0x90, "Char", aOffsets*)
 value := jelan.write(0x00423073, 0x90, "Char", aOffsets*)
 value := jelan.write(0x00423074, 0x90, "Char", aOffsets*)
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -12674,24 +13497,24 @@ if(Ras = 1 and SelectRas = 1)
 if(CountPortal = 0)
 {
 PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 201
 return
 }
 if(CountPortal = 1)
 {
 PostClick(645,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 201
 return
 }
 if(CountPortal = 2)
 {
 PostClick(660,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 201
 return
 }
@@ -12702,22 +13525,29 @@ if(Step = 201)
 Check_NPCMsg()
 IfInString,NPCMsg,라스의깃
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<:라깃 부족. 게임 확인 요망."
+텔레그램메시지보내기(TMessage)
 IfWinExist,ahk_pid %jPID%
 {
 WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
+WINKILL, ahk_exe MRMsph.exe
 }
-GUICONTROL, , Gui_NowState, 라스의깃이 없어 강제 종료 합니다.
+GUICONTROL, , Gui_NowState, 라스의깃이 부족합니다.
 GuiControl, , 로그인상태정보, 자동정지
 SB_SetText("라깃 부족")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -12758,6 +13588,8 @@ Step = 203
 }
 if(Step = 203)
 {
+GuiControl, , Gui_NowState, [베이커리] 상점 이동
+SB_SetText("베이커리 이동")
 Check_Moving()
 if(Moving = 0)
 {
@@ -12780,6 +13612,13 @@ Step = 205
 IfNotInString,Location,포프레스네 베이커리
 {
 AltR()
+베이커리체크 += 1
+if(베이커리체크 > 30)
+{
+    step := 10000
+    이유 := "베이커리 오류"
+    return
+}
 Step = 202
 }
 }
@@ -12788,59 +13627,45 @@ if(Step = 205)
 GuiControl, , Gui_NowState, [베이커리] 상점 도착.
 SB_SetText("FP채우기 - 현재소지 갈리드 체크 중")
 Get_Gold()
+베이커리체크 := 0
 if(Gold <= 100000)
 {
 Step = 500
 }
 else
 {
+Step = 1111
+}
+}
+if(Step = 1111)
+{
+GuiControl, , Gui_NowState, [베이커리] 상점 위치 이동
+SB_SetText("자리이동 중")
+좌표입력(32,30,0)
+RunMemory("좌표이동")
+Sleep, 100
+Step = 1112
+}
+if(Step = 1112)
+{
+좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
+좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
+좌표Z := jelan.read(0x0058DAD4, "UInt", 0x18)
+SB_SetText("자리확인 중")
+if (Abs(좌표X = 32) <= 2 && Abs(좌표Y = 30) <= 2 && 좌표Z = 0)
+{
+SB_SetText("자리 도착")
 Step = 206
+}
+else
+{
+    step = 1111
 }
 }
 if(Step = 206)
 {
-SB_SetText("몸찌방지 자리이동 중")
-if(몸찌체크 < 3)
-{
-좌표입력(19,28,0)
-RunMemory("좌표이동")
-Step = 207
-}
-else if(3 <= 몸찌체크 and 몸찌체크 < 6)
-{
-좌표입력(29,15,0)
-RunMemory("좌표이동")
-Step = 207
-}
-else
-{
-AltR()
-Step = 250
-몸찌체크 := 0
-}
-Sleep, 3500
-}
-if(Step = 207)
-{
-좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
-좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
-SB_SetText("몸찌방지 자리확인 중")
-Sleep,500
-if((좌표X = 19 and 좌표Y = 28) or (좌표X = 29 and 좌표Y = 15))
-{
-Step = 208
-Sleep, 100
-}
-else
-{
-Step = 206
-몸찌체크 += 1
-Sleep, 100
-}
-}
-if(Step = 208)
-{
 SB_SetText("식빵 구매 중")
+몸찌이동인식 = 0
 Move_Buy()
 Sleep, 100
 PostMessage, 0x100, 17, 1900545, , ahk_pid %jPID%
@@ -12849,9 +13674,9 @@ PostMessage, 0x101, 51, 262145, , ahk_pid %jPID%
 PostMessage, 0x101, 17, 1900545, , ahk_pid %jPID%
 Sleep, 500
 ShopOpendTime := A_TickCount
-Step = 209
+Step = 207
 }
-if(Step = 209)
+if(Step = 207)
 {
 Check_NPCMenu()
 if(NPCMenu = 1)
@@ -12862,7 +13687,7 @@ if(NPCMenuBuyPosX != "" and NPCMenuBuyPosY != "")
 Sleep, 700
 PostClick(NPCMenuBuyPosX,NPCMenuBuyPosY)
 BuyCheckedTime := A_TickCount
-Step = 210
+Step = 208
 }
 }
 if(NPCMenu = 0)
@@ -12870,7 +13695,103 @@ if(NPCMenu = 0)
 ShopOpenTime := A_TickCount - ShopOpendTime
 if(ShopOpenTime >= 10000)
 {
-Step = 208
+Step = 206
+}
+}
+}
+if(Step = 208)
+{
+Check_Shop()
+if(Buy = 1)
+{
+Sleep, 500
+빵++
+PostClick(115,60)
+Step = 209
+Sleep,500
+}
+if(Buy = 0)
+{
+BuyCheckTime := A_TickCount - BuyCheckedTime
+if(BuyCheckTime >= 10000)
+{
+Step = 206
+}
+}
+}
+if(Step = 209)
+{
+Get_inven()
+if(빵 = 1)
+{
+if(Nowinven != 50)
+{
+Loop,27
+{
+PostMessage, 0x100, 40, 22020097, , ahk_pid %jPID%
+PostMessage, 0x101, 40, 22020097, , ahk_pid %jPID%
+Sleep, 1
+}
+Loop,100
+{
+POSTMESSAGE,0x100,39,21823489,,ahk_pid %jPID%
+POSTMESSAGE,0x101,39,21823489,,ahk_pid %jPID%
+Sleep, 1
+}
+PostClick(424,323)
+KeyClick("Enter")
+Sleep, 300
+PostMessage, 0x100, 27, 65537, , ahk_pid %jPID%
+PostMessage, 0x101, 27, 65537, , ahk_pid %jPID%
+Sleep, 300
+Step = 206
+}
+if(Nowinven = 50)
+{
+Sleep,100
+Step = 210
+빵 = 1
+}
+}
+if(빵 > 1)
+{
+Get_inven()
+if(InvenCount != 50)
+{
+Loop,27
+{
+PostMessage, 0x100, 40, 22020097, , ahk_pid %jPID%
+PostMessage, 0x101, 40, 22020097, , ahk_pid %jPID%
+Sleep, 1
+}
+;Loop,100
+;{
+;POSTMESSAGE,0x100,39,21823489,,ahk_pid %jPID%
+;POSTMESSAGE,0x101,39,21823489,,ahk_pid %jPID%
+;Sleep, 1
+;}
+keyclick("W1")
+keyclick("W0")
+keyclick("W0")
+Loop,
+{
+PostClick(424,323)
+Sleep,10
+POSTMESSAGE,0x100,13,1835009 ,,ahk_pid %jPID%
+POSTMESSAGE,0x101,13,1835009 ,,ahk_pid %jPID%
+Sleep,10
+POSTMESSAGE,0x100,13,1835009 ,,ahk_pid %jPID%
+POSTMESSAGE,0x101,13,1835009 ,,ahk_pid %jPID%
+Sleep,10
+Get_inven()
+if(Nowinven = 50)
+{
+SLEEP,100
+Step = 210
+빵 = 1
+break
+}
+}
 }
 }
 }
@@ -12879,123 +13800,26 @@ if(Step = 210)
 Check_Shop()
 if(Buy = 1)
 {
-Sleep, 500
-빵++
-PostClick(115,60)
+Sleep, 300
+PostMessage, 0x100, 27, 65537, , ahk_pid %jPID%
+PostMessage, 0x101, 27, 65537, , ahk_pid %jPID%
+Sleep, 300
 Step = 211
-Sleep,500
-}
-if(Buy = 0)
-{
-BuyCheckTime := A_TickCount - BuyCheckedTime
-if(BuyCheckTime >= 10000)
-{
-Step = 208
-}
 }
 }
 if(Step = 211)
 {
-Get_inven()
-if(빵 = 1)
-{
-if(Nowinven < 48)
-{
-Loop,27
-{
-PostMessage, 0x100, 40, 22020097, , ahk_pid %jPID%
-PostMessage, 0x101, 40, 22020097, , ahk_pid %jPID%
-}
-Loop,100
-{
-POSTMESSAGE,0x100,39,21823489,,ahk_pid %jPID%
-POSTMESSAGE,0x101,39,21823489,,ahk_pid %jPID%
-}
-KeyClick("Enter")
-Sleep, 300
-PostMessage, 0x100, 27, 65537, , ahk_pid %jPID%
-PostMessage, 0x101, 27, 65537, , ahk_pid %jPID%
-Sleep, 300
-Step = 208
-빵 = 1
-}
-else
-{
-Loop,27
-{
-PostMessage, 0x100, 40, 22020097, , ahk_pid %jPID%
-PostMessage, 0x101, 40, 22020097, , ahk_pid %jPID%
-}
-Loop,100
-{
-POSTMESSAGE,0x100,39,21823489,,ahk_pid %jPID%
-POSTMESSAGE,0x101,39,21823489,,ahk_pid %jPID%
-}
-KeyClick("Enter")
-Sleep,100
-Step = 212
-빵 = 1
-}
-}
-if(빵 > 1)
-{
-Get_inven()
-Get_FP()
-Loop,27
-{
-PostMessage, 0x100, 40, 22020097, , ahk_pid %jPID%
-PostMessage, 0x101, 40, 22020097, , ahk_pid %jPID%
-}
-Loop,100
-{
-POSTMESSAGE,0x100,39,21823489,,ahk_pid %jPID%
-POSTMESSAGE,0x101,39,21823489,,ahk_pid %jPID%
-}
-Loop,
-{
-Sleep,200
-POSTMESSAGE,0x100,13,1835009 ,,ahk_pid %jPID%
-POSTMESSAGE,0x101,13,1835009 ,,ahk_pid %jPID%
-Sleep,200
-POSTMESSAGE,0x100,13,1835009 ,,ahk_pid %jPID%
-POSTMESSAGE,0x101,13,1835009 ,,ahk_pid %jPID%
-Sleep,200
-Get_inven()
-if(Nowinven = 50)
-{
-SLEEP,100
-Step = 212
-빵 = 1
-break
-}
-}
-}
-}
-if(Step = 212)
-{
-Check_Shop()
-if(Buy = 1)
-{
-Sleep, 300
-PostMessage, 0x100, 27, 65537, , ahk_pid %jPID%
-PostMessage, 0x101, 27, 65537, , ahk_pid %jPID%
-Sleep, 300
-Step = 213
-}
-}
-if(Step = 213)
-{
 Check_Shop()
 if(Buy = 0)
 {
-Step = 214
+Step = 212
 }
 if(Buy = 1)
 {
-Step = 212
+Step = 210
 }
 }
-if(Step = 214)
+if(Step = 212)
 {
 SB_SetText("FP 채우는 중")
 Check_Shop()
@@ -13010,10 +13834,10 @@ PostMessage, 0x101, 57, 655361, , ahk_pid %jPID%
 }
 Sleep,30
 }
-Step = 215
+Step = 213
 }
 }
-if(Step = 215)
+if(Step = 213)
 {
 Get_FP()
 if(NowFP != MaxFP)
@@ -13025,270 +13849,24 @@ if(NowFP = MaxFP)
 {
 SB_SetText("FP채우기 완료")
 Sleep, 200
-Step = 216
-몸찌체크 := 0
+Step = 2141
 }
 }
-if(Step = 216)
-{
-SB_SetText("상점 밖으로 이동 중")
-좌표입력(32,31,0)
-RunMemory("좌표이동")
-Sleep,3500
-if(상점밖이동 >= 3)
-{
-AltR()
-상점밖이동 := 0
-Step = 8
-return
-}
-Step = 217
-}
-if(Step = 217)
-{
-SB_SetText("베이커리 상점을 나왔는지 체크 중")
-Get_Location()
-IfInString,Location,베이커리
-{
-AltR()
-Step = 216
-상점밖이동++
-}
-IfNotInString,Location,베이커리
-{
-if(HuntPlace = 1)
-{
-Step = 11
-상점밖이동 := 0
-}
-if(HuntPlace = 2)
-{
-Step = 1002
-상점밖이동 := 0
-}
-}
-}
-if(Step = 250)
-{
-GuiControl, , Gui_NowState, 몸찌방해감지 - 세르니카로이동.
-SB_SetText("베이커리 - 몸찌방해감지")
-value := jelan.write(0x0042483A, 0xB0, "Char", aOffsets*)
-value := jelan.write(0x0042483B, 0x01, "Char", aOffsets*)
-value := jelan.write(0x0042483C, 0x90, "Char", aOffsets*)
-value := jelan.write(0x0042483D, 0x90, "Char", aOffsets*)
-value := jelan.write(0x0042483E, 0x90, "Char", aOffsets*)
-value := jelan.write(0x0042483F, 0x90, "Char", aOffsets*)
-value := jelan.write(0x00436071, 0xEB, "Char", aOffsets*)
-value := jelan.write(0x0042304D, 0xEB, "Char", aOffsets*)
-value := jelan.write(0x0042304B, 0x90, "Char", aOffsets*)
-value := jelan.write(0x0042304C, 0x90, "Char", aOffsets*)
-value := jelan.write(0x00423073, 0x90, "Char", aOffsets*)
-value := jelan.write(0x00423074, 0x90, "Char", aOffsets*)
-CheckPB = 0
-CheckPN = 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
-Check_Map()
-if(Map = 1)
-{
-OpenMap()
-Sleep, 100
-}
-Check_Ras()
-if(Ras = 0)
-{
-Sleep, 500
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Sleep, 500
-PostMessage, 0x100, 48, 720897, , ahk_pid %jPID%
-PostMessage, 0x101, 48, 720897, , ahk_pid %jPID%
-Sleep, 800
-}
-if(Ras = 1 and SelectRas = 0)
-{
-PostClick(542,142)
-Sleep, 500
-}
-if(Ras = 1 and SelectRas = 1)
-{
-if(CountPortal = 0)
-{
-PostClick(546,120)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
-Step = 251
-return
-}
-if(CountPortal = 1)
-{
-PostClick(560,120)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
-Step = 251
-return
-}
-if(CountPortal = 2)
-{
-PostClick(574,120)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
-Step = 251
-return
-}
-}
-}
-if(Step = 251)
-{
-Check_NPCMsg()
-IfInString,NPCMsg,라스의깃
-{
-IfWinExist,ahk_pid %jPID%
-{
-WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
-}
-GUICONTROL, , Gui_NowState, 라스의깃이 없어 강제 종료 합니다.
-GuiControl, , 로그인상태정보, 자동정지
-SB_SetText("라깃 부족")
-Gui_Enable()
-SetTimer, Hunt, Off
-SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
-SetTimer, incineration, off
-CheckPB = 0
-CheckPN = 0
-return
-}
-Get_Location()
-IfInString,Location,[알파차원] 세르니카 마을
-{
-Step = 252
-}
-IfInString,Location,[베타차원] 세르니카 마을
-{
-Step = 252
-}
-IfInString,Location,[감마차원] 세르니카 마을
-{
-Step = 252
-}
-}
-if(Step = 252)
-{
-Check_Map()
-if(Map = 1)
-{
-OpenMap()
-Sleep, 100
-}
-Move_Map()
-Sleep, 100
-OpenMap()
-PostClick(480,205)
-PostClick(380,205)
-OpenMap()
-Sleep, 500
-Check_Map()
-if(Map = 1)
-{
-OpenMap()
-Sleep, 100
-}
-Step = 253
-}
-if(Step = 253)
-{
-Check_Moving()
-if(Moving = 0)
-{
-Sleep, 1000
-Check_Moving()
-if(Moving = 0)
-{
-Step = 254
-}
-}
-}
-if(Step = 254)
-{
-SB_SetText("현재위치가 베이커리인지 확인 중")
-Get_Location()
-IfInString,Location,세르니카 빵가게
-{
-Step = 255
-sleep,100
-}
-IfNotInString,Location,세르니카 빵가게
-{
-AltR()
-Step = 252
-}
-}
-if(Step = 255)
-{
-GuiControl, , Gui_NowState, [베이커리] 상점 도착.
-SB_SetText("FP채우기 - 현재소지 갈리드 체크 중")
-Get_Gold()
-if(Gold <= 100000)
-{
-Step = 500
-}
-else
-{
-Step = 256
-}
-}
-if(Step = 256)
-{
-SB_SetText("몸찌방지 자리이동 중")
-if(몸찌체크 < 5)
-{
-좌표입력(20,36,0)
-RunMemory("좌표이동")
-Step = 257
-}
-else
-{
-AltR()
-Step = 8
-몸찌체크 := 0
-}
-Sleep, 3000
-}
-if(Step = 257)
-{
-좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
-좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
-SB_SetText("몸찌방지 자리확인 중")
-Sleep,500
-if(좌표X = 20 and 좌표Y = 36)
-{
-Step = 258
-}
-else
-{
-Step = 256
-몸찌체크 += 1
-Sleep, 100
-}
-}
-if(Step = 258)
+
+if(Step = 2141)
 {
 SB_SetText("식빵 구매 중")
 Move_Buy()
 Sleep, 100
 PostMessage, 0x100, 17, 1900545, , ahk_pid %jPID%
-PostMessage, 0x100, 56, 589825, , ahk_pid %jPID%
-PostMessage, 0x101, 56, 589825, , ahk_pid %jPID%
+PostMessage, 0x100, 51, 262145, , ahk_pid %jPID%
+PostMessage, 0x101, 51, 262145, , ahk_pid %jPID%
 PostMessage, 0x101, 17, 1900545, , ahk_pid %jPID%
 Sleep, 500
 ShopOpendTime := A_TickCount
-Step = 259
+Step = 2142
 }
-if(Step = 259)
+if(Step = 2142)
 {
 Check_NPCMenu()
 if(NPCMenu = 1)
@@ -13299,7 +13877,7 @@ if(NPCMenuBuyPosX != "" and NPCMenuBuyPosY != "")
 Sleep, 700
 PostClick(NPCMenuBuyPosX,NPCMenuBuyPosY)
 BuyCheckedTime := A_TickCount
-Step = 260
+Step = 2143
 }
 }
 if(NPCMenu = 0)
@@ -13307,11 +13885,11 @@ if(NPCMenu = 0)
 ShopOpenTime := A_TickCount - ShopOpendTime
 if(ShopOpenTime >= 10000)
 {
-Step = 258
+Step = 2141
 }
 }
 }
-if(Step = 260)
+if(Step = 2143)
 {
 Check_Shop()
 if(Buy = 1)
@@ -13319,7 +13897,7 @@ if(Buy = 1)
 Sleep, 500
 빵++
 PostClick(115,60)
-Step = 261
+Step = 2144
 Sleep,500
 }
 if(Buy = 0)
@@ -13327,18 +13905,18 @@ if(Buy = 0)
 BuyCheckTime := A_TickCount - BuyCheckedTime
 if(BuyCheckTime >= 10000)
 {
-Step = 258
+Step = 2141
 }
 }
 }
-if(Step = 261)
+if(Step = 2144)
 {
 Get_inven()
 if(빵 = 1)
 {
-if(Nowinven != 50)
+if(Nowinven < 38)
 {
-Loop,41
+Loop,27
 {
 PostMessage, 0x100, 40, 22020097, , ahk_pid %jPID%
 PostMessage, 0x101, 40, 22020097, , ahk_pid %jPID%
@@ -13348,25 +13926,27 @@ Loop,100
 POSTMESSAGE,0x100,39,21823489,,ahk_pid %jPID%
 POSTMESSAGE,0x101,39,21823489,,ahk_pid %jPID%
 }
+PostClick(424,323)
 KeyClick("Enter")
 Sleep, 300
 PostMessage, 0x100, 27, 65537, , ahk_pid %jPID%
 PostMessage, 0x101, 27, 65537, , ahk_pid %jPID%
 Sleep, 300
-Step = 258
+Step = 2141
 }
-if(Nowinven = 50)
+if(Nowinven > 38)
 {
 Sleep,100
-Step = 262
+Step = 2145
 빵 = 1
 }
 }
 if(빵 > 1)
 {
 Get_inven()
-Get_FP()
-Loop,41
+if(InvenCount < 38)
+{
+Loop,27
 {
 PostMessage, 0x100, 40, 22020097, , ahk_pid %jPID%
 PostMessage, 0x101, 40, 22020097, , ahk_pid %jPID%
@@ -13378,25 +13958,27 @@ POSTMESSAGE,0x101,39,21823489,,ahk_pid %jPID%
 }
 Loop,
 {
-Sleep,200
+PostClick(424,323)
+Sleep,10
 POSTMESSAGE,0x100,13,1835009 ,,ahk_pid %jPID%
 POSTMESSAGE,0x101,13,1835009 ,,ahk_pid %jPID%
-Sleep,200
+Sleep,10
 POSTMESSAGE,0x100,13,1835009 ,,ahk_pid %jPID%
 POSTMESSAGE,0x101,13,1835009 ,,ahk_pid %jPID%
-Sleep,200
+Sleep,10
 Get_inven()
-if(Nowinven = 50)
+if(Nowinven > 38)
 {
 SLEEP,100
-Step = 262
+Step = 2145
 빵 = 1
 break
 }
 }
 }
 }
-if(Step = 262)
+}
+if(Step = 2145)
 {
 Check_Shop()
 if(Buy = 1)
@@ -13405,126 +13987,47 @@ Sleep, 300
 PostMessage, 0x100, 27, 65537, , ahk_pid %jPID%
 PostMessage, 0x101, 27, 65537, , ahk_pid %jPID%
 Sleep, 300
-Step = 263
+Step = 2146
 }
 }
-if(Step = 263)
+if(Step = 2146)
 {
 Check_Shop()
 if(Buy = 0)
 {
-Step = 264
+Step = 214
 }
 if(Buy = 1)
 {
-Step = 262
+Step = 2145
 }
 }
-if(Step = 264)
+
+if(Step = 214)
 {
-SB_SetText("FP 채우는 중")
-Check_Shop()
-if(Buy = 0)
-{
-Loop,120
-{
-Loop,50
-{
-PostMessage, 0x100, 57, 655361, , ahk_pid %jPID%
-PostMessage, 0x101, 57, 655361, , ahk_pid %jPID%
+SB_SetText("상점 밖으로 이동 중")
+좌표입력(32,31,0)
+RunMemory("좌표이동")
+Sleep,500
+Step = 215
 }
-Sleep,30
-}
-Step = 265
-}
-}
-if(Step = 265)
+if(Step = 215)
 {
-Get_FP()
-if(NowFP != MaxFP)
-{
-Sleep, 200
-Step = 255
-}
-if(NowFP = MaxFP)
-{
-SB_SetText("FP채우기 완료")
-Sleep, 200
-Step = 266
-몸찌체크 := 0
-}
-}
-if(Step = 266)
-{
-SB_SetText("포프레스네 마을로 이동")
-GuiControl, , Gui_NowState, 포프레스네 마을로 이동.
-CheckPB = 0
-CheckPN = 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
-Check_Map()
-if(Map = 1)
-{
-OpenMap()
-Sleep, 100
-}
-Check_Ras()
-if(Ras = 0)
-{
-Sleep, 500
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Sleep, 500
-PostMessage, 0x100, 48, 720897, , ahk_pid %jPID%
-PostMessage, 0x101, 48, 720897, , ahk_pid %jPID%
-Sleep, 800
-}
-if(Ras = 1 and SelectRas = 0)
-{
-PostClick(625,365)
-Sleep, 500
-}
-if(Ras = 1 and SelectRas = 1)
-{
-if(CountPortal = 0)
-{
-PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
-Step = 267
-return
-}
-if(CountPortal = 1)
-{
-PostClick(645,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
-Step = 267
-return
-}
-if(CountPortal = 2)
-{
-PostClick(660,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
-Step = 267
-return
-}
-}
-}
-if(Step = 267)
-{
-SB_SetText("포프레스네 마을 체크중")
+SB_SetText("베이커리 상점을 나왔는지 체크 중")
 Get_Location()
-IfInString,Location,세르니카 마을
+IfInString,Location,베이커리
 {
 AltR()
-Step = 266
+Step = 214
 }
-IfNotInString,Location,세르니카 마을
+IfNotInString,Location,베이커리
 {
+좌표입력(56,93,1)
+RunMemory("좌표이동")
+Sleep,500
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 식빵 정상 구매 완료. 다시 사냥하러 갑니다."
+텔레그램메시지보내기(TMessage)
 if(HuntPlace = 1)
 {
 Step = 11
@@ -13533,6 +14036,10 @@ if(HuntPlace = 2)
 {
 Step = 1002
 }
+if(HuntPlace = 3)
+{
+Step = 3000
+}
 }
 }
 if(Step = 300)
@@ -13540,7 +14047,8 @@ if(Step = 300)
 GuiControl, , Gui_NowState, [수리점] 상점으로 이동 중.
 SB_SetText("무기수리 - 수리점으로 이동 중")
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -13572,24 +14080,24 @@ if(Ras = 1 and SelectRas = 1)
 if(CountPortal = 0)
 {
 PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 301
 return
 }
 if(CountPortal = 1)
 {
 PostClick(645,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 301
 return
 }
 if(CountPortal = 2)
 {
 PostClick(660,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 301
 return
 }
@@ -13602,8 +14110,11 @@ IfInString,NPCMsg,라스의깃
 {
 IfWinExist,ahk_pid %jPID%
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 라스의깃 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
+WINKILL, ahk_exe MRMsph.exe
 }
 GUICONTROL, , Gui_NowState, 라스의깃이 없어 강제 종료 합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -13611,11 +14122,15 @@ SB_SetText("라깃 부족")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -13696,22 +14211,26 @@ Step = 1113
 }
 if(Step = 1113)
 {
-GuiControl, , Gui_NowState, [수리점] 상점 도착.
-SB_SetText("몸찌방지 자리이동 중")
-좌표입력(20,29,0)
+GuiControl, , Gui_NowState, [수리점] 상점 도착. . .
+좌표입력(32,30,0)
 RunMemory("좌표이동")
-Sleep, 3500
+Sleep, 100
 Step = 1114
 }
 if(Step = 1114)
 {
+GuiControl, , Gui_NowState, [수리점] 좌표 확인
 좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
 좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
 좌표Z := jelan.read(0x0058DAD4, "UInt", 0x18)
-SB_SetText("몸찌방지 자리확인 중")
-if( 좌표X = 20 && 좌표Y = 29 && 좌표Z = 0)
+SB_SetText("몸찌 자리확인 중")
+if (Abs(좌표X = 32) <= 3 && Abs(좌표Y = 30) <= 3 && 좌표Z = 0)
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<< : 정상 수리장소 도착."
+텔레그램메시지보내기(TMessage)
 Step = 306
+SB_SetText("자리 도착")
 }
 else
 {
@@ -13727,7 +14246,7 @@ PostMessage, 0x100, 17, 1900545, , ahk_pid %jPID%
 PostMessage, 0x100, 50, 196609, , ahk_pid %jPID%
 PostMessage, 0x101, 50, 196609, , ahk_pid %jPID%
 PostMessage, 0x101, 17, 1900545, , ahk_pid %jPID%
-Sleep, 500
+Sleep, 300
 ShopOpendTime := A_TickCount
 Step = 307
 }
@@ -13806,7 +14325,7 @@ if(Step = 312)
 SB_SetText("수리점 밖으로 이동 중")
 좌표입력(31,31,0)
 RunMemory("좌표이동")
-Sleep, 3500
+Sleep, 500
 Step = 313
 }
 if(Step = 313)
@@ -13820,31 +14339,19 @@ Step = 311
 }
 IfNotInString,Location,석공소
 {
+좌표입력(75,69,1)
+RunMemory("좌표이동")
+sleep,200
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<< : 정상 수리 완료."
+텔레그램메시지보내기(TMessage)
+sleep,100
 Step = 314
 }
 }
 if(Step = 314)
 {
-Check_Map()
-if(Map = 1)
-{
-OpenMap()
-Sleep, 100
-}
-Move_Map()
-Sleep, 100
-OpenMap()
-PostClick(480,205)
-PostClick(349,233)
-OpenMap()
-Sleep, 500
-Check_Map()
-if(Map = 1)
-{
-OpenMap()
-Sleep, 100
-}
-Sleep, 500
+Sleep, 200
 Step = 315
 }
 if(Step = 315)
@@ -13857,6 +14364,10 @@ Step = 11
 if(HuntPlace = 2)
 {
 Step = 1002
+}
+if(HuntPlace = 3)
+{
+Step = 3000
 }
 }
 if(Step = 400)
@@ -14115,7 +14626,8 @@ if(Step = 500)
 GuiControl, , Gui_NowState, [은행] 상점으로 이동 중.
 SB_SetText("골드바 > 갈리드로 변경하러 가는 중")
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -14145,8 +14657,8 @@ Sleep, 500
 if(Ras = 1 and SelectRas = 1)
 {
 PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 CountPortal = 1
 Step = 501
 }
@@ -14158,8 +14670,11 @@ IfInString,NPCMsg,라스의깃
 {
 IfWinExist,ahk_pid %jPID%
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 라스의깃 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
+WINKILL, ahk_exe MRMsph.exe
 }
 GUICONTROL, , Gui_NowState, 라스의깃이 없어 강제 종료 합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -14167,11 +14682,16 @@ SB_SetText("라깃 부족")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
+SetTimer, RL, OFF
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -14312,16 +14832,24 @@ GuiControl, , Gui_NowState, 골드바가 없어 종료합니다.
 SB_SetText("골드바가 부족합니다.")
 IfWinExist,ahk_pid %jPID%
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 골드바 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
+SetTimer, RL, OFF
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 return
 }
 }
@@ -14398,6 +14926,10 @@ if(HuntPlace = 2)
 {
 Step = 1002
 }
+if(HuntPlace = 3)
+{
+Step = 3000
+}
 }
 }
 if(Step = 550)
@@ -14405,7 +14937,8 @@ if(Step = 550)
 GuiControl, , Gui_NowState, [은행] 상점으로 이동 중.
 SB_SetText("골드바 > 갈리드로 변경하러 가는 중")
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -14435,8 +14968,8 @@ Sleep, 500
 if(Ras = 1 and SelectRas = 1)
 {
 PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 CountPortal = 1
 Step = 551
 }
@@ -14449,7 +14982,10 @@ IfInString,NPCMsg,라스의깃
 IfWinExist,ahk_pid %jPID%
 {
 WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
+WINKILL, ahk_exe MRMsph.exe
+GuiControl, , jTitle, %jTitle%
+TMessage :="[ Helancia_Log ]>>" jTitle "<<: 라스의깃 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 }
 GUICONTROL, , Gui_NowState, 라스의깃이 없어 강제 종료 합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -14457,11 +14993,15 @@ SB_SetText("라깃 부족")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -14601,16 +15141,24 @@ IfInString,NPCMsg,속이려는건가
 GuiControl, , Gui_NowState, 골드바가 없어 종료합니다.
 IfWinExist,ahk_pid %jPID%
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 골드바 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
+SetTimer, RL, OFF
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 return
 }
 }
@@ -14687,6 +15235,10 @@ if(HuntPlace = 2)
 {
 Step = 1002
 }
+if(HuntPlace = 3)
+{
+Step = 3000
+}
 }
 }
 if(Step = 800)
@@ -14694,7 +15246,8 @@ if(Step = 800)
 GuiControl, , Gui_NowState, [은행] 상점으로 이동 중.
 SB_SetText("강제그렐 골드바 > 갈리드 이동중")
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -14724,8 +15277,8 @@ Sleep, 500
 if(Ras = 1 and SelectRas = 1)
 {
 PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 CountPortal = 1
 Step = 801
 }
@@ -14737,8 +15290,11 @@ IfInString,NPCMsg,라스의깃
 {
 IfWinExist,ahk_pid %jPID%
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 라스의깃 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
+WINKILL, ahk_exe MRMsph.exe
 }
 GUICONTROL, , Gui_NowState, 라스의깃이 없어 강제 종료 합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -14746,11 +15302,15 @@ SB_SetText("라깃 부족")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -14887,19 +15447,27 @@ Step = 810
 }
 IfInString,NPCMsg,속이려는건가
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 골드바 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 GuiControl, , Gui_NowState, 골드바가 없어 종료합니다.
 IfWinExist,ahk_pid %jPID%
 {
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
+SetTimer, RL, OFF
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 return
 }
 }
@@ -14971,7 +15539,8 @@ if(Step = 600)
 GuiControl, , Gui_NowState, [신전/성당] 기도하러 가는 중
 SB_SetText("그레이드 하러 가는 중")
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -15003,24 +15572,24 @@ if(Ras = 1 and SelectRas = 1)
 if(CountPortal = 0)
 {
 PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 601
 return
 }
 if(CountPortal = 1)
 {
 PostClick(645,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 601
 return
 }
 if(CountPortal = 2)
 {
 PostClick(660,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 601
 return
 }
@@ -15033,8 +15602,11 @@ IfInString,NPCMsg,라스의깃
 {
 IfWinExist,ahk_pid %jPID%
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 라스의깃 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
+WINKILL, ahk_exe MRMsph.exe
 }
 GUICONTROL, , Gui_NowState, 라스의깃이 없어 강제 종료 합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -15042,11 +15614,15 @@ SB_SetText("라깃 부족")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -15126,22 +15702,29 @@ Step = 500
 }
 if(Gui_Grade = 0)
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 갈리드 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 GuiControl, , Gui_NowState, 갈리드가 부족하여 종료합니다.
 GuiControl, , 로그인상태정보, 자동정지
 SB_SetText("갈리드 부족")
 IfWinExist,ahk_pid %jPID%
 {
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+Pause
 }
 }
 if(Gold >= 1000000)
@@ -16654,7 +17237,7 @@ Step = 609
 }
 if(Step = 609)
 {
-SB_SetText("신전 밖으로 이동 중")
+SB_SetText("신전 밖으로 이동 중") ;신전밖 안나가는 이슈 해결
 Set_MoveSpeed()
 Loop,3
 {
@@ -16710,7 +17293,7 @@ if(BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2 and BWValue3 < 
 HuntPlace = 1
 Step = 8
 }
-if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility3)
+if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility35)
 {
 HuntPlace = 2
 Step = 8
@@ -16744,12 +17327,12 @@ Step = 8
 }
 if(Gui_4ButMuba = 1)
 {
-if(BWValue0 < Gui_LimitAbility0 and BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2 and BWValue3 < Gui_LimitAbility3)
+if(BWValue0 < Gui_LimitAbility0 and BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2)
 {
 HuntPlace = 1
 Step = 8
 }
-if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility3)
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2)
 {
 HuntPlace = 2
 Step = 8
@@ -16760,6 +17343,11 @@ if(Gui_HuntPonam = 1)
 {
 HuntPlace = 1
 Step = 11
+}
+if(Gui_HuntMummy = 1)
+{
+HuntPlace = 3
+Step = 3003
 }
 if(Gui_HuntPobuk = 1)
 {
@@ -16773,7 +17361,8 @@ if(Step = 650)
 GuiControl, , Gui_NowState, [신전/성당] 기도하러 가는 중.
 SB_SetText("스펠 그레이드 하러 가는 중")
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -16805,24 +17394,24 @@ if(Ras = 1 and SelectRas = 1)
 if(CountPortal = 0)
 {
 PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 651
 return
 }
 if(CountPortal = 1)
 {
 PostClick(645,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 651
 return
 }
 if(CountPortal = 2)
 {
 PostClick(660,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 651
 return
 }
@@ -16835,8 +17424,11 @@ IfInString,NPCMsg,라스의깃
 {
 IfWinExist,ahk_pid %jPID%
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 라스의깃 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
+WINKILL, ahk_exe MRMsph.exe
 }
 GUICONTROL, , Gui_NowState, 라스의깃이 없어 강제 종료 합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -16844,11 +17436,15 @@ SB_SetText("라깃 부족")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+Pause
 }
 Get_Location()
 IfInString,Location,[알파차원] 포프레스네 마을
@@ -16928,19 +17524,26 @@ Step = 550
 }
 if(Gui_Grade = 0)
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 갈리드 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 GuiControl, , Gui_NowState, 갈리드가 부족하여 종료합니다.
 IfWinExist,ahk_pid %jPID%
 {
 WinKill, ahk_pid %jPID%
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 }
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 return
 }
 }
@@ -17061,96 +17664,16 @@ MagicAbility8 = 0
 Sleep, 1000
 return
 }
-if(MagicAbility9 = 100)
-{
-Sleep, 1000
-SendMagicName(Gui_MagicName9)
-MagicAbility9 = 0
-Sleep, 1000
-return
-}
-if(MagicAbility10 = 100)
-{
-Sleep, 1000
-SendMagicName(Gui_MagicName10)
-MagicAbility10 = 0
-Sleep, 1000
-return
-}
-if(MagicAbility11 = 100)
-{
-Sleep, 1000
-SendMagicName(Gui_MagicName11)
-MagicAbility11 = 0
-Sleep, 1000
-return
-}
-if(MagicAbility12 = 100)
-{
-Sleep, 1000
-SendMagicName(Gui_MagicName12)
-MagicAbility12 = 0
-Sleep, 1000
-return
-}
-if(MagicAbility13 = 100)
-{
-Sleep, 1000
-SendMagicName(Gui_MagicName13)
-MagicAbility13 = 0
-Sleep, 1000
-return
-}
-if(MagicAbility14 = 100)
-{
-Sleep, 1000
-SendMagicName(Gui_MagicName14)
-MagicAbility14 = 0
-Sleep, 1000
-return
-}
-if(MagicAbility15 = 100)
-{
-Sleep, 1000
-SendMagicName(Gui_MagicName15)
-MagicAbility15 = 0
-Sleep, 1000
-return
-}
-if(MagicAbility16 = 100)
-{
-Sleep, 1000
-SendMagicName(Gui_MagicName16)
-MagicAbility16 = 0
-Sleep, 1000
-return
-}
-if(MagicAbility17 = 100)
-{
-Sleep, 1000
-SendMagicName(Gui_MagicName17)
-MagicAbility17 = 0
-Sleep, 1000
-return
-}
-if(MagicAbility18 = 100)
-{
-Sleep, 1000
-SendMagicName(Gui_MagicName18)
-MagicAbility18 = 0
-Sleep, 1000
-return
-}
 }
 }
 if(Step = 658)
 {
 SB_SetText("스펠 그레이드할 어빌리티 체크 중")
-if(MagicAbility3 = 100 or MagicAbility4 = 100 or MagicAbility5 = 100 or MagicAbility6 = 100 or MagicAbility7 = 100 or MagicAbility8 = 100 or MagicAbility9 = 100 or MagicAbility10 = 100 or MagicAbility11 = 100 or MagicAbility12 = 100 or MagicAbility13 = 100 or MagicAbility14 = 100 or MagicAbility15 = 100 or MagicAbility16 = 100 or MagicAbility17 = 100 or MagicAbility18 = 100)
+if(MagicAbility3 = 100 or MagicAbility4 = 100 or MagicAbility5 = 100 or MagicAbility6 = 100 or MagicAbility7 = 100 or MagicAbility8 = 100)
 {
 Step = 655
 }
-if(MagicAbility3 != 100 and MagicAbility4 != 100 and MagicAbility5 != 100 and MagicAbility6 != 100 and MagicAbility7 != 100 and MagicAbility8 != 100 and MagicAbility9 != 100 and MagicAbility10 != 100 and MagicAbility11 != 100 and MagicAbility12 != 100 and MagicAbility13 != 100 and MagicAbility14 != 100 and MagicAbility15 != 100 and MagicAbility16 != 100 and MagicAbility17 != 100 and MagicAbility18 != 100)
+if(MagicAbility3 != 100 and MagicAbility4 != 100 and MagicAbility5 != 100 and MagicAbility6 != 100 and MagicAbility7 != 100 and MagicAbility3=8 != 100)
 {
 Step = 659
 }
@@ -17213,7 +17736,7 @@ if(BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2 and BWValue3 < 
 HuntPlace = 1
 Step = 8
 }
-if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility3)
+if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility35)
 {
 HuntPlace = 2
 Step = 8
@@ -17247,12 +17770,12 @@ Step = 8
 }
 if(Gui_4ButMuba = 1)
 {
-if(BWValue0 < Gui_LimitAbility0 and BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2 and BWValue3 < Gui_LimitAbility3)
+if(BWValue0 < Gui_LimitAbility0 and BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2)
 {
 HuntPlace = 1
 Step = 8
 }
-if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility3)
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2)
 {
 HuntPlace = 2
 Step = 8
@@ -17269,6 +17792,87 @@ if(Gui_HuntPobuk = 1)
 HuntPlace = 2
 Step = 1002
 }
+if(Gui_HuntMummy = 1)
+{
+if(Gui_1Muba = 1)
+{
+if(BWValue1 < Gui_LimitAbility1)
+{
+HuntPlace = 3
+Step = 8
+}
+if(BWValue1 >= Gui_LimitAbility1)
+{
+HuntPlace = 2
+Step = 8
+}
+}
+if(Gui_2Muba = 1)
+{
+if(BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2)
+{
+HuntPlace = 3
+Step = 8
+}
+if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2)
+{
+HuntPlace = 2
+Step = 8
+}
+}
+if(Gui_3Muba = 1)
+{
+if(BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2 and BWValue3 < Gui_LimitAbility3)
+{
+HuntPlace = 3
+Step = 8
+}
+if(BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2 or BWValue3 >= Gui_LimitAbility35)
+{
+HuntPlace = 2
+Step = 8
+}
+}
+if(Gui_2ButMuba = 1)
+{
+if(BWValue0 < Gui_LimitAbility0 and BWValue1 < Gui_LimitAbility1)
+{
+HuntPlace = 3
+Step = 8
+}
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1)
+{
+HuntPlace = 2
+Step = 8
+}
+}
+if(Gui_3ButMuba = 1)
+{
+if(BWValue0 < Gui_LimitAbility0 and BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2)
+{
+HuntPlace = 3
+Step = 8
+}
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2)
+{
+HuntPlace = 2
+Step = 8
+}
+}
+if(Gui_4ButMuba = 1)
+{
+if(BWValue0 < Gui_LimitAbility0 and BWValue1 < Gui_LimitAbility1 and BWValue2 < Gui_LimitAbility2)
+{
+HuntPlace = 3
+Step = 8
+}
+if(BWValue0 >= Gui_LimitAbility0 or BWValue1 >= Gui_LimitAbility1 or BWValue2 >= Gui_LimitAbility2)
+{
+HuntPlace = 2
+Step = 8
+}
+}
+}
 }
 }
 if(Step = 700)
@@ -17276,7 +17880,8 @@ if(Step = 700)
 GuiControl, , Gui_NowState, [신전/성당] 기도하러 가는 중.
 SB_SetText("강제그레이드 - 신전으로 이동 중")
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -17308,24 +17913,24 @@ if(Ras = 1 and SelectRas = 1)
 if(CountPortal = 0)
 {
 PostClick(630,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 701
 return
 }
 if(CountPortal = 1)
 {
 PostClick(645,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 701
 return
 }
 if(CountPortal = 2)
 {
 PostClick(660,345)
-라깃카운트 := 라깃카운트-1
-GuiControl, , Gui_RasCount, %라깃카운트%
+RasCount := RasCount-1
+GuiControl, , Gui_RasCount, %RasCount%
 Step = 701
 return
 }
@@ -17338,8 +17943,11 @@ IfInString,NPCMsg,라스의깃
 {
 IfWinExist,ahk_pid %jPID%
 {
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 라스의깃 부족. 강제 종료, 위치보고: " . "(" . 현재차원 . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+텔레그램메시지보내기(TMessage)
 WINKILL, ahk_pid %jPID%
-WINKILL, ahk_exe MRMSPH.exe
+WINKILL, ahk_exe MRMsph.exe
 }
 GUICONTROL, , Gui_NowState, 라스의깃이 없어 강제 종료 합니다.
 GuiControl, , 로그인상태정보, 자동정지
@@ -17347,14 +17955,18 @@ SB_SetText("라깃 부족")
 Gui_Enable()
 SetTimer, Hunt, Off
 SetTimer, AttackCheck, Off
-SetTimer, 타겟팅, Off
+SetTimer, AttackMGB, off
 SetTimer, incineration, off
+SetTimer, GetMemory, OFF
+SetTimer, ClearMem, OFF
+SetTimer, 타겟팅, OFF
 CheckPB = 0
-CheckPN = 0
-return
+CheckPN := 0
+countsignal := 0
+Pause
 }
 Get_Location()
-IfInString,Location,[알파차원] 포프레스네 마을
+IfInString,Location,포프레스네 마을
 {
 Step = 702
 }
@@ -17543,27 +18155,31 @@ if(Step = 708)
 GuiControl, choose, Gui_forceweapon, 선택
 Step = 609
 }
-if(Step = 1000 and 초기마을이동 = 3)
+if(Step = 1000 and gui_Startmap = 3)
 {
 GuiControl, , Gui_NowState, [포북] 사냥터로 가기.
-SB_SetText("사냥터로 이동 시작")
+상승체력평균치 := (A_TickCount-ProgramStartTime)/1000
+RunningTime := FormatSeconds((A_TickCount-ProgramStartTime)/1000)
+상승체력평균값 := (CheckUPHP * 60) / (상승체력평균치/60)
+GuiControl,,시작체력,%CheckFirstHP%
+GuiControl,,상승체력,%CheckUPHP% (%상승체력평균값%)
+GuiControl,,경과시간,%RunningTime%
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
 Send, {F16 Up}
 Step = 1001
-초기마을이동 := 4
-포북시작 := 0
+gui_Startmap := 4
 MapNumber := 1
 }
-if(Step = 1000 and 초기마을이동 = 4)
+if(Step = 1000 and gui_Startmap = 4)
 {
 GuiControl, , Gui_NowState, [포북] 사냥터로 가기.
-SB_SetText("사냥터로 이동 시작")
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -17656,7 +18272,9 @@ return
 }
 if(Step = 1001)
 {
+GuiControl, , Gui_NowState, [포북] 사냥터로 가기.
 SB_SetText("차원 확인 중")
+포북캐릭()
 if(Gui_CheckUseMagic = 1)
 {
 Send, {F17 Down}
@@ -17670,6 +18288,12 @@ Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
 Get_Location()
+IfInString,Location,크로노시스
+{
+Step := 1000
+gui_Startmap = 4
+return
+}
 IfInString,Location,[알파차원] 포프레스네 마을
 {
 Step = 1002
@@ -17688,6 +18312,30 @@ IfInString,Location,[감마차원] 포프레스네 마을
 {
 Step = 1002
 }
+Send, {F13 Down}
+Sleep, 30
+Send, {F13 Up}
+IfInString,Location,[알파차원] 포프레스네 북쪽
+{
+Step = 1002
+}
+Send, {F13 Down}
+Sleep, 30
+Send, {F13 Up}
+IfInString,Location,[베타차원] 포프레스네 북쪽
+{
+Step = 1002
+}
+Send, {F13 Down}
+Sleep, 30
+Send, {F13 Up}
+IfInString,Location,[감마차원] 포프레스네 북쪽
+{
+Step = 1002
+}
+Send, {F13 Down}
+Sleep, 30
+Send, {F13 Up}
 }
 if(Step = 1002)
 {
@@ -17703,11 +18351,11 @@ Send, {F17 UP}
 }
 Get_MsgM()
 Get_Perfect()
-if(라깃카운트 <= 5)
+if(RasCount <= 5)
 {
 Step = 100
 }
-if(라깃카운트 > 5)
+if(RasCount > 5)
 {
 Step = 1055
 }
@@ -17721,7 +18369,8 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000)
 {
-step = 10000
+이유 := "메모리 부족"
+step := 10000
 }
 if(byte <= 1000000)
 {
@@ -17732,7 +18381,8 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-step = 10000
+이유 := "메모리 부족"
+step := 10000
 }
 if(byte <= 620000)
 {
@@ -17742,7 +18392,7 @@ step = 1003
 }
 if(Step = 1003)
 {
-SB_SetText("파티 체크 중")
+SB_SetText("파티 설정 중")
 Check_State()
 if(State = 1)
 {
@@ -17752,7 +18402,7 @@ PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
 PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
 Sleep, 100
 }
-if(Gui_PartyOff = 1)
+if(Gui_PartyON = 1)
 {
 Move_StateForMount()
 Sleep, 100
@@ -17760,8 +18410,25 @@ PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
 PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
 PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
 PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+SLEEP, 100
+PostClick(190,310)
+SLEEP, 100
+PostDClick(225,310)
 Sleep, 100
-PostDClick(190,310)
+PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
+PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+Sleep, 100
+}
+else if(Gui_PartyOff = 1)
+{
+Move_StateForMount()
+Sleep, 100
+PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
+PostMessage, 0x100, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 80, 1638401, , ahk_pid %jPID%
+PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
 Sleep, 100
 PostDClick(225,310)
 Sleep, 100
@@ -17780,7 +18447,7 @@ PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
 Sleep, 500
 Check_State()
 Check_StatePos()
-if(StatePosX = 549 and StatePosY = 644 and State = 1)
+if(StatePosX = 565 and StatePosY = 655 and State = 1)
 {
 if(Gui_CheckUseParty = 1)
 {
@@ -17811,23 +18478,30 @@ Step = 500
 return
 }
 }
-Get_FP()
-절반FP := MaxFP/2
-if(NowFP < 절반FP)
+get_FP()
+if(NowFP = 0)
 {
-GuiControl, , Gui_NowState, FP를 채우고 체잠 시작합니다.
-SB_SetText("FP 채우러 가기")
+FPcount ++
+if(nowFP = 0 && FPcount >= 20)
+{
+SB_SetText("FP 확인 중")
 Sleep, 200
 Step = 201
 return
+}
 }
 if(Gui_CheckUseParty = 1)
 {
 party()
 }
-GuiControl, , Gui_NowState, [포북] 사냥터로 가기.
 SB_SetText("포북 사냥터로 이동 중")
-포북캐릭()
+Get_Location()
+if InStr(Location, "포프레스네 북쪽")
+{
+    step = 1006
+    return
+}
+랜덤감응 = 0
 Check_Map()
 if(Map = 1)
 {
@@ -17883,6 +18557,7 @@ Step = 1005
 }
 if(Step = 1005)
 {
+GuiControl, , Gui_NowState, [포북] 사냥터 이동 중
 SB_SetText("움직임 체크 중")
 Check_Moving()
 if(Moving = 0)
@@ -17897,8 +18572,8 @@ Step = 1006
 }
 if(Step = 1006)
 {
+GuiControl, , Gui_NowState, [포북] 사냥터노?
 SB_SetText("북쪽 필드인지 확인 중")
-Get_Location()
 IfInString,Location,북쪽 필드
 {
 RCC = 0
@@ -17910,12 +18585,13 @@ AltR()
 Step = 1004
 }
 }
-if( 포북시작 = 0 )
+if( GUI_KON = 0 )
 {
 if(Step = 1007)
 {
 GuiControl, , Gui_NowState, [포북] 사냥터 도착.
 SB_SetText("파수꾼으로 이동 중")
+Move_NPCTalkForm()
 if(Gui_jjOn = 1)
 {
 Send, {F18 Down}
@@ -17959,7 +18635,7 @@ Step = 1000
 Check_Moving()
 if(Moving = 0)
 {
-Sleep, 1000
+Sleep, 500
 Check_Moving()
 if(Moving = 0)
 {
@@ -17985,6 +18661,9 @@ MoveWaitCount = 0
 pbtalkcheck += 1
 pbtalkcheck1 := A_TickCount
 Step = 1010
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 파수꾼 위치 도착. |" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 :  " . RunningTime
+텔레그램메시지보내기(TMessage)
+sleep,100
 }
 if(!((PosX >= MovePosX-2 and PosX <= MovePosX+2) and (PosY >= MovePosY-2 and PosY <= MovePosY+2)))
 {
@@ -18018,11 +18697,14 @@ IfInString,Location,[감마차원]
 {
 호출대상 := "감마 - 길잃은수색대"
 }
-SB_SetText("파수꾼과 대화 중")
-WinActivate, ahk_pid %jPID%
+SB_SetText("파수꾼과 직접 대화 중")
+IfWinNotActive, ahk_pid %jPID%
+{
+WINACTIVATE, ahk_pid %jPID%
+}
 Move_NPCTalkForm()
 callid = 1
-Sleep, 1000
+Sleep, 500
 PixelSearch, MobX, MobY, 410, 100, 580, 235, 0xEF8AFF, 1, Fast
 if(ErrorLevel = 1)
 {
@@ -18033,38 +18715,93 @@ PixelSearch, MobX, MobY, 410, 100, 580, 235, 0xEF8AFF, 1, Fast
 if(ErrorLevel = 0)
 {
 PostClick(MobX,MobY)
-Sleep, 800
+Get_Location()
+sleep,100
+Loop, 10
+{
+IfInString,Location,[알파차원]
+{
+차원 := "알파"
+SetFormat, integer, H
+A길잃파 := jelan.read(0x00584C2C, "UInt", aOffsets*)
+SetFormat, integer, D
+GuiControl,, A길잃파, %A길잃파%
+SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
+Sleep, 100
+if (A길잃파 != 0x0000)
+{
+    SB_SETTEXT(차원 . A길잃파 . FormNumber "-길잃은 수색대 완료", 2)
+    OID저장()
+    sleep,100
+    break  ; 루프를 멈추고 정상적으로 진행
+}
+}
+IfInString,Location,[베타차원]
+{
+차원 := "베타"
+SetFormat, integer, H
+B길잃파 := jelan.read(0x00584C2C, "UInt", aOffsets*)
+SetFormat, integer, D
+GuiControl,, B길잃파, %B길잃파%
+SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
+Sleep, 100
+if (B길잃파 != 0x0000)
+{
+    SB_SETTEXT(차원 . B길잃파 . FormNumber "-길잃은 수색대 완료", 2)
+    OID저장()
+    sleep,100
+    break  ; 0x로 시작하고 0이 아닌 값일 때 루프 멈춤
+}
+}
+IfInString,Location,[감마차원]
+{
+차원 := "감마"
+SetFormat, integer, H
+G길잃파 := jelan.read(0x00584C2C, "UInt", aOffsets*)
+SetFormat, integer, D
+GuiControl,, G길잃파, %G길잃파%
+SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대", 2)
+Sleep, 100
+if (G길잃파 != 0x0000)
+{
+    SB_SETTEXT(차원 . G길잃파 . FormNumber "-길잃은 수색대 완료", 2)
+    OID저장()
+    sleep,100
+    break  ; 0x로 시작하고 0이 아닌 값일 때 루프 멈춤
+}
+}
+}
 Check_FormNumber()
 if(FormNumber = 117)
 {
-Check_OID()
 Step = 1011
+sleep,100
 }
 }
 }
 if(Step = 1011)
 {
 SB_SetText("피부 버프 받는 중")
-Sleep, 400
+Sleep, 100
 Check_FormNumber()
 Sleep, 100
 if(FormNumber = 117)
 {
-Sleep, 300
+Sleep, 200
 PostClick(110,85)
-Sleep, 300
+Sleep, 200
 }
 if(FormNumber = 93)
 {
-Sleep, 300
+Sleep, 200
 PostClick(130,90)
-Sleep, 300
+Sleep, 200
 }
 if(FormNumber = 81)
 {
-Sleep, 300
+Sleep, 200
 PostClick(120,80)
-Sleep, 300
+Sleep, 200
 step = 10334
 }
 }
@@ -18076,11 +18813,11 @@ if(결정갯수 >= 2)
 Loop, %결정갯수%
 {
 SB_SetText("결정 > 정수로 교환 중")
-Sleep, 300
+Sleep, 200
 PostClick(121,104)
-Sleep, 300
+Sleep, 200
 PostClick(90,90)
-Sleep, 300
+Sleep, 200
 }
 }
 if(나무갯수 >= 2)
@@ -18089,11 +18826,11 @@ if(나무갯수 >= 2)
 Loop, %나무갯수%
 {
 SB_SetText("나무 > 결정으로 교환 중")
-Sleep, 300
+Sleep, 200
 PostClick(121,104)
-Sleep, 300
+Sleep, 200
 PostClick(90,78)
-Sleep, 300
+Sleep, 200
 }
 }
 if(가루갯수 >= 3)
@@ -18102,11 +18839,11 @@ if(가루갯수 >= 3)
 Loop, %가루갯수%
 {
 SB_SetText("가루 > 결정으로 교환 중")
-Sleep, 300
+Sleep, 200
 PostClick(121,104)
-Sleep, 300
+Sleep, 200
 PostClick(90,65)
-Sleep, 300
+Sleep, 200
 }
 }
 Step = 1012
@@ -18114,12 +18851,12 @@ Step = 1012
 if(Step = 1012)
 {
 Check_FormNumber()
-Sleep, 300
+Sleep, 200
 if(FormNumber = 117)
 {
-Sleep, 300
+Sleep, 200
 PostClick(85,113)
-Sleep, 300
+Sleep, 200
 newTime = %A_Now%
 EnvAdd, newTime, 27, Minutes
 FormatTime, newTime1, %newTime%, yyyyMMddHHmm
@@ -18127,20 +18864,26 @@ CheckPB = 1
 pbtalkcheck = 0
 Sleep, 50
 step = 1013
-Sleep,500
-포북시작 := 1
+GuiControl, , Gui_KON, 1
 MapNumber = 1
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 길잃은 파수꾼 감응 정상 적용 완료.|" Location " 시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 :  " . RunningTime
+텔레그램메시지보내기(TMessage)
+Sleep,200
+return
 }
 }
 }
-if( 포북시작 = 1 )
+if( GUI_KON = 1 )
 {
 if(Step = 1007)
 {
 정수체크()
+Move_NPCTalkForm()
 GuiControl, , Gui_NowState, [포북] 사냥터 도착.
-SB_SetText("원격대화 시도 중")
+SB_SetText("파수꾼과 원격 대화 중")
+Get_Location()
 포북대화시도 := A_TickCount
+Move_NPCTalkForm()
 IfInString,Location,[알파차원]
 {
 호출대상 := "알파 - 길잃은수색대"
@@ -18164,26 +18907,91 @@ Sleep, 40
 Send, {F18 Up}
 PickUp_itemsetPN()
 }
+Get_Location()
 Loop,
+{
+IfInString,Location,[알파차원]
 {
 WriteExecutableMemory("NPC호출용1")
 WriteExecutableMemory("NPC호출용2")
-jelan.write(0x00527b54, CCD, "UInt", aOffset*)
-sleep, 100
+차원 := "알파"
+jelan.write(0x00527b54, A길잃파, "UInt", aOffset*)
+SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
+Sleep, 500
 RunMemory("NPC호출")
+}
+IfInString,Location,[베타차원]
+{
+WriteExecutableMemory("NPC호출용1")
+WriteExecutableMemory("NPC호출용2")
+차원 := "베타"
+jelan.write(0x00527b54, B길잃파, "UInt", aOffset*)
+SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
+Sleep, 500
+RunMemory("NPC호출")
+}
+IfInString,Location,[감마차원]
+{
+WriteExecutableMemory("NPC호출용1")
+WriteExecutableMemory("NPC호출용2")
+차원 := "감마"
+jelan.write(0x00527b54, G길잃파, "UInt", aOffset*)
+SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대", 2)
+Sleep, 500
+RunMemory("NPC호출")
+}
+ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
+IfInString,ServerMsg,서버와의 연결이
+{
+    OID리셋()
+   TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 맞지않는 OID로 리셋 |" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
+텔레그램메시지보내기(TMessage)
+sleep,10
+return
+}
 Check_FormNumber()
-if( FormNumber != 0 )
+if(FormNumber = 117)
 {
 Step = 1011
+sleep,100
 break
 }
 포북대화경과 := A_TickCount - 포북대화시도
-if(포북대화경과 >= 5000)
+if(포북대화경과 >= 15000)
 {
 AltR()
 Sleep, 1000
+IfInString,Location,[알파차원]
+{
+차원 := "알파"
+A길잃파 := 0x0
+GuiControl,, A길잃파, %A길잃파%
+SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대만 리셋", 2)
+OID저장()
+Sleep, 500
+}
+IfInString,Location,[베타차원]
+{
+차원 := "베타"
+B길잃파 := 0x0
+GuiControl,, B길잃파, %B길잃파%
+SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대만 리셋", 2)
+OID저장()
+Sleep, 500
+}
+IfInString,Location,[감마차원]
+{
+차원 := "감마"
+G길잃파 := 0x0
+GuiControl,, G길잃파, %G길잃파%
+SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대만 리셋", 2)
+OID저장()
+sleep,100
+}
+   TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 대화 실패, 다른방식으로 감응 재시도.|" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
+텔레그램메시지보내기(TMessage)
+GuiControl, , Gui_KOFF, 1
 Step = 1006
-포북시작 := 0
 break
 }
 }
@@ -18191,26 +18999,26 @@ break
 if(Step = 1011)
 {
 SB_SetText("피부 버프 받는 중")
-Sleep, 400
+Sleep, 200
 Check_FormNumber()
 Sleep, 100
 if(FormNumber = 117)
 {
-Sleep, 300
+Sleep, 200
 PostClick(110,85)
-Sleep, 300
+Sleep, 200
 }
 if(FormNumber = 93)
 {
-Sleep, 300
+Sleep, 200
 PostClick(130,90)
-Sleep, 300
+Sleep, 200
 }
 if(FormNumber = 81)
 {
-Sleep, 300
+Sleep, 200
 PostClick(120,80)
-Sleep, 300
+Sleep, 200
 step = 10334
 }
 }
@@ -18222,11 +19030,11 @@ if(결정갯수 >= 2)
 Loop, %결정갯수%
 {
 SB_SetText("결정 > 정수로 교환 중")
-Sleep, 300
+Sleep, 200
 PostClick(121,104)
-Sleep, 300
+Sleep, 200
 PostClick(90,90)
-Sleep, 300
+Sleep, 200
 }
 }
 if(나무갯수 >= 2)
@@ -18235,11 +19043,11 @@ if(나무갯수 >= 2)
 Loop, %나무갯수%
 {
 SB_SetText("나무 > 결정으로 교환 중")
-Sleep, 300
+Sleep, 200
 PostClick(121,104)
-Sleep, 300
+Sleep, 200
 PostClick(90,78)
-Sleep, 300
+Sleep, 200
 }
 }
 if(가루갯수 >= 3)
@@ -18248,11 +19056,11 @@ if(가루갯수 >= 3)
 Loop, %가루갯수%
 {
 SB_SetText("가루 > 결정으로 교환 중")
-Sleep, 300
+Sleep, 200
 PostClick(121,104)
-Sleep, 300
+Sleep, 200
 PostClick(90,65)
-Sleep, 300
+Sleep, 200
 }
 }
 Step = 1012
@@ -18260,12 +19068,12 @@ Step = 1012
 if(Step = 1012)
 {
 Check_FormNumber()
-Sleep, 300
+Sleep, 200
 if(FormNumber = 117)
 {
-Sleep, 300
+Sleep, 200
 PostClick(85,113)
-Sleep, 300
+Sleep, 200
 newTime = %A_Now%
 EnvAdd, newTime, 27, Minutes
 FormatTime, newTime1, %newTime%, yyyyMMddHHmm
@@ -18273,8 +19081,12 @@ CheckPB = 1
 pbtalkcheck = 0
 Sleep, 50
 step = 1013
-Sleep,500
+차원이동감응 := 0
 MapNumber := 5
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 [원격] 시작.|" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
+텔레그램메시지보내기(TMessage)
+Sleep,200
+return
 }
 }
 }
@@ -18286,34 +19098,62 @@ if(Gui_CheckWPDMagic = 1)
 {
 WPD()
 }
-if(MapNumber >= 153)
+if(Aloute = 1)
+{
+if(MapNumber >= 121)
 {
 MapNumber = 1
 Step = 1000
 return
 }
+}
+if(Bloute = 1)
+{
+if(MapNumber >= 347)
+{
+MapNumber = 1
+Step = 1000
+return
+}
+}
+if(Cloute = 1)
+{
+if(MapNumber >= 185)
+{
+MapNumber = 1
+Step = 1000
+return
+}
+}
 CharMovePobuk()
+sleep,500
 Step = 1014
 }
 if(Step = 1014)
 {
 SB_SetText("움직임 체크 중")
+IfWinNotActive, ahk_pid %jPID%
+{
+WinActivate, ahk_pid %jPID%
+}
 Check_Moving()
 Get_Pos()
 Get_MovePos()
 if(Moving = 0)
 {
-Sleep, 200
+sleep,200
 Check_Moving()
 if(Moving = 0)
 {
 Step = 1015
 }
 }
-if((PosX >= MovePosX and PosX <= MovePosX) and (PosY >= MovePosY and PosY <= MovePosY))
+거리범위 := 3
+if (Abs(PosX - MovePosX) <= 거리범위 && Abs(PosY - MovePosY) <= 거리범위)
 {
-MoveWaitCount = 0
-Step = 1016
+    MoveWaitCount := 0
+    Step := 1016
+    한번만 := 1
 }
 }
 if(Step = 1015)
@@ -18337,6 +19177,8 @@ else
 Step = 1016
 }
 }
+return
+
 }
 if(Step = 1016)
 {
@@ -18345,47 +19187,48 @@ IfWinNotActive, ahk_pid %jPID%
 {
 WinActivate, ahk_pid %jPID%
 }
+AttackingCount3 := 0
 포북몹 := 0xB5F5F7
-PixelSearch, MobX, MobY, 350, 160, 410, 260, 포북몹, 5, *ScanBR *Fast  *RGB
+PixelSearch, MobX, MobY, 350, 160, 410, 260, 포북몹, 10, *ScanBR *Fast  *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 350, 160, 410, 260, 포북몹, 5, *ScanBR *Fast  *RGB
+PixelSearch, MobX, MobY, 350, 160, 410, 260, 포북몹, 10, *ScanBR *Fast  *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 360, 209, 437, 260, 포북몹, 5, *ScanLB *Fast *RGB
+PixelSearch, MobX, MobY, 360, 209, 437, 260, 포북몹, 10, *ScanLB *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 360, 209, 437, 260, 포북몹, 5, *ScanLB *Fast *RGB
+PixelSearch, MobX, MobY, 360, 209, 437, 260, 포북몹, 10, *ScanLB *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 362, 186, 432, 255, 포북몹, 5, *ScanLT *Fast *RGB
+PixelSearch, MobX, MobY, 362, 186, 432, 255, 포북몹, 10, *ScanLT *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 362, 186, 432, 255, 포북몹, 5, *ScanLT *Fast *RGB
+PixelSearch, MobX, MobY, 362, 186, 432, 255, 포북몹, 10, *ScanLT *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 333, 161, 460, 281, 포북몹, 5, *ScanRT *Fast *RGB
+PixelSearch, MobX, MobY, 333, 161, 460, 281, 포북몹, 10, *ScanRT *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 333, 161, 460, 281, 포북몹, 5, *ScanRT *Fast *RGB
+PixelSearch, MobX, MobY, 333, 161, 460, 281, 포북몹, 10, *ScanRT *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 315, 138, 483, 305, 포북몹, 5, *ScanLT *Fast *RGB
+PixelSearch, MobX, MobY, 315, 138, 483, 305, 포북몹, 10, *ScanLT *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 315, 138, 483, 305, 포북몹, 5, *ScanLT *Fast *RGB
+PixelSearch, MobX, MobY, 315, 138, 483, 305, 포북몹, 10, *ScanLT *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 260, 92, 533, 352, 포북몹, 5, *ScanRT *Fast *RGB
+PixelSearch, MobX, MobY, 260, 92, 533, 352, 포북몹, 10, *ScanRT *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 260, 92, 533, 352, 포북몹, 5, *ScanRT *Fast *RGB
+PixelSearch, MobX, MobY, 260, 92, 533, 352, 포북몹, 10, *ScanRT *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 214, 44, 580, 400, 포북몹, 5, *ScanLT *Fast *RGB
+PixelSearch, MobX, MobY, 214, 44, 580, 400, 포북몹, 10, *ScanLT *Fast *RGB
 if(ErrorLevel = 1)
 {
-PixelSearch, MobX, MobY, 214, 44, 580, 400, 포북몹, 5, *ScanLT *Fast *RGB
+PixelSearch, MobX, MobY, 214, 44, 580, 400, 포북몹, 10, *ScanLT *Fast *RGB
 }
 }
 }
@@ -18426,7 +19269,8 @@ return
 }
 AttackLoopCount = 0
 AttackCount = 0
-Sleep, 500
+sleep,200
+keyclick("AltR")
 movmob := A_TickCount
 Step = 1019
 return
@@ -18468,6 +19312,7 @@ if(AttackCount > 5)
 AttackLoopCount = 0
 AttackCount = 0
 Step = 1016
+return
 }
 else
 {
@@ -18486,25 +19331,29 @@ SplashImage, 9: off
 SplashImage, 10: off
 Step = 1026
 AttackingCount := A_TickCount
+AttackingCount2 := A_TickCount
+return
 }
 }
 }
 if(Step = 1019)
 {
 SB_SetText("몬스터가 가까이 있는지 확인 중")
+;sleep,100
+keyclick("AltR")
 Check_Moving()
 if(Moving = 0)
 {
-Sleep, 200
 Check_Moving()
 if(Moving = 0)
 {
-AltR()
 Step = 1018
+AttackMissCount := 0
+한번만 := 1
 }
 }
 movmob2 := A_TickCount - movmob
-if(movmob2 >= 4000)
+if(movmob2 >= 2500)
 {
 SB_SetText("거리가 멉니다.")
 Sleep, 100
@@ -18513,58 +19362,27 @@ PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
 Step = 1016
 }
 }
-if(Step = 1026)
+if(Step = 1026) ;무바파트
 {
-SB_SetText("무바를 시작하였습니다")
-if(Gui_1Muba = 1)
+GUICONTROL, , Gui_NowState, [포북] 무바 중
+SB_SetText("포북 메모리 무바", 1)
+AttackMissCount ++
+if(AttackMissCount >= 300 and 한번만 = 1)
+{
+    sleep,100
+    keyclick("AltR")
+    AttackMissCount := 0
+    한번만 :=0
+}
+if(gui_1muba = 1)
 {
 ReadAbilityNameValue()
 if(AbilityName = Gui_Weapon1)
 {
 BWValue1 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5)
-{
-RepairWeaponCount1 = 0
-MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
-return
 }
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount1 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount1 = 0
-}
-}
-if(Gui_2Muba = 1)
+if(gui_2muba = 1)
 {
 ReadAbilityNameValue()
 if(AbilityName = Gui_Weapon1)
@@ -18575,94 +19393,8 @@ if(AbilityName = Gui_Weapon2)
 {
 BWValue2 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5 or RepairWeaponCount2 >= 5)
-{
-RepairWeaponCount1 = 0
-RepairWeaponCount2 = 0
-MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
-return
 }
-if(MubaStep = 1)
-{
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(TempWeapon = Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount1 += 1
-}
-if(TempWeapon != Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount1 = 0
-}
-MubaStep = 2
-return
-}
-if(MubaStep = 2)
-{
-keyclick(2)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(TempWeapon = Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount2 += 1
-}
-if(TempWeapon != Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount2 = 0
-}
-MubaStep = 1
-return
-}
-}
-if(Gui_3Muba = 1)
+if(gui_3muba = 1)
 {
 ReadAbilityNameValue()
 if(AbilityName = Gui_Weapon1)
@@ -18677,133 +19409,8 @@ if(AbilityName = Gui_Weapon3)
 {
 BWValue3 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5 or RepairWeaponCount2 >= 5 or RepairWeaponCount3 >= 5)
-{
-RepairWeaponCount1 = 0
-RepairWeaponCount2 = 0
-RepairWeaponCount3 = 0
-MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
-return
 }
-if(MubaStep = 1)
-{
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(TempWeapon = Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount1 += 1
-}
-if(TempWeapon != Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount1 = 0
-}
-MubaStep = 2
-return
-}
-if(MubaStep = 2)
-{
-keyclick(2)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(TempWeapon = Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount2 += 1
-}
-if(TempWeapon != Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount2 = 0
-}
-MubaStep = 3
-return
-}
-if(MubaStep = 3)
-{
-keyclick(3)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon3)
-{
-BWValue3 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(TempWeapon = Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount3 += 1
-}
-if(TempWeapon != Weapon)
-{
-TempWeapon := Weapon
-RepairWeaponCount3 = 0
-}
-MubaStep = 1
-return
-}
-}
-if(Gui_2ButMuba = 1)
+if(Gui_2butmuba = 1)
 {
 ReadAbilityNameValue()
 if(AbilityName = "격투")
@@ -18814,69 +19421,8 @@ if(AbilityName = Gui_Weapon1)
 {
 BWValue1 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5)
-{
-RepairWeaponCount1 = 0
-MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
-return
 }
-if(MubaStep = 1)
-{
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount1 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount1 = 0
-}
-MubaStep = 2
-return
-}
-if(MubaStep = 2)
-{
-WPD()
-Sleep, 100
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 1
-return
-}
-}
-if(Gui_3ButMuba = 1)
+if(Gui_3butmuba = 1)
 {
 ReadAbilityNameValue()
 if(AbilityName = "격투")
@@ -18891,123 +19437,10 @@ if(AbilityName = Gui_Weapon2)
 {
 BWValue2 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5 or RepairWeaponCount2 >= 5)
-{
-RepairWeaponCount1 = 0
-RepairWeaponCount2 = 0
-MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
-return
 }
-if(MubaStep = 1)
+if(Gui_4butMuba = 1)
 {
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
 ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount1 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount1 = 0
-}
-MubaStep = 2
-return
-}
-if(MubaStep = 2)
-{
-WPD()
-Sleep, 100
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 3
-return
-}
-if(MubaStep = 3)
-{
-keyclick(2)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount2 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount2 = 0
-}
-MubaStep = 4
-return
-}
-if(MubaStep = 4)
-{
-WPD()
-Sleep, 100
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 1
-return
-}
-}
-if(Gui_4ButMuba = 1)
-{
 if(AbilityName = "격투")
 {
 BWValue0 := AbilityValue
@@ -19024,186 +19457,84 @@ if(AbilityName = Gui_Weapon3)
 {
 BWValue3 := AbilityValue
 }
-if(RepairWeaponCount1 >= 5 or RepairWeaponCount2 >= 5 or RepairWeaponCount3 >= 5)
+}
+if(Gui_CheckUseMagic = 1)
 {
-RepairWeaponCount1 = 0
-RepairWeaponCount2 = 0
-RepairWeaponCount3 = 0
+if(BWValue0 = "격투" or Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프" || Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프" || Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
+{
+RemoteM()
+}
+}
+현재무기 := jelan.read(0x0058DAD4, "UInt", 0x121)
+if (현재무기 != 0) ;4벗무바무기수리로직
+{
+    if(Gui_2Muba = 1 || Gui_3butMuba = 1||Gui_3Muba = 1 || Gui_4butMuba = 1)
+    {
+    TrackWeaponChange(현재무기)
+    }
+    if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+    {
+    RepairWeaponCount = 0
+    }
+}
+if (현재무기 = 0)
+{
+    if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+    {
+    RepairWeaponCount += 1
+    }
+    else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
+    {
+    RecentWeapons.RemoveAt(2)
+    }
+    else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
+    {
+    RecentWeapons.RemoveAt(3)
+    }
+}
+무바여부 := CheckTrackedWeapons()
+if(Gui_1Muba = 1 || Gui_2butMuba = 1)
+{
+사용할무기수량 := 1
+}
+else if(Gui_2Muba = 1 || Gui_3butMuba = 1)
+{
+사용할무기수량 := 2
+}
+else if(Gui_3Muba = 1 || Gui_4butMuba = 1)
+{
+사용할무기수량 := 3
+}
+if (무바여부 = 사용할무기수량)
+{
+RepairWeaponCount := 0
+}
+if (무바여부 != 사용할무기수량)
+{
+RepairWeaponCount += 1
+sleep,100
+}
+else
+{
+  RepairWeaponCount := 0
+}
+if (RepairWeaponCount >= 300)
+{
+RepairWeaponCount = 0
 MapNumber = 1
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Step = 300
+step = 300
 return
-}
-if(MubaStep = 1)
-{
-keyclick(1)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon1)
-{
-BWValue1 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon1 = "현금" or Gui_Weapon1 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount1 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount1 = 0
-}
-MubaStep = 2
-return
-}
-if(MubaStep = 2)
-{
-WPD()
-Sleep, 100
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 3
-return
-}
-if(MubaStep = 3)
-{
-keyclick(2)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon2)
-{
-BWValue2 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon2 = "현금" or Gui_Weapon2 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount2 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount2 = 0
-}
-MubaStep = 4
-return
-}
-if(MubaStep = 4)
-{
-WPD()
-Sleep, 100
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 5
-return
-}
-if(MubaStep = 5)
-{
-keyclick(3)
-Sleep, %무바딜레이%
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
-{
-RemoteM()
-}
-}
-Sleep, %무바딜레이%
-ReadAbilityNameValue()
-if(AbilityName = Gui_Weapon3)
-{
-BWValue3 := AbilityValue
-}
-if(Gui_CheckUseMagic = 1)
-{
-if(Gui_Weapon3 = "현금" or Gui_Weapon3 =  "스태프")
-{
-RemoteM()
-}
-}
-Check_Weapon()
-if(Weapon = 0)
-{
-RepairWeaponCount3 += 1
-}
-if(Weapon != 0)
-{
-RepairWeaponCount3 = 0
-}
-MubaStep = 6
-return
-}
-if(MubaStep = 6)
-{
-WPD()
-ReadAbilityNameValue()
-if(AbilityName = "격투")
-{
-BWValue0 := AbilityValue
-}
-Sleep, 100
-if(Gui_CheckUseMagic = 1)
-{
-RemoteM()
-}
-MubaStep = 1
-return
-}
 }
 }
 if(Step = 1030)
 {
 SB_SetText("피부 버프 받는 중")
 CheckPB = 0
-CheckPN = 0
-Sleep, 100
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
+RepairWeaponCount = 0
+Sleep, 500
+Keyclick("tab")
 Sleep, 300
 CheckPB = 0
-CheckPN = 0
 Step = 1056
 }
 if(Step = 1056)
@@ -19214,7 +19545,8 @@ if(TotalPhy > 2000000)
 {
 if(byte > 1000000)
 {
-step = 10000
+이유 := "메모리 부족"
+step := 10000
 }
 if(byte <= 1000000)
 {
@@ -19227,7 +19559,8 @@ if(TotalPhy <= 2000000)
 {
 if(byte > 620000)
 {
-step = 10000
+이유 := "메모리 부족"
+step := 10000
 }
 if(byte <= 620000)
 {
@@ -19240,7 +19573,7 @@ step = 1031
 if(Step = 1031)
 {
 정수체크()
-SB_SetText("원격대화 시도 중")
+SB_SetText("원격대화 시도 중2")
 포북대화시도 := A_TickCount
 IfInString,Location,[알파차원]
 {
@@ -19254,17 +19587,40 @@ IfInString,Location,[감마차원]
 {
 호출대상 := "감마 - 길잃은수색대"
 }
+sleep,300
 Loop,
 {
 WriteExecutableMemory("NPC호출용1")
 WriteExecutableMemory("NPC호출용2")
-jelan.write(0x00527b54, CCD, "UInt", aOffset*)
+IfInString,Location,[알파차원]
+{
+차원 := "알파"
+jelan.write(0x00527b54, A길잃파, "UInt", aOffset*)
+SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
 sleep, 100
 RunMemory("NPC호출")
+}
+IfInString,Location,[베타차원]
+{
+차원 := "베타"
+jelan.write(0x00527b54, B길잃파, "UInt", aOffset*)
+SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
+sleep, 100
+RunMemory("NPC호출")
+}
+IfInString,Location,[감마차원]
+{
+차원 := "감마"
+jelan.write(0x00527b54, G길잃파, "UInt", aOffset*)
+SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대", 2)
+sleep, 100
+RunMemory("NPC호출")
+}
 Check_FormNumber()
 if( FormNumber != 0 )
 {
 Step = 1032
+sleep,100
 break
 }
 포북대화경과 := A_TickCount - 포북대화시도
@@ -19273,7 +19629,11 @@ if(포북대화경과 >= 5000)
 AltR()
 Sleep,1000
 Step = 1006
-포북시작 := 0
+   TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 대화 실패, 다른방식으로 감응 재시도.|" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
+텔레그램메시지보내기(TMessage)
+Sleep,500
+GuiControl, , Gui_KOFF, 1
+차원이동감응 := 1
 break
 }
 }
@@ -19281,7 +19641,7 @@ break
 if(Step = 1032)
 {
 SB_SetText("피부 버프 갱신 중")
-Sleep, 400
+Sleep, 200
 Check_FormNumber()
 Sleep, 100
 if(FormNumber = 117)
@@ -19362,7 +19722,10 @@ FormatTime, newTime1, %newTime%, yyyyMMddHHmm
 CheckPB = 1
 pbtalkcheck = 0
 Sleep, 50
-step = 1016
+step := 1016
+TMessage := "[ Helancia_Log ]>>" jTitle "<<: 포북 사냥터 [원격] 시간별 정상작동.|" Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
+텔레그램메시지보내기(TMessage)
+sleep,100
 }
 }
 if(Step = 10000)
@@ -19376,89 +19739,10 @@ Sleep, 1000
 }
 if(internet = 1)
 {
-try {
-    ; ======================
-    ; MSXML2.XMLHTTP 방식
-    ; ======================
-    winhttp := ComObjCreate("MSXML2.XMLHTTP.6.0")
-    winhttp.Open("GET", "http://elancia.nexon.com/main/page/nx.aspx?url=home/index", false)
-    winhttp.Send("")
-
-    ; HTTP 상태 코드 확인
-    if (winhttp.Status != 200) {
-        ; 상태 코드가 200이 아닐 경우 처리
-    } else {
-        Content := winhttp.ResponseText
-        ; 정규 표현식으로 데이터 추출
-        if RegExMatch(Content, "style=""color:#60c722;"" >(.*?)</span>", Server) {
-            ; 성공적인 데이터 추출
-        } else {
-            ; 데이터 추출 실패
-        }
-    }
-
-    ; ======================
-    ; Internet Explorer 방식
-    ; ======================
-    ie := ComObjCreate("InternetExplorer.Application")
-    ie.Visible := false
-    url := "https://elancia.nexon.com/"
-    ie.Navigate(url)
-
-    ; 로딩 완료 대기
-    while ie.Busy or ie.ReadyState != 4
-        Sleep, 100
-
-    ; 페이지 HTML 가져오기
-    html := ie.document.body.innerHTML
-
-    ; "서버 현황" 단어 위치 찾기 및 300자 추출
-    target1 := "서버 현황"
-    pos1 := InStr(html, target1, false) ; 대소문자 구분 없이 검색
-
-    if (pos1 > 0) {
-        extractedText := SubStr(html, pos1, 300)
-
-        ; "엘" 단어 찾기
-        target2 := "엘"
-        pos2 := InStr(extractedText, target2, false)
-
-        if (pos2 > 0) {
-            ; <dd>와 </dd> 사이 텍스트 추출
-            ddStart := InStr(extractedText, "<dd>", false, pos2)
-            ddEnd := InStr(extractedText, "</dd>", false, ddStart)
-
-            if (ddStart > 0 and ddEnd > ddStart) {
-                result := SubStr(extractedText, ddStart + 4, ddEnd - ddStart - 4)
-                ; 성공적인 데이터 추출
-            } else {
-                ; <dd> 데이터 추출 실패
-            }
-        } else {
-            ; '엘' 단어를 찾을 수 없음
-        }
-    } else {
-        ; '서버 현황' 단어를 찾을 수 없음
-    }
-
-    ; IE 객체 종료
-    ie.Quit()
-} catch e {
-    ; 예외 처리
-}
-{
-GuiControl, , 로그인상태정보, 일랜시아 서버 정상. 재접속 중
+GuiControl, , 로그인상태정보, 인터넷 정상. 재접속 중
 SB_SetText("재접속 시도 중")
-if(ParasCount > 3)
-{
-GuiControl, , Gui_NowState, [포남] 파라스 감지 포남 > 포북변경
-MsgBox,48,파라스감지, 파라스방해로 포남 > 포북 사냥터로 변경,2
-SB_SetText("파라스를 방해감지")
-GuiControl, , Gui_HuntPobuk, 1
-ParasCount = 3
-파라스방해감지 := 1
-실행초기화 := 1
-}
+Reserver += 1
+감응 := 0
 Step = 0
 SplashImage, 1: off
 SplashImage, 2: off
@@ -19470,17 +19754,9 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
+TMessage :="[ Helancia_Log ]>>" jTitle "<<: 메모리 정리후 리로드 [ 종료횟수 : " Reserver "/ 이유:" 이유 "/" 이전스텝 "]"
+텔레그램메시지보내기(TMessage)
 return
-}
-if(Server1 != "정상")
-{
-GuiControl, , 로그인상태정보, 일랜시아 홈페이지 서버 점검 중. 대기
-SB_SetText("일랜시아 서버 점검 대기 중")
-ParasCount = 0
-실행초기화 := 0
-Sleep, 1000
-return
-}
 }
 }
 if(Step = 900)
@@ -20406,13 +20682,26 @@ Sleep, 10000
 step = 1004
 }
 return
+
+AttackMGB:
+Gui, Submit, Nohide
+if(Gui_mgb = 1)
+{
+if(Step = 27 or Step = 1026 or step = 3030)
+{
+RandomSendCtrlKey()
+}
+}
+return
+
+
 AttackCheck:
 Gui, Submit, Nohide
-if(Step >= 7 and Step < 10000)
+if (Step >= 7 && Step < 10000)
 {
-Set_MoveSpeed()
+    Set_MoveSpeed()
 }
-if(Step = 27 or Step = 1026)
+if(Step = 27 or Step = 1026 or step = 3030)
 {
 AttackLoopCount += 1
 Check_Attack()
@@ -20433,12 +20722,14 @@ AttackCount = 0
 if(HuntPlace = 1)
 {
 Step = 24
-AltR()
 }
 if(HuntPlace = 2)
 {
 Step = 1016
-AltR()
+}
+if(HuntPlace = 3)
+{
+Step = 3027
 }
 }
 else
@@ -20447,39 +20738,51 @@ AttackLoopCount = 0
 AttackCount = 0
 }
 }
-if(Step = 1026)
-{
-Attacking := A_TickCount - AttackingCount
-if(Attacking >= 300000)
-{
-AttackingCount := A_TickCount
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
-Sleep,500
-AltR()
-}
-}
 }
 return
 GuiClose:
 Gui, Submit, NoHide
-SkinForm(0)
+jelan.write(0x0058FFE0,0,"UInt", aOffsets*)
+jelan.write(0x0058DAD4, 400, "UInt", 0x178, 0x9C)
+jelan.write(0x0058DAD4, 400, "UInt", 0x178, 0x98)
+무바비활성화()
 IfWinExist,ahk_pid %jPID%
 {
 WinKill, ahk_pid %jPID%
+WinKill, ahk_exe MRMsph.exe
 }
-IfWinExist,ahk_exe MRMSPH.exe
+if(Gui_MGB = 1)
 {
-WinKill, ahk_exe MRMSPH.exe
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MGB, 1
 }
+if(Gui_MGB = 0)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MGB, 0
+}
+if(Gui_CheckUseHPHospital = 1)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseHPHospital, 1
+}
+if(Gui_CheckUseHPHospital = 0)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseHPHospital, 0
+}
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, HPHospital, %Gui_HPHospital%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, VMRE, 0
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 실행시간, 0
+RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam,ChatID, %ChatID%
+RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam,동파감응시간셋팅, %동파감응시간셋팅%
+RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam,서파감응시간셋팅, %서파감응시간셋팅%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 게임시작x, %게임시작x%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 게임시작y, %게임시작y%
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 서버팅김,0
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Reserver,0
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 파라스감지,0
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 수천감지,0
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 수호천사방지,0
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 인연방지,0
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 파라스방해감지,0
+RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, TTM, %ChatID%
+RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam,동파감응시간셋팅, %동파감응시간셋팅%
+RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam,서파감응시간셋팅, %서파감응시간셋팅%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, P1, %Name1%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, P2, %Name2%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, P3, %Name3%
@@ -20579,13 +20882,13 @@ if(Gui_KOFF = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, KONOFF, 2
 }
-if(방어구방지ON = 1)
+if(Protect_AmorON = 1)
 {
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 방어구방지ONOFF, 1
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Protect_AmorONOFF, 1
 }
-if(방어구방지OFF = 1)
+if(Protect_AmorOFF = 1)
 {
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 방어구방지ONOFF, 2
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Protect_AmorONOFF, 2
 }
 if(Gui_jjON = 1)
 {
@@ -20652,6 +20955,10 @@ if(Gui_HuntPobuk = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Place, 3
 }
+if(Gui_HuntMummy = 1)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Place, 4
+}
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Limit0, %Gui_LimitAbility0%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Limit1, %Gui_LimitAbility1%
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Limit2, %Gui_LimitAbility2%
@@ -20663,6 +20970,14 @@ RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Party, 1
 if(Gui_PartyOff = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Party, 2
+}
+if(Gui_MGB = 1)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MGB, 1
+}
+if(Gui_MGB = 0)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MGB, 0
 }
 if(Gui_Grade = 1)
 {
@@ -20689,7 +21004,7 @@ if(랜덤차원 = 1)
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 포탈, 3
 }
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, loady, 0
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 업데이트체크, %업데이트체크%
+;RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 업데이트체크, %업데이트체크%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, CharNumber, %Gui_CharNumber%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, MNS, %Gui_MagicNStack%
 RegWrite, REG_SZ, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, Server, %Gui_Server%
@@ -20744,6 +21059,14 @@ RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯7번,
 if(7번사용 = 0)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯7번, 0
+}
+if(8번사용 = 1)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯8번, 1
+}
+if(8번사용 = 0)
+{
+RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 퀵슬롯8번, 0
 }
 if(현혹사용 = 1)
 {
@@ -21369,86 +21692,6 @@ if(Gui_MagicCheck8 = 0)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC8, 0
 }
-if(Gui_MagicCheck9 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC9, 1
-}
-if(Gui_MagicCheck9 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC9, 0
-}
-if(Gui_MagicCheck10 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC10, 1
-}
-if(Gui_MagicCheck10 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC10, 0
-}
-if(Gui_MagicCheck11 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC11, 1
-}
-if(Gui_MagicCheck11 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC11, 0
-}
-if(Gui_MagicCheck12 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC12, 1
-}
-if(Gui_MagicCheck12 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC12, 0
-}
-if(Gui_MagicCheck13 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC13, 1
-}
-if(Gui_MagicCheck13 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC13, 0
-}
-if(Gui_MagicCheck14 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC14, 1
-}
-if(Gui_MagicCheck14 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC14, 0
-}
-if(Gui_MagicCheck15 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC15, 1
-}
-if(Gui_MagicCheck15 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC15, 0
-}
-if(Gui_MagicCheck16 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC16, 1
-}
-if(Gui_MagicCheck16 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC16, 0
-}
-if(Gui_MagicCheck17 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC17, 1
-}
-if(Gui_MagicCheck17 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC17, 0
-}
-if(Gui_MagicCheck18 = 1)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC18, 1
-}
-if(Gui_MagicCheck18 = 0)
-{
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, UseMC18, 0
-}
 if(Gui_relogerror = 1)
 {
 RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, relog, 1
@@ -21459,14 +21702,15 @@ RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, relog, 0
 }
 Gui, submit, nohide
 Gui, listview, 포프레스네소각
-FileDelete, %A_ScriptDir%\소각리스트.ini
+FileDelete, C:\소각리스트.ini
 save := LV_GetCount()
-loop, %save%{
+loop, %save%
+{
 lv_gettext(savefile1,a_index)
-FileAppend, %savefile1%`n, %A_ScriptDir%\소각리스트.ini
-FileSetAttrib, +H, %A_ScriptDir%\소각리스트.ini
+FileAppend, %savefile1%`n, C:\소각리스트.ini
+FileSetAttrib, +H, C:\소각리스트.ini
 }
-WinKill, ahk_exe MRMSPH.exe
+WinKill, ahk_exe MRMsph.exe
 ExitApp
 return
 IME_CHECK(WinTitle)
@@ -21619,9 +21863,17 @@ GuiControl, Enable, Gui_MobMagic
 GuiControl, Enable, Gui_PartyOn
 GuiControl, Enable, Gui_PartyOff
 GuiControl, Enable, Gui_Grade
+GuiControl, Enable, Gui_MGB
 GuiControl, Enable, Gui_StartButton
 GuiControl, Enable, Gui_WindowSettingButton
 GuiControl, Enable, Gui_Agree
+}
+PlugClick(x,y)
+{
+MousePos := x|y<<16
+PostMessage, 0x200, 0, %MousePos%, Chrome_WidgetWin_01, ahk_pid %플러그%
+PostMessage, 0x201, 1, %MousePos%, Chrome_WidgetWin_01, ahk_pid %플러그%
+PostMessage, 0x202, 0, %MousePos%, Chrome_WidgetWin_01, ahk_pid %플러그%
 }
 PostMove(MouseX,MouseY)
 {
@@ -21658,30 +21910,54 @@ PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
 }
 AltR()
 {
-PostMessage, 0x100, 18, 540540929, , ahk_pid %jPID%
-PostMessage, 0x100, 82, 1245185, , ahk_pid %jPID%
-PostMessage, 0x101, 82, 1245185, , ahk_pid %jPID%
-PostMessage, 0x101, 18, 540540929, , ahk_pid %jPID%
+keyclick("AltR")
 }
+Check_Dimension()
+{
+Dimension := jelan.read(0x0058EB1C, "UInt", 0x10A)
+if(Dimension>20000)
+차원체크:="감마"
+else if(Dimension>10000)
+차원체크:="베타"
+else if(Dimension<10000)
+차원체크:="알파"
+}
+return
+
+Set_nomalSpeed()
+{
+jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x9C)
+jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x98)
+jelan.write(0x0058FFE0,0,"UInt", aOffsets*)
+}
+return
+
 Set_MoveSpeed()
 {
-value := jelan.write(0x0058DAD4, 730, "UInt", 0x178, 0x9C)
-value := jelan.write(0x0058DAD4, 730, "UInt", 0x178, 0x98)
+jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x9C)
+jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x98)
+;jelan.write(0x0058FFE0,45,"UInt", aOffsets*)
+;jelan.write(0x0058DAD4, 2300, "UInt", 0x178, 0x9C)
+;jelan.write(0x0058DAD4, 2300, "UInt", 0x178, 0x98)
 }
+return
 Check_Moving()
 {
 Moving := jelan.read(0x0058EB1C, "UInt", 0x174)
 }
+return
 Check_OID()
 {
 Get_Location()
 CCD := jelan.read(0x00584C2C, "UInt", aOffsets*)
 }
+return
 Monster_OID()
 {
-몬스터ID :=	jelan.read(0x00584C2C, "UInt", aOffsets*)
-GuiControl,,현재타겟OID값,0x%몬스터ID%
+MonsterPID :=jelan.read(0x00584C2C, "UInt", aOffsets*)
+GuiControl,,MonsterTargetPID,0x%MonsterPID%
 }
+return
 Check_State()
 {
 State := jelan.read(0x0058EB98, "UInt", aOffsets*)
@@ -21690,11 +21966,13 @@ if(State != 0)
 State = 1
 }
 }
+return
 Check_StatePos()
 {
 StatePosX := jelan.read(0x0058EB48, "UInt", 0x44)
 StatePosY := jelan.read(0x0058EB48, "UInt", 0x48)
 }
+return
 Check_Mount()
 {
 Mount := jelan.read(0x0058DAD4, "UInt", 0x22C)
@@ -21820,16 +22098,6 @@ Slot5MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x14, 0x
 Slot6MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x18, 0x8, 0xC)
 Slot7MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x1C, 0x8, 0xC)
 Slot8MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x20, 0x8, 0xC)
-Slot9MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x24, 0x8, 0xC)
-Slot10MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x28, 0x8, 0xC)
-Slot11MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x2C, 0x8, 0xC)
-Slot12MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x30, 0x8, 0xC)
-Slot13MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x34, 0x8, 0xC)
-Slot14MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x38, 0x8, 0xC)
-Slot15MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x3C, 0x8, 0xC)
-Slot16MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x40, 0x8, 0xC)
-Slot17MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x44, 0x8, 0xC)
-Slot18MN := jelan.readString(0x0058DAD4, 22, "UTF-16", 0x178, 0xC2, 0x8, 0x48, 0x8, 0xC)
 }
 Check_SMagic()
 {
@@ -21839,16 +22107,6 @@ Slot5Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x14, 0x8, 0x42C)
 Slot6Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x18, 0x8, 0x42C)
 Slot7Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x1C, 0x8, 0x42C)
 Slot8Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x20, 0x8, 0x42C)
-Slot9Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x24, 0x8, 0x42C)
-Slot10Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x28, 0x8, 0x42C)
-Slot11Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x2C, 0x8, 0x42C)
-Slot12Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x30, 0x8, 0x42C)
-Slot13Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x34, 0x8, 0x42C)
-Slot14Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x38, 0x8, 0x42C)
-Slot15Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x3C, 0x8, 0x42C)
-Slot16Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x40, 0x8, 0x42C)
-Slot17Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x44, 0x8, 0x42C)
-Slot18Magic := jelan.read(0x0058DAD4, "UInt", 0x178, 0xC2, 0x8, 0x48, 0x8, 0x42C)
 }
 Check_SAbility()
 {
@@ -21917,10 +22175,6 @@ Check_Attack()
 {
 Attack := jelan.read(0x0058DAD4, "UInt", 0x178, 0xEB)
 }
-Check_Chat()
-{
-Chat := jelan.read(0x0058DAD4, "UInt", 0x1AC)
-}
 Check_NPCMenu()
 {
 NPCMenu := jelan.read(0x0058F0A4, "UInt", aOffsets*)
@@ -21963,6 +22217,9 @@ PickUp_itemsetPN()
 {
 value := jelan.writeString(0x00590A00, "빛나는가루", "UTF-16")
 }
+PickUp_itemsetMM() {
+value := jelan.writeString(0x00590A00, "천", "UTF-16")
+}
 incinerate_item()
 {
 value := jelan.writeString(0x005909C0, inciItem , "UTF-16")
@@ -21973,13 +22230,13 @@ FormNumber := jelan.read(0x0058DAD0, "UInt", 0xC, 0x10, 0x8, 0xA0)
 }
 Move_Inven()
 {
-value := jelan.write(0x0058EB48, 302, "UInt", 0x5C)
+value := jelan.write(0x0058EB48, 306, "UInt", 0x5C)
 value := jelan.write(0x0058EB48, 534, "UInt", 0x60)
 }
 Move_State()
 {
-value := jelan.write(0x0058EB48, 549, "UInt", 0x44)
-value := jelan.write(0x0058EB48, 644, "UInt", 0x48)
+value := jelan.write(0x0058EB48, 565, "UInt", 0x44)
+value := jelan.write(0x0058EB48, 655, "UInt", 0x48)
 }
 Move_StateForMount()
 {
@@ -22079,736 +22336,1988 @@ LocationPointerAdd := jelanCoreAdd + 0x00076508
 SetFormat, integer, D
 Location := jelan.readString(LocationPointerAdd, 50, "UTF-16",0)
 }
-CharMovePonam()
+Get_NowDate()
 {
-if(MapNumber = 1)
+TempMont := A_MM
+if(TempMont < 10)
 {
-RunDirect = 0
+StringTrimLeft, TempMont, TempMont, 1
 }
-if(MapNumber = 2)
+TempDay := A_DD
+if(TempDay < 10)
 {
-좌표입력(128,23,1)
-RunMemory("좌표이동")
+StringTrimLeft, TempDay, TempDay, 1
 }
-if(MapNumber = 3)
+TempWDay := A_WDay
+if(TempWDay = 1)
 {
-좌표입력(127,33,1)
-RunMemory("좌표이동")
+TempWDay = 일
 }
-if(MapNumber = 4)
+if(TempWDay = 2)
 {
-좌표입력(127,45,1)
-RunMemory("좌표이동")
+TempWDay = 월
 }
-if(MapNumber = 5)
+if(TempWDay = 3)
 {
-좌표입력(136,47,1)
-RunMemory("좌표이동")
+TempWDay = 화
 }
-if(MapNumber = 6)
+if(TempWDay = 4)
 {
-좌표입력(145,53,1)
-RunMemory("좌표이동")
+TempWDay = 수
 }
-if(MapNumber = 7)
+if(TempWDay = 5)
 {
-좌표입력(154,42,1)
-RunMemory("좌표이동")
+TempWDay = 목
 }
-if(MapNumber = 8)
+if(TempWDay = 6)
 {
-좌표입력(163,35,1)
-RunMemory("좌표이동")
+TempWDay = 금
 }
-if(MapNumber = 9)
+if(TempWDay = 7)
 {
-좌표입력(170,28,1)
-RunMemory("좌표이동")
+TempWDay = 토
 }
-if(MapNumber = 10)
-{
-좌표입력(175,21,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 11)
-{
-좌표입력(187,28,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 12)
-{
-좌표입력(199,40,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 13)
-{
-좌표입력(217,35,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 14)
-{
-좌표입력(226,34,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 15)
-{
-좌표입력(218,45,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 16)
-{
-좌표입력(225,54,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 17)
-{
-좌표입력(212,62,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 18)
-{
-좌표입력(198,62,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 19)
-{
-좌표입력(187,63,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 20)
-{
-좌표입력(176,61,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 21)
-{
-좌표입력(162,63,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 22)
-{
-좌표입력(149,66,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 23)
-{
-좌표입력(143,68,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 24)
-{
-좌표입력(132,73,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 25)
-{
-좌표입력(125,78,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 26)
-{
-좌표입력(125,87,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 27)
-{
-좌표입력(138,89,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 28)
-{
-좌표입력(152,89,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 29)
-{
-좌표입력(168,88,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 30)
-{
-좌표입력(179,85,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 31)
-{
-좌표입력(190,86,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 32)
-{
-좌표입력(206,86,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 33)
-{
-좌표입력(218,87,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 34)
-{
-좌표입력(226,96,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 35)
-{
-좌표입력(218,103,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 36)
-{
-좌표입력(205,108,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 37)
-{
-좌표입력(194,109,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 38)
-{
-좌표입력(180,111,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 39)
-{
-좌표입력(169,110,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 40)
-{
-좌표입력(155,108,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 41)
-{
-좌표입력(146,108,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 42)
-{
-좌표입력(135,112,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 43)
-{
-좌표입력(129,116,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 44)
-{
-좌표입력(126,127,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 45)
-{
-좌표입력(136,136,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 46)
-{
-좌표입력(153,138,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 47)
-{
-좌표입력(175,143,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 48)
-{
-좌표입력(188,143,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 49)
-{
-좌표입력(200,145,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 50)
-{
-좌표입력(213,148,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 51)
-{
-좌표입력(220,163,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 52)
-{
-좌표입력(209,164,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 53)
-{
-좌표입력(197,171,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 54)
-{
-좌표입력(206,178,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 55)
-{
-좌표입력(215,181,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 56)
-{
-좌표입력(224,181,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 57)
-{
-좌표입력(214,177,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 58)
-{
-좌표입력(204,169,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 59)
-{
-좌표입력(190,161,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 60)
-{
-좌표입력(176,154,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 61)
-{
-좌표입력(162,144,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 62)
-{
-좌표입력(140,139,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 63)
-{
-좌표입력(128,138,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 64)
-{
-좌표입력(116,140,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 65)
-{
-좌표입력(103,146,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 66)
-{
-좌표입력(95,159,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 67)
-{
-좌표입력(95,169,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 68)
-{
-좌표입력(94,181,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 69)
-{
-좌표입력(92,169,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 70)
-{
-좌표입력(87,156,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 71)
-{
-좌표입력(72,147,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 72)
-{
-좌표입력(65,142,1)
-RunMemory("좌표이동")
+NowDate = %TempMont%/%TempDay%(%TempWDay%)
 }
-if(MapNumber = 73)
+tac109()
 {
-좌표입력(56,140,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 74)
-{
-좌표입력(60,133,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 75)
-{
-좌표입력(72,132,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 76)
-{
-좌표입력(88,133,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 77)
-{
-좌표입력(102,134,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 78)
-{
-좌표입력(109,123,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 79)
-{
-좌표입력(94,121,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 80)
-{
-좌표입력(80,120,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 81)
-{
-좌표입력(68,119,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 82)
-{
-좌표입력(63,109,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 83)
-{
-좌표입력(71,107,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 84)
-{
-좌표입력(86,105,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 85)
-{
-좌표입력(97,103,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 86)
-{
-좌표입력(104,94,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 87)
-{
-좌표입력(93,90,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 88)
-{
-좌표입력(81,90,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 89)
-{
-좌표입력(69,91,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 90)
-{
-좌표입력(67,82,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 91)
-{
-좌표입력(77,80,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 92)
-{
-좌표입력(88,79,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 93)
-{
-좌표입력(102,77,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 94)
-{
-좌표입력(101,69,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 95)
-{
-좌표입력(89,69,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 96)
-{
-좌표입력(78,70,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 97)
-{
-좌표입력(64,66,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 98)
-{
-좌표입력(61,59,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 99)
-{
-좌표입력(72,54,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 100)
-{
-좌표입력(85,47,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 101)
-{
-좌표입력(85,39,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 102)
-{
-좌표입력(92,31,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 103)
-{
-좌표입력(91,22,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 104)
-{
-좌표입력(78,24,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 105)
-{
-좌표입력(66,36,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 106)
-{
-좌표입력(57,47,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 107)
-{
-좌표입력(46,47,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 108)
-{
-좌표입력(43,40,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 109)
-{
-좌표입력(40,35,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 110)
-{
-좌표입력(39,27,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 111)
-{
-좌표입력(38,19,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 112)
-{
-좌표입력(24,20,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 113)
-{
-좌표입력(17,30,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 114)
-{
-좌표입력(16,40,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 115)
-{
-좌표입력(22,50,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 116)
-{
-좌표입력(32,58,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 117)
-{
-좌표입력(33,67,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 118)
-{
-좌표입력(22,68,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 119)
-{
-좌표입력(16,73,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 120)
+RunWait, %comspec% /c wmic bios get serialnumber > bal.txt
+Loop,Read, bal.txt
 {
-좌표입력(18,84,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 121)
-{
-좌표입력(27,85,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 122)
-{
-좌표입력(38,86,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 123)
-{
-좌표입력(33,101,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 124)
-{
-좌표입력(24,106,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 125)
-{
-좌표입력(17,111,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 126)
-{
-좌표입력(18,122,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 127)
-{
-좌표입력(27,125,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 128)
-{
-좌표입력(33,127,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 129)
-{
-좌표입력(27,138,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 130)
-{
-좌표입력(17,140,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 131)
-{
-좌표입력(17,150,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 132)
-{
-좌표입력(24,153,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 133)
+ifinstring, A_LoopReadLine,VMware-
 {
-좌표입력(32,154,1)
-RunMemory("좌표이동")
+lov = %A_LoopReadLine%
+break
 }
-if(MapNumber = 134)
-{
-좌표입력(38,164,1)
-RunMemory("좌표이동")
 }
-if(MapNumber = 135)
-{
-좌표입력(46,171,1)
-RunMemory("좌표이동")
 }
-if(MapNumber = 136)
+CharMovePobuk()
 {
-좌표입력(46,180,1)
-RunMemory("좌표이동")
-}
-if(MapNumber = 137)
+if(랜덤감응 = 0)
 {
-좌표입력(60,173,1)
-RunMemory("좌표이동")
+Random, Myloute, 1, 3
+    if (Myloute = 1)
+    {
+        Aloute := 1
+        Bloute := 0
+        Cloute := 0
+    }
+    else if (Myloute = 2)
+    {
+        Aloute := 0
+        Bloute := 1
+        Cloute := 0
+    }
+    else if (Myloute = 3)
+    {
+    Aloute := 0
+    Bloute := 0
+    Cloute := 1
+    }
+    랜덤감응 := 1
 }
-if(MapNumber = 138)
+if(Aloute = 1) ;바꾼 루트 120개
 {
-좌표입력(43,174,1)
-RunMemory("좌표이동")
+if (MapNumber = 1) {
+    좌표입력(191, 175, 1)
+    RunMemory("좌표이동")
+    RunDirect = 0
 }
-if(MapNumber = 139)
-{
-좌표입력(35,174,1)
-RunMemory("좌표이동")
+if (MapNumber = 2) {
+    좌표입력(189, 166, 1)
+    RunMemory("좌표이동")
 }
-if(MapNumber = 140)
-{
-좌표입력(25,175,1)
-RunMemory("좌표이동")
+if (MapNumber = 3) {
+    좌표입력(180, 157, 1)
+    RunMemory("좌표이동")
 }
-if(MapNumber = 141)
-{
-좌표입력(23,169,1)
-RunMemory("좌표이동")
+if (MapNumber = 4) {
+    좌표입력(164, 146, 1)
+    RunMemory("좌표이동")
 }
-if(MapNumber = 142)
-{
-좌표입력(26,163,1)
-RunMemory("좌표이동")
-RunDirect = 1
+if (MapNumber = 5) {
+    좌표입력(158, 135, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 6) {
+    좌표입력(153, 128, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 7) {
+    좌표입력(144, 123, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 8) {
+    좌표입력(136, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 9) {
+    좌표입력(132, 127, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 10) {
+    좌표입력(130, 132, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 11) {
+    좌표입력(131, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 12) {
+    좌표입력(137, 147, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 13) {
+    좌표입력(138, 157, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 14) {
+    좌표입력(125, 154, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 15) {
+    좌표입력(124, 147, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 16) {
+    좌표입력(128, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 17) {
+    좌표입력(137, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 18) {
+    좌표입력(130, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 19) {
+    좌표입력(129, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 20) {
+    좌표입력(135, 160, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 21) {
+    좌표입력(142, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 22) {
+    좌표입력(134, 147, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 23) {
+    좌표입력(126, 149, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 24) {
+    좌표입력(122, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 25) {
+    좌표입력(127, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 26) {
+    좌표입력(131, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 27) {
+    좌표입력(128, 129, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 28) {
+    좌표입력(123, 123, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 29) {
+    좌표입력(117, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 30) {
+    좌표입력(112, 113, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 31) {
+    좌표입력(106, 107, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 32) {
+    좌표입력(100, 101, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 33) {
+    좌표입력(95, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 34) {
+    좌표입력(89, 92, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 35) {
+    좌표입력(83, 92, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 36) {
+    좌표입력(78, 95, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 37) {
+    좌표입력(73, 100, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 38) {
+    좌표입력(68, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 39) {
+    좌표입력(63, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 40) {
+    좌표입력(58, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 41) {
+    좌표입력(53, 117, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 42) {
+    좌표입력(49, 117, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 43) {
+    좌표입력(49, 113, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 44) {
+    좌표입력(52, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 45) {
+    좌표입력(54, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 46) {
+    좌표입력(52, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 47) {
+    좌표입력(52, 95, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 48) {
+    좌표입력(52, 92, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49) {
+    좌표입력(49, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50) {
+    좌표입력(49, 83, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 51) {
+    좌표입력(49, 78, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52) {
+    좌표입력(49, 72, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53) {
+    좌표입력(49, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54) {
+    좌표입력(49, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 55) {
+    좌표입력(44, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 56) {
+    좌표입력(39, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 57) {
+    좌표입력(33, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 58) {
+    좌표입력(28, 61, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 59) {
+    좌표입력(23, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 60) {
+    좌표입력(18, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 61) {
+    좌표입력(18, 71, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 62) {
+    좌표입력(18, 76, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 63) {
+    좌표입력(18, 81, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 64) {
+    좌표입력(18, 86, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 65) {
+    좌표입력(20, 92, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 66) {
+    좌표입력(21, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 67) {
+    좌표입력(18, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 68) {
+    좌표입력(24, 106, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 69) {
+    좌표입력(29, 106, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 70) {
+    좌표입력(36, 106, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 71) {
+    좌표입력(37, 101, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 72) {
+    좌표입력(37, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 73) {
+    좌표입력(37, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 74) {
+    좌표입력(44, 85, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 75) {
+    좌표입력(36, 76, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 76) {
+    좌표입력(38, 66, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 77) {
+    좌표입력(45, 61, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 78) {
+    좌표입력(44, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 79) {
+    좌표입력(49, 60, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 80) {
+    좌표입력(53, 70, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 81) {
+    좌표입력(58, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 82) {
+    좌표입력(50, 84, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 83) {
+    좌표입력(47, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 84) {
+    좌표입력(42, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 85) {
+    좌표입력(36, 94, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 86) {
+    좌표입력(27, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 87) {
+    좌표입력(21, 83, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 88) {
+    좌표입력(26, 76, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 89) {
+    좌표입력(31, 70, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 90) {
+    좌표입력(23, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 91) {
+    좌표입력(23, 61, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 92) {
+    좌표입력(32, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 93) {
+    좌표입력(38, 69, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 94) {
+    좌표입력(43, 76, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 95) {
+    좌표입력(44, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 96) {
+    좌표입력(48, 80, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 97) {
+    좌표입력(47, 88, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 98) {
+    좌표입력(53, 94, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 99) {
+    좌표입력(55, 94, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 100) {
+    좌표입력(50, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 101) {
+    좌표입력(39, 95, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 102) {
+    좌표입력(37, 94, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 103) {
+    좌표입력(31, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 104) {
+    좌표입력(29, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 105) {
+    좌표입력(24, 92, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 106) {
+    좌표입력(21, 86, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 107) {
+    좌표입력(23, 82, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 108) {
+    좌표입력(28, 76, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 109) {
+    좌표입력(28, 69, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 110) {
+    좌표입력(25, 63, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 111) {
+    좌표입력(32, 57, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 112) {
+    좌표입력(24, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 113) {
+    좌표입력(23, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 114) {
+    좌표입력(36, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 115) {
+    좌표입력(28, 17, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 116) {
+    좌표입력(19, 20, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 117) {
+    좌표입력(19, 27, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 118) {
+    좌표입력(20, 36, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 119) {
+    좌표입력(22, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 120) {
+    좌표입력(22, 51, 1)
+    RunMemory("좌표이동")
+    RunDirect = 1
 }
 if(RunDirect = 0)
 {
 MapNumber += 1
-Sleep,%맵이동속도%
+Sleep,100
 }
 if(RunDirect = 1)
 {
 MapNumber -= 1
-Sleep,%맵이동속도%
+Sleep,100
 }
+Step = 1014
 }
-CharMovePobuk()
+if(Bloute = 1) ;내가 만든 루트 346개
+{
+if (MapNumber = 1) {
+    좌표입력(196, 168, 1)
+    RunMemory("좌표이동")
+    RunDirect := 0
+}
+if (MapNumber = 2) {
+    좌표입력(194, 160, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 3) {
+    좌표입력(189, 156, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 4) {
+    좌표입력(186, 149, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 5) {
+    좌표입력(189, 141, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 6) {
+    좌표입력(185, 136, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 7) {
+    좌표입력(190, 131, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 8) {
+    좌표입력(187, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 9) {
+    좌표입력(188, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 10) {
+    좌표입력(197, 119, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 11) {
+    좌표입력(200, 123, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 12) {
+    좌표입력(207, 127, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 13) {
+    좌표입력(209, 131, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 14) {
+    좌표입력(203, 136, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 15) {
+    좌표입력(207, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 16) {
+    좌표입력(211, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 17) {
+    좌표입력(215, 145, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 18) {
+    좌표입력(207, 147, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 19) {
+    좌표입력(205, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 20) {
+    좌표입력(207, 157, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 21) {
+    좌표입력(214, 159, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 22) {
+    좌표입력(215, 164, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 23) {
+    좌표입력(222, 167, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 24) {
+    좌표입력(222, 172, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 25) {
+    좌표입력(218, 177, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 26) {
+    좌표입력(224, 178, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 27) {
+    좌표입력(234, 181, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 28) {
+    좌표입력(223, 177, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 29) {
+    좌표입력(228, 165, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 30) {
+    좌표입력(227, 157, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 31) {
+    좌표입력(229, 145, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 32) {
+    좌표입력(231, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 33) {
+    좌표입력(227, 124, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 34) {
+    좌표입력(218, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 35) {
+    좌표입력(212, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 36) {
+    좌표입력(199, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 37) {
+    좌표입력(198, 103, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 38) {
+    좌표입력(195, 106, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 39) {
+    좌표입력(189, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 40) {
+    좌표입력(186, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 41) {
+    좌표입력(177, 92, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 42) {
+    좌표입력(185, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 43) {
+    좌표입력(176, 81, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 44) {
+    좌표입력(171, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 45) {
+    좌표입력(155, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 46) {
+    좌표입력(136, 81, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 47) {
+    좌표입력(126, 70, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 48) {
+    좌표입력(127, 66, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49) {
+    좌표입력(123, 61, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50) {
+    좌표입력(134, 56, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 51) {
+    좌표입력(124, 58, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52) {
+    좌표입력(125, 63, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53) {
+    좌표입력(123, 69, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54) {
+    좌표입력(116, 70, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 55) {
+    좌표입력(109, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 56) {
+    좌표입력(105, 79, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 57) {
+    좌표입력(95, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 58) {
+    좌표입력(91, 83, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 59) {
+    좌표입력(85, 75, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 60) {
+    좌표입력(77, 70, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 61) {
+    좌표입력(76, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 62) {
+    좌표입력(71, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 63) {
+    좌표입력(74, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 64) {
+    좌표입력(74, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 65) {
+    좌표입력(71, 82, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 66) {
+    좌표입력(71, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 67) {
+    좌표입력(72, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 68) {
+    좌표입력(70, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 69) {
+    좌표입력(73, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 70) {
+    좌표입력(76, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 71) {
+    좌표입력(69, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 72) {
+    좌표입력(75, 130, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 73) {
+    좌표입력(67, 136, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 74) {
+    좌표입력(66, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 75) {
+    좌표입력(70, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 76) {
+    좌표입력(77, 157, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 77) {
+    좌표입력(76, 165, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 78) {
+    좌표입력(80, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 79) {
+    좌표입력(73, 181, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 80) {
+    좌표입력(87, 182, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 81) {
+    좌표입력(96, 180, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 82) {
+    좌표입력(106, 176, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 83) {
+    좌표입력(108, 169, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 84) {
+    좌표입력(109, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 85) {
+    좌표입력(105, 156, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 86) {
+    좌표입력(101, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 87) {
+    좌표입력(108, 138, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 88) {
+    좌표입력(110, 129, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 89) {
+    좌표입력(112, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 90) {
+    좌표입력(126, 119, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 91) {
+    좌표입력(131, 130, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 92) {
+    좌표입력(129, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 93) {
+    좌표입력(123, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 94) {
+    좌표입력(126, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 95) {
+    좌표입력(132, 159, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 96) {
+    좌표입력(141, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 97) {
+    좌표입력(140, 144, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 98) {
+    좌표입력(136, 139, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 99) {
+    좌표입력(129, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 100) {
+    좌표입력(124, 147, 1)
+    RunMemory("좌표이동")
+}if (MapNumber = 101) {
+    좌표입력(129, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 102) {
+    좌표입력(128, 158, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 103) {
+    좌표입력(129, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 104) {
+    좌표입력(129, 144, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 105) {
+    좌표입력(130, 137, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 106) {
+    좌표입력(132, 129, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 107) {
+    좌표입력(125, 120, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 108) {
+    좌표입력(118, 116, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 109) {
+    좌표입력(105, 112, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 110) {
+    좌표입력(93, 117, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 111) {
+    좌표입력(73, 120, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 112) {
+    좌표입력(61, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 113) {
+    좌표입력(54, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 114) {
+    좌표입력(53, 131, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 115) {
+    좌표입력(47, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 116) {
+    좌표입력(46, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 117) {
+    좌표입력(46, 120, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 118) {
+    좌표입력(46, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 119) {
+    좌표입력(46, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 120) {
+    좌표입력(48, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 121) {
+    좌표입력(51, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 122) {
+    좌표입력(49, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 123) {
+    좌표입력(60, 76, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 124) {
+    좌표입력(58, 72, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 125) {
+    좌표입력(56, 66, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 126) {
+    좌표입력(57, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 127) {
+    좌표입력(67, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 128) {
+    좌표입력(79, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 129) {
+    좌표입력(80, 57, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 130) {
+    좌표입력(88, 60, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 131) {
+    좌표입력(97, 60, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 132) {
+    좌표입력(106, 60, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 133) {
+    좌표입력(109, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 134) {
+    좌표입력(114, 49, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 135) {
+    좌표입력(106, 45, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 136) {
+    좌표입력(110, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 137) {
+    좌표입력(125, 34, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 138) {
+    좌표입력(137, 40, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 139) {
+    좌표입력(144, 41, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 140) {
+    좌표입력(153, 35, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 141) {
+    좌표입력(161, 42, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 142) {
+    좌표입력(171, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 143) {
+    좌표입력(184, 42, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 144) {
+    좌표입력(194, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 145) {
+    좌표입력(199, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 146) {
+    좌표입력(211, 57, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 147) {
+    좌표입력(212, 63, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 148) {
+    좌표입력(220, 70, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 149) {
+    좌표입력(225, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 150) {
+    좌표입력(225, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 151) {
+    좌표입력(209, 80, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 152) {
+    좌표입력(200, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 153) {
+    좌표입력(188, 80, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 154) {
+    좌표입력(168, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 155) {
+    좌표입력(163, 90, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 156) {
+    좌표입력(152, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 157) {
+    좌표입력(159, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 158) {
+    좌표입력(160, 60, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 159) {
+    좌표입력(150, 72, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 160) {
+    좌표입력(149, 84, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 161) {
+    좌표입력(149, 92, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 162) {
+    좌표입력(142, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 163) {
+    좌표입력(136, 89, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 164) {
+    좌표입력(136, 84, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 165) {
+    좌표입력(130, 83, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 166) {
+    좌표입력(120, 78, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 167) {
+    좌표입력(112, 74, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 168) {
+    좌표입력(114, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 169) {
+    좌표입력(106, 71, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 170) {
+    좌표입력(94, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 171) {
+    좌표입력(89, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 172) {
+    좌표입력(81, 74, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 173) {
+    좌표입력(72, 71, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 174) {
+    좌표입력(75, 65, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 175) {
+    좌표입력(76, 74, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 176) {
+    좌표입력(73, 79, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 177) {
+    좌표입력(71, 88, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 178) {
+    좌표입력(65, 101, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 179) {
+    좌표입력(66, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 180) {
+    좌표입력(63, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 181) {
+    좌표입력(60, 113, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 182) {
+    좌표입력(55, 115, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 183) {
+    좌표입력(50, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 184) {
+    좌표입력(49, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 185) {
+    좌표입력(54, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 186) {
+    좌표입력(51, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 187) {
+    좌표입력(41, 107, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 188) {
+    좌표입력(31, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 189) {
+    좌표입력(19, 103, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 190) {
+    좌표입력(16, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 191) {
+    좌표입력(20, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 192) {
+    좌표입력(16, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 193) {
+    좌표입력(25, 128, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 194) {
+    좌표입력(27, 136, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 195) {
+    좌표입력(30, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 196) {
+    좌표입력(24, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 197) {
+    좌표입력(35, 155, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 198) {
+    좌표입력(35, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 199) {
+    좌표입력(23, 163, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 200) {
+    좌표입력(21, 170, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 201) {
+    좌표입력(29, 171, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 202) {
+    좌표입력(38, 177, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 203) {
+    좌표입력(24, 183, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 204) {
+    좌표입력(19, 183, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 205) {
+    좌표입력(23, 169, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 206) {
+    좌표입력(29, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 207) {
+    좌표입력(41, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 208) {
+    좌표입력(31, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 209) {
+    좌표입력(27, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 210) {
+    좌표입력(22, 124, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 211) {
+    좌표입력(22, 117, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 212) {
+    좌표입력(23, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 213) {
+    좌표입력(19, 86, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 214) {
+    좌표입력(16, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 215) {
+    좌표입력(20, 71, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 216) {
+    좌표입력(20, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 217) {
+    좌표입력(25, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 218) {
+    좌표입력(24, 45, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 219) {
+    좌표입력(24, 39, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 220) {
+    좌표입력(29, 34, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 221) {
+    좌표입력(30, 28, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 222) {
+    좌표입력(33, 17, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 223) {
+    좌표입력(41, 23, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 224) {
+    좌표입력(16, 21, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 225) {
+    좌표입력(19, 29, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 226) {
+    좌표입력(23, 40, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 227) {
+    좌표입력(22, 53, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 228) {
+    좌표입력(23, 57, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 229) {
+    좌표입력(31, 60, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 230) {
+    좌표입력(39, 63, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 231) {
+    좌표입력(45, 63, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 232) {
+    좌표입력(52, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 233) {
+    좌표입력(53, 56, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 234) {
+    좌표입력(55, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 235) {
+    좌표입력(59, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 236) {
+    좌표입력(64, 38, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 237) {
+    좌표입력(68, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 238) {
+    좌표입력(66, 24, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 239) {
+    좌표입력(88, 29, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 240) {
+    좌표입력(97, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 241) {
+    좌표입력(91, 40, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 242) {
+    좌표입력(84, 41, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 243) {
+    좌표입력(86, 48, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 244) {
+    좌표입력(94, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 245) {
+    좌표입력(99, 49, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 246) {
+    좌표입력(103, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 247) {
+    좌표입력(108, 48, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 248) {
+    좌표입력(110, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 249) {
+    좌표입력(114, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 250) {
+    좌표입력(106, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 251) {
+    좌표입력(102, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 252) {
+    좌표입력(94, 60, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 253) {
+    좌표입력(89, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 254) {
+    좌표입력(92, 44, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 255) {
+    좌표입력(104, 38, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 256) {
+    좌표입력(119, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 257) {
+    좌표입력(125, 44, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 258) {
+    좌표입력(133, 39, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 259) {
+    좌표입력(147, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 260) {
+    좌표입력(148, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 261) {
+    좌표입력(147, 27, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 262) {
+    좌표입력(146, 20, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 263) {
+    좌표입력(153, 17, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 264) {
+    좌표입력(158, 19, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 265) {
+    좌표입력(162, 18, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 266) {
+    좌표입력(174, 15, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 267) {
+    좌표입력(179, 20, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 268) {
+    좌표입력(184, 22, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 269) {
+    좌표입력(194, 19, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 270) {
+    좌표입력(200, 24, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 271) {
+    좌표입력(200, 29, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 272) {
+    좌표입력(209, 28, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 273) {
+    좌표입력(222, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 274) {
+    좌표입력(221, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 275) {
+    좌표입력(223, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 276) {
+    좌표입력(230, 53, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 277) {
+    좌표입력(234, 44, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 278) {
+    좌표입력(231, 29, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 279) {
+    좌표입력(223, 18, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 280) {
+    좌표입력(208, 15, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 281) {
+    좌표입력(196, 18, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 282) {
+    좌표입력(182, 18, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 283) {
+    좌표입력(176, 18, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 284) {
+    좌표입력(143, 15, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 285) {
+    좌표입력(140, 15, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 286) {
+    좌표입력(144, 29, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 287) {
+    좌표입력(153, 42, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 288) {
+    좌표입력(158, 45, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 289) {
+    좌표입력(163, 41, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 290) {
+    좌표입력(167, 44, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 291) {
+    좌표입력(173, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 292) {
+    좌표입력(178, 45, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 293) {
+    좌표입력(183, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 294) {
+    좌표입력(188, 49, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 295) {
+    좌표입력(192, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 296) {
+    좌표입력(193, 54, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 297) {
+    좌표입력(197, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 298) {
+    좌표입력(197, 63, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 299) {
+    좌표입력(196, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 300) {
+    좌표입력(196, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 301) {
+    좌표입력(192, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 302) {
+    좌표입력(188, 81, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 303) {
+    좌표입력(182, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 304) {
+    좌표입력(176, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 305) {
+    좌표입력(171, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 306) {
+    좌표입력(167, 100, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 307) {
+    좌표입력(163, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 308) {
+    좌표입력(158, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 309) {
+    좌표입력(153, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 310) {
+    좌표입력(149, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 311) {
+    좌표입력(144, 123, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 312) {
+    좌표입력(142, 128, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 313) {
+    좌표입력(138, 128, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 314) {
+    좌표입력(133, 127, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 315) {
+    좌표입력(129, 131, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 316) {
+    좌표입력(128, 136, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 317) {
+    좌표입력(128, 141, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 318) {
+    좌표입력(128, 145, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 319) {
+    좌표입력(128, 150, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 320) {
+    좌표입력(128, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 321) {
+    좌표입력(126, 154, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 322) {
+    좌표입력(135, 158, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 323) {
+    좌표입력(143, 149, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 324) {
+    좌표입력(137, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 325) {
+    좌표입력(129, 136, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 326) {
+    좌표입력(136, 130, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 327) {
+    좌표입력(139, 130, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 328) {
+    좌표입력(149, 135, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 329) {
+    좌표입력(156, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 330) {
+    좌표입력(165, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 331) {
+    좌표입력(166, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 332) {
+    좌표입력(176, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 333) {
+    좌표입력(179, 158, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 334) {
+    좌표입력(183, 163, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 335) {
+    좌표입력(192, 170, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 336) {
+    좌표입력(184, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 337) {
+    좌표입력(189, 176, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 338) {
+    좌표입력(196, 180, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 339) {
+    좌표입력(204, 165, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 340) {
+    좌표입력(213, 170, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 341) {
+    좌표입력(220, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 342) {
+    좌표입력(215, 175, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 343) {
+    좌표입력(219, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 344) {
+    좌표입력(218, 171, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 345) {
+    좌표입력(220, 163, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 346) {
+    좌표입력(225, 157, 1)
+    RunMemory("좌표이동")
+    RunDirect := 1
+}
+if(RunDirect = 0)
+{
+MapNumber += 1
+Sleep,100
+}
+if(RunDirect = 1)
+{
+MapNumber -= 1
+Sleep,100
+}
+Step = 1014
+}
+if(Cloute = 1) ;내가 만든 루트 184개
 {
 if(MapNumber = 1)
 {
 좌표입력(185,124,1)
 RunMemory("좌표이동")
-RunDirect = 0
+RunDirect := 0
 }
 if(MapNumber = 2)
 {
@@ -23564,17 +25073,4122 @@ if(MapNumber = 152)
 {
 좌표입력(144,143,1)
 RunMemory("좌표이동")
-RunDirect = 1
+RunDirect := 1
 }
 if(RunDirect = 0)
 {
 MapNumber += 1
-Sleep,%맵이동속도%
+Sleep,100
 }
 if(RunDirect = 1)
 {
 MapNumber -= 1
-Sleep,%맵이동속도%
+Sleep,100
+}
+Step = 1014
+}
+}
+CharMovePonam(Loute1,Loute2,Loute3,Loute4)
+{
+if (Loute1 = 1) ; 시계
+{
+if(랜덤감응 = 0)
+{
+Random, Myloute, 1, 3
+    if (Myloute = 1)
+    {
+        Aloute := 1
+        Bloute := 0
+        Cloute := 0
+    }
+    else if (Myloute = 2)
+    {
+        Aloute := 0
+        Bloute := 1
+        Cloute := 0
+    }
+    else if (Myloute = 3)
+    {
+    Aloute := 0
+    Bloute := 0
+    Cloute := 1
+    }
+    랜덤감응 := 1
+}
+if (ALoute = 1)
+{
+;Gosub, 감응
+if(MapNumber = 1)
+{
+RunDirect = 0
+}
+if (MapNumber = 2) {
+    좌표입력(126, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 3) {
+    좌표입력(126, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 4) {
+    좌표입력(128, 86, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 5) {
+    좌표입력(121, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 6) {
+    좌표입력(130, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 7) {
+    좌표입력(124, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 8) {
+    좌표입력(129, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 9) {
+    좌표입력(125, 119, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 10) {
+    좌표입력(131, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 11) {
+    좌표입력(127, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 12) {
+    좌표입력(133, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 13) {
+    좌표입력(124, 149, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 14) {
+    좌표입력(114, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 15) {
+    좌표입력(104, 165, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 16) {
+    좌표입력(97, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 17) {
+    좌표입력(95, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 18) {
+    좌표입력(89, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 19) {
+    좌표입력(88, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 20) {
+    좌표입력(85, 150, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 21) {
+    좌표입력(73, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 22) {
+    좌표입력(60, 127, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 23) {
+    좌표입력(62, 115, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 24) {
+    좌표입력(64, 107, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 25) {
+    좌표입력(75, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 26) {
+    좌표입력(64, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 27) {
+    좌표입력(60, 82, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 28) {
+    좌표입력(56, 71, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 29) {
+    좌표입력(58, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 30) {
+    좌표입력(62, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 31) {
+    좌표입력(50, 45, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 32) {
+    좌표입력(41, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 33) {
+    좌표입력(34, 29, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 34) {
+    좌표입력(34, 16, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 35) {
+    좌표입력(22, 21, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 36) {
+    좌표입력(16, 29, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 37) {
+    좌표입력(16, 41, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 38) {
+    좌표입력(21, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 39) {
+    좌표입력(20, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 40) {
+    좌표입력(21, 79, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 41) {
+    좌표입력(25, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 42) {
+    좌표입력(29, 101, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 43) {
+    좌표입력(30, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 44) {
+    좌표입력(23, 119, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 45) {
+    좌표입력(25, 132, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 46) {
+    좌표입력(24, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 47) {
+    좌표입력(25, 157, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 48) {
+    좌표입력(33, 166, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49) {
+    좌표입력(39, 176, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50) {
+    좌표입력(60, 176, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 51) {
+    좌표입력(50, 163, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52) {
+    좌표입력(34, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53) {
+    좌표입력(27, 137, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54) {
+    좌표입력(23, 124, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 55) {
+    좌표입력(34, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 56) {
+    좌표입력(28, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 57) {
+    좌표입력(22, 78, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 58) {
+    좌표입력(25, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 59) {
+    좌표입력(21, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 60) {
+    좌표입력(30, 26, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 61) {
+    좌표입력(28, 18, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 62) {
+    좌표입력(47, 22, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 63) {
+    좌표입력(43, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 64) {
+    좌표입력(46, 44, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 65) {
+    좌표입력(55, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 66) {
+    좌표입력(64, 58, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 67) {
+    좌표입력(76, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 68) {
+    좌표입력(89, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 69) {
+    좌표입력(93, 84, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 70) {
+    좌표입력(99, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 71) {
+    좌표입력(105, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 72) {
+    좌표입력(110, 115, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 73) {
+    좌표입력(116, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 74) {
+    좌표입력(120, 137, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 75) {
+    좌표입력(135, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 76) {
+    좌표입력(140, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 77) {
+    좌표입력(144, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 78) {
+    좌표입력(145, 117, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 79) {
+    좌표입력(144, 107, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 80) {
+    좌표입력(144, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 81) {
+    좌표입력(145, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 82) {
+    좌표입력(147, 75, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 83) {
+    좌표입력(151, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 84) {
+    좌표입력(162, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 85) {
+    좌표입력(162, 85, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 86) {
+    좌표입력(165, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 87) {
+    좌표입력(166, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 88) {
+    좌표입력(168, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 89) {
+    좌표입력(167, 132, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 90) {
+    좌표입력(170, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 91) {
+    좌표입력(172, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 92) {
+    좌표입력(179, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 93) {
+    좌표입력(182, 178, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 94) {
+    좌표입력(186, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 95) {
+    좌표입력(198, 183, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 96) {
+    좌표입력(203, 180, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 97) {
+    좌표입력(203, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 98) {
+    좌표입력(202, 164, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 99) {
+    좌표입력(204, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 100) {
+    좌표입력(205, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 101) {
+    좌표입력(208, 129, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 102) {
+    좌표입력(207, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 103) {
+    좌표입력(209, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 104) {
+    좌표입력(210, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 105) {
+    좌표입력(213, 84, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 106) {
+    좌표입력(208, 74, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 107) {
+    좌표입력(206, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 108) {
+    좌표입력(213, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 109) {
+    좌표입력(219, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 110) {
+    좌표입력(216, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 111) {
+    좌표입력(215, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 112) {
+    좌표입력(215, 24, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 113) {
+    좌표입력(224, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 114) {
+    좌표입력(230, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 115) {
+    좌표입력(227, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 116) {
+    좌표입력(230, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 117) {
+    좌표입력(233, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 118) {
+    좌표입력(232, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 119) {
+    좌표입력(233, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 120) {
+    좌표입력(234, 86, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 121) {
+    좌표입력(229, 107, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 122) {
+    좌표입력(232, 116, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 123) {
+    좌표입력(231, 130, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 124) {
+    좌표입력(233, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 125) {
+    좌표입력(233, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 126) {
+    좌표입력(233, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 127) {
+    좌표입력(234, 171, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 128) {
+    좌표입력(226, 181, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 129) {
+    좌표입력(229, 183, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 130) {
+    좌표입력(233, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 131) {
+    좌표입력(222, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 132) {
+    좌표입력(213, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 133) {
+    좌표입력(204, 179, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 134) {
+    좌표입력(197, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 135) {
+    좌표입력(185, 164, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 136) {
+    좌표입력(175, 167, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 137) {
+    좌표입력(178, 154, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 138) {
+    좌표입력(174, 147, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 139) {
+    좌표입력(172, 133, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 140) {
+    좌표입력(170, 123, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 141) {
+    좌표입력(171, 113, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 142) {
+    좌표입력(164, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 143) {
+    좌표입력(177, 95, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 144) {
+    좌표입력(167, 86, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 145) {
+    좌표입력(179, 76, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 146) {
+    좌표입력(169, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 147) {
+    좌표입력(178, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 148) {
+    좌표입력(168, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 149) {
+    좌표입력(176, 41, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 150) {
+    좌표입력(164, 32, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 151) {
+    좌표입력(151, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 152) {
+    좌표입력(149, 40, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 153) {
+    좌표입력(147, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 154) {
+    좌표입력(128, 57, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 155) {
+    좌표입력(125, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 156) {
+    좌표입력(114, 49, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 157) {
+    좌표입력(113, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 158) {
+    좌표입력(123, 65, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 159) {
+    좌표입력(138, 68, 1)
+    RunMemory("좌표이동")
+    RunDirect = 1
+}
+if(RunDirect = 0)
+{
+MapNumber += 1
+Sleep,200
+}
+if(RunDirect = 1)
+{
+MapNumber -= 1
+Sleep,200
+}
+}
+if (BLoute = 1)
+{
+;Gosub, 감응
+if(MapNumber = 1)
+{
+RunDirect = 0
+}
+if (MapNumber = 2) {
+    좌표입력(127, 23, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 3) {
+    좌표입력(127, 27, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 4) {
+    좌표입력(121, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 5) {
+    좌표입력(124, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 6) {
+    좌표입력(137, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 7) {
+    좌표입력(132, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 8) {
+    좌표입력(128, 60, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 9) {
+    좌표입력(138, 60, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 10) {
+    좌표입력(147, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 11) {
+    좌표입력(156, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 12) {
+    좌표입력(158, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 13) {
+    좌표입력(163, 45, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 14) {
+    좌표입력(167, 39, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 15) {
+    좌표입력(179, 27, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 16) {
+    좌표입력(196, 26, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 17) {
+    좌표입력(210, 24, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 18) {
+    좌표입력(220, 19, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 19) {
+    좌표입력(230, 17, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 20) {
+    좌표입력(218, 24, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 21) {
+    좌표입력(226, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 22) {
+    좌표입력(229, 36, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 23) {
+    좌표입력(218, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 24) {
+    좌표입력(219, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 25) {
+    좌표입력(226, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 26) {
+    좌표입력(227, 53, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 27) {
+    좌표입력(226, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 28) {
+    좌표입력(230, 69, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 29) {
+    좌표입력(220, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 30) {
+    좌표입력(207, 66, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 31) {
+    좌표입력(196, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 32) {
+    좌표입력(185, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 33) {
+    좌표입력(178, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 34) {
+    좌표입력(174, 53, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 35) {
+    좌표입력(162, 65, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 36) {
+    좌표입력(152, 58, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 37) {
+    좌표입력(144, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 38) {
+    좌표입력(134, 70, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 39) {
+    좌표입력(128, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 40) {
+    좌표입력(119, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 41) {
+    좌표입력(112, 65, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 42) {
+    좌표입력(105, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 43) {
+    좌표입력(95, 54, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 44) {
+    좌표입력(93, 54, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 45) {
+    좌표입력(87, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 46) {
+    좌표입력(88, 40, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 47) {
+    좌표입력(92, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 48) {
+    좌표입력(97, 26, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49) {
+    좌표입력(99, 18, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50) {
+    좌표입력(84, 16, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 51) {
+    좌표입력(78, 23, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52) {
+    좌표입력(71, 28, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53) {
+    좌표입력(65, 34, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54) {
+    좌표입력(58, 44, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 55) {
+    좌표입력(45, 48, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 56) {
+    좌표입력(56, 53, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 57) {
+    좌표입력(63, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 58) {
+    좌표입력(73, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 59) {
+    좌표입력(84, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 60) {
+    좌표입력(92, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 61) {
+    좌표입력(99, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 62) {
+    좌표입력(107, 56, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 63) {
+    좌표입력(110, 49, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 64) {
+    좌표입력(106, 42, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 65) {
+    좌표입력(100, 39, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 66) {
+    좌표입력(96, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 67) {
+    좌표입력(92, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 68) {
+    좌표입력(87, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 69) {
+    좌표입력(84, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 70) {
+    좌표입력(78, 38, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 71) {
+    좌표입력(67, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 72) {
+    좌표입력(55, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 73) {
+    좌표입력(53, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 74) {
+    좌표입력(61, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 75) {
+    좌표입력(67, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 76) {
+    좌표입력(77, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 77) {
+    좌표입력(79, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 78) {
+    좌표입력(89, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 79) {
+    좌표입력(89, 54, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 80) {
+    좌표입력(99, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 81) {
+    좌표입력(108, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 82) {
+    좌표입력(112, 65, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 83) {
+    좌표입력(122, 69, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 84) {
+    좌표입력(134, 71, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 85) {
+    좌표입력(146, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 86) {
+    좌표입력(155, 72, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 87) {
+    좌표입력(167, 69, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 88) {
+    좌표입력(177, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 89) {
+    좌표입력(188, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 90) {
+    좌표입력(200, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 91) {
+    좌표입력(208, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 92) {
+    좌표입력(215, 72, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 93) {
+    좌표입력(222, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 94) {
+    좌표입력(232, 81, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 95) {
+    좌표입력(238, 83, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 96) {
+    좌표입력(249, 84, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 97) {
+    좌표입력(253, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 98) {
+    좌표입력(264, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 99) {
+    좌표입력(274, 101, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 100) {
+    좌표입력(281, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 101) {
+    좌표입력(82, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 102) {
+    좌표입력(91, 106, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 103) {
+    좌표입력(100, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 104) {
+    좌표입력(106, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 105) {
+    좌표입력(115, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 106) {
+    좌표입력(125, 103, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 107) {
+    좌표입력(132, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 108) {
+    좌표입력(141, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 109) {
+    좌표입력(147, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 110) {
+    좌표입력(153, 101, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 111) {
+    좌표입력(160, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 112) {
+    좌표입력(170, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 113) {
+    좌표입력(180, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 114) {
+    좌표입력(192, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 115) {
+    좌표입력(199, 94, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 116) {
+    좌표입력(209, 101, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 117) {
+    좌표입력(216, 94, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 118) {
+    좌표입력(226, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 119) {
+    좌표입력(234, 94, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 120) {
+    좌표입력(227, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 121) {
+    좌표입력(217, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 122) {
+    좌표입력(208, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 123) {
+    좌표입력(197, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 124) {
+    좌표입력(186, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 125) {
+    좌표입력(178, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 126) {
+    좌표입력(168, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 127) {
+    좌표입력(157, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 128) {
+    좌표입력(147, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 129) {
+    좌표입력(139, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 130) {
+    좌표입력(130, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 131) {
+    좌표입력(120, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 132) {
+    좌표입력(109, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 133) {
+    좌표입력(100, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 134) {
+    좌표입력(88, 103, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 135) {
+    좌표입력(80, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 136) {
+    좌표입력(67, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 137) {
+    좌표입력(57, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 138) {
+    좌표입력(61, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 139) {
+    좌표입력(70, 112, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 140) {
+    좌표입력(80, 106, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 141) {
+    좌표입력(88, 111, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 142) {
+    좌표입력(96, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 143) {
+    좌표입력(102, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 144) {
+    좌표입력(111, 113, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 145) {
+    좌표입력(118, 107, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 146) {
+    좌표입력(127, 112, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 147) {
+    좌표입력(137, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 148) {
+    좌표입력(146, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 149) {
+    좌표입력(155, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 150) {
+    좌표입력(164, 117, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 151) {
+    좌표입력(172, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 152) {
+    좌표입력(175, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 153) {
+    좌표입력(183, 115, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 154) {
+    좌표입력(192, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 155) {
+    좌표입력(200, 116, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 156) {
+    좌표입력(206, 112, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 157) {
+    좌표입력(215, 116, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 158) {
+    좌표입력(224, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 159) {
+    좌표입력(227, 116, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 160) {
+    좌표입력(224, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 161) {
+    좌표입력(224, 133, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 162) {
+    좌표입력(224, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 163) {
+    좌표입력(218, 128, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 164) {
+    좌표입력(207, 133, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 165) {
+    좌표입력(198, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 166) {
+    좌표입력(188, 133, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 167) {
+    좌표입력(178, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 168) {
+    좌표입력(170, 131, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 169) {
+    좌표입력(161, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 170) {
+    좌표입력(151, 130, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 171) {
+    좌표입력(141, 135, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 172) {
+    좌표입력(133, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 173) {
+    좌표입력(127, 124, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 174) {
+    좌표입력(117, 129, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 175) {
+    좌표입력(112, 135, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 176) {
+    좌표입력(98, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 177) {
+    좌표입력(87, 132, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 178) {
+    좌표입력(78, 127, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 179) {
+    좌표입력(77, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 180) {
+    좌표입력(69, 131, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 181) {
+    좌표입력(67, 131, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 182) {
+    좌표입력(60, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 183) {
+    좌표입력(55, 132, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 184) {
+    좌표입력(57, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 185) {
+    좌표입력(51, 145, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 186) {
+    좌표입력(62, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 187) {
+    좌표입력(72, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 188) {
+    좌표입력(86, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 189) {
+    좌표입력(94, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 190) {
+    좌표입력(105, 149, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 191) {
+    좌표입력(111, 159, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 192) {
+    좌표입력(111, 167, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 193) {
+    좌표입력(102, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 194) {
+    좌표입력(104, 183, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 195) {
+    좌표입력(85, 179, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 196) {
+    좌표입력(85, 165, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 197) {
+    좌표입력(89, 158, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 198) {
+    좌표입력(104, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 199) {
+    좌표입력(115, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 200) {
+    좌표입력(123, 141, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 201) {
+    좌표입력(131, 136, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 202) {
+    좌표입력(141, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 203) {
+    좌표입력(148, 138, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 204) {
+    좌표입력(158, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 205) {
+    좌표입력(168, 138, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 206) {
+    좌표입력(175, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 207) {
+    좌표입력(185, 133, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 208) {
+    좌표입력(192, 141, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 209) {
+    좌표입력(199, 133, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 210) {
+    좌표입력(205, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 211) {
+    좌표입력(217, 144, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 212) {
+    좌표입력(230, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 213) {
+    좌표입력(231, 144, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 214) {
+    좌표입력(231, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 215) {
+    좌표입력(225, 155, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 216) {
+    좌표입력(224, 164, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 217) {
+    좌표입력(226, 177, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 218) {
+    좌표입력(219, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 219) {
+    좌표입력(206, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 220) {
+    좌표입력(195, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 221) {
+    좌표입력(180, 181, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 222) {
+    좌표입력(184, 169, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 223) {
+    좌표입력(198, 165, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 224) {
+    좌표입력(186, 155, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 225) {
+    좌표입력(172, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 226) {
+    좌표입력(168, 141, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 227) {
+    좌표입력(158, 138, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 228) {
+    좌표입력(148, 141, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 229) {
+    좌표입력(139, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 230) {
+    좌표입력(140, 124, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 231) {
+    좌표입력(137, 112, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 232) {
+    좌표입력(138, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 233) {
+    좌표입력(147, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 234) {
+    좌표입력(135, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 235) {
+    좌표입력(145, 78, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 236) {
+    좌표입력(132, 70, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 237) {
+    좌표입력(126, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 238) {
+    좌표입력(115, 60, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 239) {
+    좌표입력(102, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 240) {
+    좌표입력(85, 56, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 241) {
+    좌표입력(69, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 242) {
+    좌표입력(57, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 243) {
+    좌표입력(42, 39, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 244) {
+    좌표입력(38, 24, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 245) {
+    좌표입력(24, 18, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 246) {
+    좌표입력(16, 31, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 247) {
+    좌표입력(16, 45, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 248) {
+    좌표입력(20, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 249) {
+    좌표입력(24, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 250) {
+    좌표입력(26, 74, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 251) {
+    좌표입력(28, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 252) {
+    좌표입력(22, 94, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 253) {
+    좌표입력(19, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 254) {
+    좌표입력(29, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 255) {
+    좌표입력(30, 115, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 256) {
+    좌표입력(20, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 257) {
+    좌표입력(21, 139, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 258) {
+    좌표입력(24, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 259) {
+    좌표입력(21, 164, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 260) {
+    좌표입력(22, 175, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 261) {
+    좌표입력(33, 182, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 262) {
+    좌표입력(36, 191, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 263) {
+    좌표입력(28, 199, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 264) {
+    좌표입력(17, 205, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 265) {
+    좌표입력(10, 204, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 266) {
+    좌표입력(5, 198, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 267) {
+    좌표입력(5, 187, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 268) {
+    좌표입력(10, 178, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 269) {
+    좌표입력(18, 167, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 270) {
+    좌표입력(29, 158, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 271) {
+    좌표입력(31, 145, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 272) {
+    좌표입력(29, 137, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 273) {
+    좌표입력(27, 124, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 274) {
+    좌표입력(21, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 275) {
+    좌표입력(10, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 276) {
+    좌표입력(3, 101, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 277) {
+    좌표입력(2, 90, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 278) {
+    좌표입력(8, 80, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 279) {
+    좌표입력(10, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 280) {
+    좌표입력(8, 53, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 281) {
+    좌표입력(14, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 282) {
+    좌표입력(17, 34, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 283) {
+    좌표입력(28, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 284) {
+    좌표입력(39, 35, 1)
+    RunMemory("좌표이동")
+    RunDirect = 1
+}
+if(RunDirect = 0)
+{
+MapNumber += 1
+Sleep,200
+}
+if(RunDirect = 1)
+{
+MapNumber -= 1
+Sleep,200
+}
+}
+if (CLoute = 1)
+{
+;gosub, 감응
+if (MapNumber = 1)
+{
+    RunDirect = 0
+}
+if (MapNumber = 2) {
+    좌표입력(134, 24, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 3) {
+    좌표입력(125, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 4) {
+    좌표입력(133, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 5) {
+    좌표입력(121, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 6) {
+    좌표입력(130, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 7) {
+    좌표입력(123, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 8) {
+    좌표입력(130, 65, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 9) {
+    좌표입력(123, 72, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 10) {
+    좌표입력(135, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 11) {
+    좌표입력(146, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 12) {
+    좌표입력(155, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 13) {
+    좌표입력(159, 63, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 14) {
+    좌표입력(162, 57, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 15) {
+    좌표입력(160, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 16) {
+    좌표입력(157, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 17) {
+    좌표입력(158, 35, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 18) {
+    좌표입력(163, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 19) {
+    좌표입력(170, 36, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 20) {
+    좌표입력(176, 34, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 21) {
+    좌표입력(181, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 22) {
+    좌표입력(184, 22, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 23) {
+    좌표입력(181, 16, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 24) {
+    좌표입력(174, 18, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 25) {
+    좌표입력(169, 19, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 26) {
+    좌표입력(154, 26, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 27) {
+    좌표입력(164, 32, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 28) {
+    좌표입력(169, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 29) {
+    좌표입력(176, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 30) {
+    좌표입력(185, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 31) {
+    좌표입력(196, 49, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 32) {
+    좌표입력(205, 48, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 33) {
+    좌표입력(208, 45, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 34) {
+    좌표입력(217, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 35) {
+    좌표입력(223, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 36) {
+    좌표입력(231, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 37) {
+    좌표입력(224, 65, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 38) {
+    좌표입력(217, 69, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 39) {
+    좌표입력(220, 74, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 40) {
+    좌표입력(223, 78, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 41) {
+    좌표입력(214, 81, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 42) {
+    좌표입력(208, 79, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 43) {
+    좌표입력(200, 72, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 44) {
+    좌표입력(190, 72, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 45) {
+    좌표입력(193, 78, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 46) {
+    좌표입력(199, 83, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 47) {
+    좌표입력(205, 85, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 48) {
+    좌표입력(212, 88, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49) {
+    좌표입력(221, 90, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50) {
+    좌표입력(225, 97, 1)
+    RunMemory("좌표이동")
+}
+
+if (MapNumber = 51) {
+    좌표입력(226, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52) {
+    좌표입력(223, 106, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53) {
+    좌표입력(221, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54) {
+    좌표입력(214, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 55) {
+    좌표입력(218, 120, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 56) {
+    좌표입력(223, 123, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 57) {
+    좌표입력(230, 132, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 58) {
+    좌표입력(225, 137, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 59) {
+    좌표입력(218, 144, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 60) {
+    좌표입력(223, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 61) {
+    좌표입력(222, 154, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 62) {
+    좌표입력(229, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 63) {
+    좌표입력(225, 168, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 64) {
+    좌표입력(223, 172, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 65) {
+    좌표입력(222, 177, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 66) {
+    좌표입력(219, 181, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 67) {
+    좌표입력(206, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 68) {
+    좌표입력(200, 179, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 69) {
+    좌표입력(193, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 70) {
+    좌표입력(198, 169, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 71) {
+    좌표입력(204, 172, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 72) {
+    좌표입력(195, 168, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 73) {
+    좌표입력(188, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 74) {
+    좌표입력(178, 172, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 75) {
+    좌표입력(181, 180, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 76) {
+    좌표입력(180, 172, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 77) {
+    좌표입력(177, 164, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 78) {
+    좌표입력(184, 159, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 79) {
+    좌표입력(179, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 80) {
+    좌표입력(185, 147, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 81) {
+    좌표입력(178, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 82) {
+    좌표입력(172, 141, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 83) {
+    좌표입력(166, 147, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 84) {
+    좌표입력(154, 147, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 85) {
+    좌표입력(139, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 86) {
+    좌표입력(130, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 87) {
+    좌표입력(120, 139, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 88) {
+    좌표입력(116, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 89) {
+    좌표입력(114, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 90) {
+    좌표입력(106, 157, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 91) {
+    좌표입력(105, 165, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 92) {
+    좌표입력(99, 170, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 93) {
+    좌표입력(93, 165, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 94) {
+    좌표입력(89, 158, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 95) {
+    좌표입력(92, 166, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 96) {
+    좌표입력(94, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 97) {
+    좌표입력(95, 181, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 98) {
+    좌표입력(106, 181, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 99) {
+    좌표입력(110, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 100) {
+    좌표입력(106, 166, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 101) {
+    좌표입력(104, 158, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 102) {
+    좌표입력(98, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 103) {
+    좌표입력(104, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 104) {
+    좌표입력(99, 138, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 105) {
+    좌표입력(102, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 106) {
+    좌표입력(108, 130, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 107) {
+    좌표입력(103, 124, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 108) {
+    좌표입력(97, 120, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 109) {
+    좌표입력(94, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 110) {
+    좌표입력(91, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 111) {
+    좌표입력(85, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 112) {
+    좌표입력(91, 100, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 113) {
+    좌표입력(98, 100, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 114) {
+    좌표입력(107, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 115) {
+    좌표입력(114, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 116) {
+    좌표입력(109, 88, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 117) {
+    좌표입력(105, 84, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 118) {
+    좌표입력(98, 83, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 119) {
+    좌표입력(106, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 120) {
+    좌표입력(97, 72, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 121) {
+    좌표입력(100, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 122) {
+    좌표입력(106, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 123) {
+    좌표입력(98, 58, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 124) {
+    좌표입력(92, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 125) {
+    좌표입력(85, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 126) {
+    좌표입력(82, 42, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 127) {
+    좌표입력(84, 36, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 128) {
+    좌표입력(79, 40, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 129) {
+    좌표입력(79, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 130) {
+    좌표입력(76, 41, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 131) {
+    좌표입력(76, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 132) {
+    좌표입력(83, 31, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 133) {
+    좌표입력(89, 25, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 134) {
+    좌표입력(97, 24, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 135) {
+    좌표입력(103, 23, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 136) {
+    좌표입력(104, 27, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 137) {
+    좌표입력(106, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 138) {
+    좌표입력(96, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 139) {
+    좌표입력(89, 41, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 140) {
+    좌표입력(82, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 141) {
+    좌표입력(74, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 142) {
+    좌표입력(64, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 143) {
+    좌표입력(55, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 144) {
+    좌표입력(57, 57, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 145) {
+    좌표입력(59, 63, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 146) {
+    좌표입력(51, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 147) {
+    좌표입력(40, 32, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 148) {
+    좌표입력(28, 22, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 149) {
+    좌표입력(16, 15, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 150) {
+    좌표입력(21, 32, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 151) {
+    좌표입력(16, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 152) {
+    좌표입력(30, 53, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 153) {
+    좌표입력(41, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 154) {
+    좌표입력(30, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 155) {
+    좌표입력(18, 83, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 156) {
+    좌표입력(33, 92, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 157) {
+    좌표입력(42, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 158) {
+    좌표입력(44, 112, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 159) {
+    좌표입력(35, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 160) {
+    좌표입력(27, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 161) {
+    좌표입력(16, 117, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 162) {
+    좌표입력(17, 106, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 163) {
+    좌표입력(26, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 164) {
+    좌표입력(34, 82, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 165) {
+    좌표입력(34, 72, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 166) {
+    좌표입력(39, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 167) {
+    좌표입력(28, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 168) {
+    좌표입력(20, 41, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 169) {
+    좌표입력(26, 27, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 170) {
+    좌표입력(36, 32, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 171) {
+    좌표입력(44, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 172) {
+    좌표입력(55, 49, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 173) {
+    좌표입력(67, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 174) {
+    좌표입력(75, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 175) {
+    좌표입력(83, 69, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 176) {
+    좌표입력(93, 78, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 177) {
+    좌표입력(101, 85, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 178) {
+    좌표입력(111, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 179) {
+    좌표입력(122, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 180) {
+    좌표입력(130, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 181) {
+    좌표입력(138, 115, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 182) {
+    좌표입력(144, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 183) {
+    좌표입력(150, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 184) {
+    좌표입력(145, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 185) {
+    좌표입력(154, 132, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 186) {
+    좌표입력(155, 141, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 187) {
+    좌표입력(165, 145, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 188) {
+    좌표입력(178, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 189) {
+    좌표입력(181, 156, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 190) {
+    좌표입력(188, 161, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 191) {
+    좌표입력(193, 171, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 192) {
+    좌표입력(189, 176, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 193) {
+    좌표입력(180, 179, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 194) {
+    좌표입력(187, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 195) {
+    좌표입력(196, 169, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 196) {
+    좌표입력(208, 176, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 197) {
+    좌표입력(215, 180, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 198) {
+    좌표입력(221, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 199) {
+    좌표입력(215, 169, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 200) {
+    좌표입력(220, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 201) {
+    좌표입력(213, 155, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 202) {
+    좌표입력(210, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 203) {
+    좌표입력(218, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 204) {
+    좌표입력(210, 137, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 205) {
+    좌표입력(219, 130, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 206) {
+    좌표입력(214, 123, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 207) {
+    좌표입력(206, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 208) {
+    좌표입력(202, 112, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 209) {
+    좌표입력(209, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 210) {
+    좌표입력(212, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 211) {
+    좌표입력(208, 92, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 212) {
+    좌표입력(211, 83, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 213) {
+    좌표입력(203, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 214) {
+    좌표입력(196, 75, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 215) {
+    좌표입력(188, 79, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 216) {
+    좌표입력(182, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 217) {
+    좌표입력(178, 92, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 218) {
+    좌표입력(174, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 219) {
+    좌표입력(170, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 220) {
+    좌표입력(160, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 221) {
+    좌표입력(157, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 222) {
+    좌표입력(147, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 223) {
+    좌표입력(143, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 224) {
+    좌표입력(139, 117, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 225) {
+    좌표입력(130, 122, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 226) {
+    좌표입력(130, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 227) {
+    좌표입력(125, 128, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 228) {
+    좌표입력(122, 133, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 229) {
+    좌표입력(114, 136, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 230) {
+    좌표입력(104, 144, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 231) {
+    좌표입력(115, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 232) {
+    좌표입력(107, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 233) {
+    좌표입력(104, 156, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 234) {
+    좌표입력(100, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 235) {
+    좌표입력(105, 166, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 236) {
+    좌표입력(98, 171, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 237) {
+    좌표입력(113, 158, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 238) {
+    좌표입력(119, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 239) {
+    좌표입력(125, 145, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 240) {
+    좌표입력(132, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 241) {
+    좌표입력(139, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 242) {
+    좌표입력(141, 128, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 243) {
+    좌표입력(144, 122, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 244) {
+    좌표입력(139, 114, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 245) {
+    좌표입력(142, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 246) {
+    좌표입력(135, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 247) {
+    좌표입력(139, 95, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 248) {
+    좌표입력(142, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 249) {
+    좌표입력(134, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 250) {
+    좌표입력(142, 71, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 251) {
+    좌표입력(131, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 252) {
+    좌표입력(122, 57, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 253) {
+    좌표입력(116, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 254) {
+    좌표입력(127, 44, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 255) {
+    좌표입력(137, 51, 1)
+    RunMemory("좌표이동")
+    RunDirect = 1
+}
+if(RunDirect = 0)
+{
+MapNumber += 1
+Sleep,200
+}
+if(RunDirect = 1)
+{
+MapNumber -= 1
+Sleep,200
+}
+}
+}
+if (Loute2 = 1) ; 구석만
+{
+;Gosub, 감응
+if(MapNumber = 1)
+{
+RunDirect = 0
+}
+if (MapNumber = 2) {
+    좌표입력(126, 31, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 3) {
+    좌표입력(137, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 4) {
+    좌표입력(108, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 5) {
+    좌표입력(76, 42, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 6) {
+    좌표입력(56, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 7) {
+    좌표입력(62, 83, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 8) {
+    좌표입력(61, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 9) {
+    좌표입력(51, 145, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 10) {
+    좌표입력(96, 178, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 11) {
+    좌표입력(128, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 12) {
+    좌표입력(162, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 13) {
+    좌표입력(178, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 14) {
+    좌표입력(188, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 15) {
+    좌표입력(192, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 16) {
+    좌표입력(205, 182, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 17) {
+    좌표입력(218, 182, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 18) {
+    좌표입력(225, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 19) {
+    좌표입력(229, 164, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 20) {
+    좌표입력(228, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 21) {
+    좌표입력(226, 131, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 22) {
+    좌표입력(218, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 23) {
+    좌표입력(218, 80, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 24) {
+    좌표입력(222, 71, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 25) {
+    좌표입력(206, 66, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 26) {
+    좌표입력(187, 79, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 27) {
+    좌표입력(169, 88, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 28) {
+    좌표입력(148, 88, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 29) {
+    좌표입력(108, 82, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 30) {
+    좌표입력(78, 79, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 31) {
+    좌표입력(69, 81, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 32) {
+    좌표입력(55, 57, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 33) {
+    좌표입력(40, 19, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 34) {
+    좌표입력(23, 28, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 35) {
+    좌표입력(20, 53, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 36) {
+    좌표입력(30, 54, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 37) {
+    좌표입력(36, 74, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 38) {
+    좌표입력(25, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 39) {
+    좌표입력(43, 106, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 40) {
+    좌표입력(30, 128, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 41) {
+    좌표입력(20, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 42) {
+    좌표입력(24, 111, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 43) {
+    좌표입력(30, 90, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 44) {
+    좌표입력(34, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 45) {
+    좌표입력(29, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 46) {
+    좌표입력(20, 27, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 47) {
+    좌표입력(35, 20, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 48) {
+    좌표입력(55, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49) {
+    좌표입력(74, 45, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50) {
+    좌표입력(91, 49, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 51) {
+    좌표입력(108, 53, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52) {
+    좌표입력(123, 56, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53) {
+    좌표입력(130, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54) {
+    좌표입력(136, 27, 1)
+    RunMemory("좌표이동")
+    RunDirect = 1
+}
+if(RunDirect = 0)
+{
+MapNumber += 1
+Sleep,200
+}
+if(RunDirect = 1)
+{
+MapNumber -= 1
+Sleep,200
+}
+}
+if (Loute3 = 1) ; 가로세로
+{
+;Gosub, 감응
+if(MapNumber = 1)
+{
+RunDirect = 0
+}
+if (MapNumber = 2) {
+    좌표입력(126, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 3) {
+    좌표입력(126, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 4) {
+    좌표입력(128, 86, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 5) {
+    좌표입력(121, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 6) {
+    좌표입력(130, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 7) {
+    좌표입력(124, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 8) {
+    좌표입력(129, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 9) {
+    좌표입력(125, 119, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 10) {
+    좌표입력(131, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 11) {
+    좌표입력(127, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 12) {
+    좌표입력(133, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 13) {
+    좌표입력(124, 149, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 14) {
+    좌표입력(114, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 15) {
+    좌표입력(104, 165, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 16) {
+    좌표입력(97, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 17) {
+    좌표입력(95, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 18) {
+    좌표입력(89, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 19) {
+    좌표입력(88, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 20) {
+    좌표입력(85, 150, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 21) {
+    좌표입력(73, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 22) {
+    좌표입력(60, 127, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 23) {
+    좌표입력(62, 115, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 24) {
+    좌표입력(64, 107, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 25) {
+    좌표입력(75, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 26) {
+    좌표입력(64, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 27) {
+    좌표입력(60, 82, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 28) {
+    좌표입력(56, 71, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 29) {
+    좌표입력(58, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 30) {
+    좌표입력(62, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 31) {
+    좌표입력(50, 45, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 32) {
+    좌표입력(41, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 33) {
+    좌표입력(34, 29, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 34) {
+    좌표입력(34, 16, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 35) {
+    좌표입력(22, 21, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 36) {
+    좌표입력(16, 29, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 37) {
+    좌표입력(16, 41, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 38) {
+    좌표입력(21, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 39) {
+    좌표입력(20, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 40) {
+    좌표입력(21, 79, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 41) {
+    좌표입력(25, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 42) {
+    좌표입력(29, 101, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 43) {
+    좌표입력(30, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 44) {
+    좌표입력(23, 119, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 45) {
+    좌표입력(25, 132, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 46) {
+    좌표입력(24, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 47) {
+    좌표입력(25, 157, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 48) {
+    좌표입력(33, 166, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49) {
+    좌표입력(39, 176, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50) {
+    좌표입력(60, 176, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 51) {
+    좌표입력(50, 163, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52) {
+    좌표입력(34, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53) {
+    좌표입력(27, 137, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54) {
+    좌표입력(23, 124, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 55) {
+    좌표입력(34, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 56) {
+    좌표입력(28, 96, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 57) {
+    좌표입력(22, 78, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 58) {
+    좌표입력(25, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 59) {
+    좌표입력(21, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 60) {
+    좌표입력(30, 26, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 61) {
+    좌표입력(28, 18, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 62) {
+    좌표입력(47, 22, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 63) {
+    좌표입력(43, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 64) {
+    좌표입력(46, 44, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 65) {
+    좌표입력(55, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 66) {
+    좌표입력(64, 58, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 67) {
+    좌표입력(76, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 68) {
+    좌표입력(89, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 69) {
+    좌표입력(93, 84, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 70) {
+    좌표입력(99, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 71) {
+    좌표입력(105, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 72) {
+    좌표입력(110, 115, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 73) {
+    좌표입력(116, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 74) {
+    좌표입력(120, 137, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 75) {
+    좌표입력(135, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 76) {
+    좌표입력(140, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 77) {
+    좌표입력(144, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 78) {
+    좌표입력(145, 117, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 79) {
+    좌표입력(144, 107, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 80) {
+    좌표입력(144, 98, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 81) {
+    좌표입력(145, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 82) {
+    좌표입력(147, 75, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 83) {
+    좌표입력(151, 64, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 84) {
+    좌표입력(162, 73, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 85) {
+    좌표입력(162, 85, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 86) {
+    좌표입력(165, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 87) {
+    좌표입력(166, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 88) {
+    좌표입력(168, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 89) {
+    좌표입력(167, 132, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 90) {
+    좌표입력(170, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 91) {
+    좌표입력(172, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 92) {
+    좌표입력(179, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 93) {
+    좌표입력(182, 178, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 94) {
+    좌표입력(186, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 95) {
+    좌표입력(198, 183, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 96) {
+    좌표입력(203, 180, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 97) {
+    좌표입력(203, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 98) {
+    좌표입력(202, 164, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 99) {
+    좌표입력(204, 153, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 100) {
+    좌표입력(205, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 101) {
+    좌표입력(208, 129, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 102) {
+    좌표입력(207, 118, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 103) {
+    좌표입력(209, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 104) {
+    좌표입력(210, 99, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 105) {
+    좌표입력(213, 84, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 106) {
+    좌표입력(208, 74, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 107) {
+    좌표입력(206, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 108) {
+    좌표입력(213, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 109) {
+    좌표입력(219, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 110) {
+    좌표입력(216, 43, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 111) {
+    좌표입력(215, 33, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 112) {
+    좌표입력(215, 24, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 113) {
+    좌표입력(224, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 114) {
+    좌표입력(230, 37, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 115) {
+    좌표입력(227, 46, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 116) {
+    좌표입력(230, 47, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 117) {
+    좌표입력(233, 55, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 118) {
+    좌표입력(232, 67, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 119) {
+    좌표입력(233, 77, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 120) {
+    좌표입력(234, 86, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 121) {
+    좌표입력(229, 107, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 122) {
+    좌표입력(232, 116, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 123) {
+    좌표입력(231, 130, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 124) {
+    좌표입력(233, 143, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 125) {
+    좌표입력(233, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 126) {
+    좌표입력(233, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 127) {
+    좌표입력(234, 171, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 128) {
+    좌표입력(226, 181, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 129) {
+    좌표입력(229, 183, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 130) {
+    좌표입력(233, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 131) {
+    좌표입력(222, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 132) {
+    좌표입력(213, 184, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 133) {
+    좌표입력(204, 179, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 134) {
+    좌표입력(197, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 135) {
+    좌표입력(185, 164, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 136) {
+    좌표입력(175, 167, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 137) {
+    좌표입력(178, 154, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 138) {
+    좌표입력(174, 147, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 139) {
+    좌표입력(172, 133, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 140) {
+    좌표입력(170, 123, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 141) {
+    좌표입력(171, 113, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 142) {
+    좌표입력(164, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 143) {
+    좌표입력(177, 95, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 144) {
+    좌표입력(167, 86, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 145) {
+    좌표입력(179, 76, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 146) {
+    좌표입력(169, 68, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 147) {
+    좌표입력(178, 59, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 148) {
+    좌표입력(168, 51, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 149) {
+    좌표입력(176, 41, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 150) {
+    좌표입력(164, 32, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 151) {
+    좌표입력(151, 30, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 152) {
+    좌표입력(149, 40, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 153) {
+    좌표입력(147, 50, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 154) {
+    좌표입력(128, 57, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 155) {
+    좌표입력(125, 52, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 156) {
+    좌표입력(114, 49, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 157) {
+    좌표입력(113, 62, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 158) {
+    좌표입력(123, 65, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 159) {
+    좌표입력(138, 68, 1)
+    RunMemory("좌표이동")
+    RunDirect = 1
+}
+if(RunDirect = 0)
+{
+MapNumber += 1
+Sleep,200
+}
+if(RunDirect = 1)
+{
+MapNumber -= 1
+Sleep,200
+}
+}
+if (Loute4 = 1) ; 아래만
+{
+;Gosub, 감응
+if(MapNumber = 1)
+{
+RunDirect = 0
+}
+if (MapNumber = 2) {
+    좌표입력(68, 123, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 3) {
+    좌표입력(66, 133, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 4) {
+    좌표입력(65, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 5) {
+    좌표입력(52, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 6) {
+    좌표입력(69, 151, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 7) {
+    좌표입력(82, 149, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 8) {
+    좌표입력(93, 171, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 9) {
+    좌표입력(92, 166, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 10) {
+    좌표입력(92, 142, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 11) {
+    좌표입력(92, 139, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 12) {
+    좌표입력(98, 129, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 13) {
+    좌표입력(94, 119, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 14) {
+    좌표입력(99, 107, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 15) {
+    좌표입력(100, 91, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 16) {
+    좌표입력(108, 87, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 17) {
+    좌표입력(109, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 18) {
+    좌표입력(110, 109, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 19) {
+    좌표입력(113, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 20) {
+    좌표입력(110, 131, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 21) {
+    좌표입력(112, 141, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 22) {
+    좌표입력(121, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 23) {
+    좌표입력(127, 127, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 24) {
+    좌표입력(130, 119, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 25) {
+    좌표입력(129, 108, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 26) {
+    좌표입력(131, 100, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 27) {
+    좌표입력(142, 94, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 28) {
+    좌표입력(148, 104, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 29) {
+    좌표입력(151, 113, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 30) {
+    좌표입력(152, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 31) {
+    좌표입력(152, 131, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 32) {
+    좌표입력(151, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 33) {
+    좌표입력(148, 149, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 34) {
+    좌표입력(162, 150, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 35) {
+    좌표입력(174, 154, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 36) {
+    좌표입력(162, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 37) {
+    좌표입력(170, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 38) {
+    좌표입력(174, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 39) {
+    좌표입력(162, 113, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 40) {
+    좌표입력(170, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 41) {
+    좌표입력(162, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 42) {
+    좌표입력(170, 89, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 43) {
+    좌표입력(177, 85, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 44) {
+    좌표입력(186, 93, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 45) {
+    좌표입력(181, 101, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 46) {
+    좌표입력(188, 110, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 47) {
+    좌표입력(180, 117, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 48) {
+    좌표입력(188, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49) {
+    좌표입력(181, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50) {
+    좌표입력(189, 144, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 51) {
+    좌표입력(183, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52) {
+    좌표입력(190, 162, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53) {
+    좌표입력(181, 173, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54) {
+    좌표입력(197, 181, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 55) {
+    좌표입력(207, 183, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 56) {
+    좌표입력(215, 179, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 57) {
+    좌표입력(209, 174, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 58) {
+    좌표입력(216, 167, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 59) {
+    좌표입력(209, 160, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 60) {
+    좌표입력(213, 152, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 61) {
+    좌표입력(206, 146, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 62) {
+    좌표입력(213, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 63) {
+    좌표입력(206, 133, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 64) {
+    좌표입력(216, 125, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 65) {
+    좌표입력(209, 122, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 66) {
+    좌표입력(218, 113, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 67) {
+    좌표입력(223, 127, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 68) {
+    좌표입력(224, 137, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 69) {
+    좌표입력(206, 134, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 70) {
+    좌표입력(198, 126, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 71) {
+    좌표입력(190, 116, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 72) {
+    좌표입력(183, 106, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 73) {
+    좌표입력(176, 97, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 74) {
+    좌표입력(169, 105, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 75) {
+    좌표입력(164, 116, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 76) {
+    좌표입력(163, 124, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 77) {
+    좌표입력(162, 135, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 78) {
+    좌표입력(154, 139, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 79) {
+    좌표입력(152, 148, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 80) {
+    좌표입력(145, 140, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 81) {
+    좌표입력(142, 132, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 82) {
+    좌표입력(142, 121, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 83) {
+    좌표입력(144, 112, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 84) {
+    좌표입력(146, 102, 1)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 85) {
+    좌표입력(141, 90, 1)
+    RunMemory("좌표이동")
+}
+if(RunDirect = 0)
+{
+MapNumber += 1
+Sleep,200
+}
+if(RunDirect = 1)
+{
+MapNumber -= 1
+Sleep,200
+}
 }
 }
 ReadAbility(WeaponName)
@@ -24167,7 +29781,105 @@ VarSetCapacity(Var, Len, 0)
 Return, StrPut(Str, &Var, Enc)
 }
 return
+감응() {
+    ; 전역 변수 사용 선언
+    Gui, Submit, Nohide
 
+    if (Gui_KON = 1) {
+        if InStr(Location, "[알파차원] 포프레스네 마을") {
+            Sleep, 100
+            포남입장시간 := A_TickCount
+            countsignal := 0
+            return
+        }
+
+        if InStr(Location, "[알파차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, A동파, "UInt")
+                jelan.write(0x00527B1C, A동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal := 1
+                호출대상 := "알파 - 동쪽파수꾼"
+                return
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, A서파, "UInt")
+                jelan.write(0x00527B1C, A서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "알파 - 서쪽파수꾼"
+                return
+            }
+        }
+
+        if InStr(Location, "[베타차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, B동파, "UInt")
+                jelan.write(0x00527B1C, B동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal := 1
+                호출대상 := "베타 - 동쪽파수꾼"
+                return
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, B서파, "UInt")
+                jelan.write(0x00527B1C, B서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "베타 - 서쪽파수꾼"
+                return
+            }
+        }
+
+        if InStr(Location, "[감마차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, G동파, "UInt")
+                jelan.write(0x00527B1C, G동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal := 1
+                호출대상 := "감마 - 동쪽파수꾼"
+                return
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, G서파, "UInt")
+                jelan.write(0x00527B1C, G서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "감마 - 서쪽파수꾼"
+                return
+            }
+        }
+    }
+}
+
+return
 checktxt()
 {
 Try
@@ -24179,6 +29891,9 @@ Catch e
 GROUPADD, ie_gruop, ahk_exe iexplore.exe
 WINKILL, ahk_exe iexplore.exe
 WINKILL, ahk_group ie_gruop
+        TMessage := "[ Helancia_Log ]>>" jTitle "<<: 인터넷 오류. 리로드, 위치보고: " . "(" . 현재차원  . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+        텔레그램메시지보내기(TMessage)
+        sleep,10
 GOSUB, RL
 }
 }
@@ -24193,35 +29908,13 @@ Catch e
 GROUPADD, ie_gruop, ahk_exe iexplore.exe
 WINKILL, ahk_exe iexplore.exe
 WINKILL, ahk_group ie_gruop
+        TMessage := "[ Helancia_Log ]>>" jTitle "<<: 인터넷 오류 2. 리로드, 위치보고: " . "(" . 현재차원  . ")" 맵이름 . Gui_NowLocation . ", 좌표: (" . 좌표X . "," . 좌표Y . "," . 좌표Z . ")"
+        텔레그램메시지보내기(TMessage)
+        sleep,10
 GOSUB, RL
 }
 }
-iereturn1()
-{
-Try
-{
-RETURN ComObjCreate("InternetExplorer.Application")
-}
-Catch e
-{
-GROUPADD, ie_gruop, ahk_exe iexplore.exe
-WINKILL, ahk_exe iexplore.exe
-WINKILL, ahk_group ie_gruop
-GOSUB, RL
-}
-}
-SkinForm(Param1 = "Apply", DLL = "", SkinName = "")
-{
-if(Param1 = Apply)
-{
-DllCall("LoadLibrary", str, DLL)
-DllCall(DLL . "\USkinInit", Int,0, Int,0, AStr, SkinName)
-}
-else if(Param1 = 0)
-{
-DllCall(DLL . "\USkinExit")
-}
-}
+
 RunThread(Addrs)
 {
 Gui,Submit,Nohide
@@ -24292,6 +29985,7 @@ else if (코드 = "좌표이동") {
 gui,submit,nohide
 Run_Thread := 1
 Addrs := 0x00590620
+SB_SetText("좌표이동",4)
 }
 else if (코드 = "퀵슬롯사용") {
 Run_Thread := 1
@@ -24342,18 +30036,6 @@ RegionSize := 0x50
 target = 00003E0054803800000054804400000000000000000201000000
 executable := jelan.executable(Addrs, RegionSize)
 }
-else if (코드 = "마법사용") {
-Addrs := 0x00590400
-RegionSize := 0x100
-target = 00B900590420B8F424DCE80000000000000000C3FF
-executable := jelan.executable(Addrs, RegionSize)
-}
-else if (코드 = "마법호출") {
-Addrs := 0x00590420
-RegionSize := 0x50
-target = 00000F00548038000000548044000000000000000000010201000000
-executable := jelan.executable(Addrs, RegionSize)
-}
 else if (코드 = "스킬사용") {
 Addrs := 0x0058D600
 RegionSize := 0x20
@@ -24372,6 +30054,20 @@ RegionSize := 0x200
 target = 000000000000000000000000010000000000000000000000000000003D836000000000840FFF00590600DAD4A100000084F8830C408B005800000073840F0200005906B93D838D0000000B850FB9A300590600055906B9A10059060F04488B188B0058DAD4A153D9AF14488B10588B000FD83958D9AF0F05830000002085B9A110005906B90F003883005906058D0000000B8506B9A3005906005906B9058D0059DAD41D8B008B00EFE850016A00580C4D8B61FFF3A200590600C3C129590600
 executable := jelan.executable(Addrs, RegionSize)
 }
+else if (코드 = "아이템줍기코드") {
+			Addrs := 0x005902E5
+			RegionSize := 0x1400
+			target = 04EE3005038B600178808B008B000000BE808B000032F88314408B008000000111840F0F00005901E53D3D81000000718474C544005901E500000061840FC704361D89625B8B460500038B00593B83664300590401E51D8DF175004A0500038B00593B8366430059040446158BF1750059044A3D8B00590020840FFA39005904361D8B00000059044605C7004A05C70000000000000000005904C700000093850F0000005904460559044A05C70000EE8300000000007C1D895E5E8B280C4E8B600059048B0059043E0D885904420D88104EF69305E8236A00FFF404D0E859FF19488810244C8A0D8B14244C8B66488966005904421D8B14244C8A1C5889660059043E7089661E48881A488B217889661FC5B9390C6C8104C7402454FF000600000059047C055B5E5F61610000C70010C25DE58B0000005904460559044A05C700005F61000000000010C25DE58B5B5E00000000000000000000000000000000000000000074C54400000000C7740020D15CC70000000000B984000000000000000000000000000000000000000000546E3400000000FFFF000000000000FFFFFFFFFFFF0000000000000000000000000000000000000000000000000000000000
+			executable := jelan.executable(Addrs, RegionSize)
+			}
+else if (코드 = "아이템줍기실행") {
+			Addrs := 0x00590A00
+			target = C29000129847E9
+			}
+else if (코드 = "아이템줍기정지") {
+			Addrs := 0x00590A00
+			target = C25DE58B5B5E5F
+			}
 else if (코드 = "게임내시간제어")  {
 Addrs := 0x0058FF80
 RegionSize := 0x200
@@ -24409,6 +30105,18 @@ RegionSize := 0x100
 target = 0D8B00000001B80002BA0059073058DAD4358B0000F3A3B0E8515000C3FF
 executable := jelan.executable(Addrs, RegionSize)
 }
+else if (코드 = "마법사용") {
+Addrs := 0x00590400
+RegionSize := 0x100
+target = 00B900590420B8F424DCE80000000000000000C3FF
+executable := jelan.executable(Addrs, RegionSize)
+}
+else if (코드 = "마법호출") {
+Addrs := 0x00590420
+RegionSize := 0x50
+target = 00000F00548038000000548044000000000000000000010201000000
+executable := jelan.executable(Addrs, RegionSize)
+}
 else if (코드 = "퀵슬롯사용") {
 Addrs := 0x0058D300
 RegionSize := 0x20
@@ -24422,53 +30130,48 @@ target = 000000042444C7E9F98B57565300000000FFFA36F7
 executable := jelan.executable(Addrs, RegionSize)
 }
 else if (코드 = "공속"){
-Addrs := 0x00527B35
-RegionSize := 0x20
-target = 0D5ED90004668300003E000F46C7FFF38CD2E9
-executable := jelan.executable(Addrs, RegionSize)
-}
+			Addrs := 0x00527B35
+			RegionSize := 0x20
+			target = 0D5ED90004668300003E000F46C7FFF38CD2E9
+			executable := jelan.executable(Addrs, RegionSize)
+			}
 else if (코드 = "1무바"){
-Addrs := 0x005FB740
-RegionSize := 0x600
-target = 1D89005FB876A3960D89005FB886B8A61589005FB85FB8B63589005F005FB8C63D89000058DAD4058B6039000001A5808B840F005FB85E05B85EA3000000B25FB86E3D83005F00000D840F0000005FB86E3D830000000078840F0183005FB87205FF0F03005FB8723D05C7000000808C000001005FB872BB000000F8B8000000BE00000001DEF6E81E6A0000ED6313E859FFEFE8FF438DF88BFF194788FFE88D6D448D502424448DE677EDE8501C24661824448B66FF24448B661A4789C78B1C4789662405C7FFED6EE2E8000001005FB86E58DAD4BF006A00C7FFEB8551E8000000005FB86E0500000000E90000005FB876058B618B005FB8861D8B158B005FB8960DB6358B005FB8A6B8C63D8B005FB80001A48589005F00FFED0635E900000000000000000000000000000000010000000000
-executable := jelan.executable(Addrs, RegionSize)
-}
+			Addrs := 0x005FB740
+			RegionSize := 0x600
+			target = 1D89005FB876A3960D89005FB886B8A61589005FB85FB8B63589005F005FB8C63D89000058DAD4058B6039000001A5808B840F005FB85E05B85EA3000000B25FB86E3D83005F00000D840F0000005FB86E3D830000000078840F0183005FB87205FF0F03005FB8723D05C7000000808C000001005FB872BB000000F8B8000000BE00000001DEF6E81E6A0000ED6313E859FFEFE8FF438DF88BFF194788FFE88D6D448D502424448DE677EDE8501C24661824448B66FF24448B661A4789C78B1C4789662405C7FFED6EE2E8000001005FB86E58DAD4BF006A00C7FFEB8551E8000000005FB86E0500000000E90000005FB876058B618B005FB8861D8B158B005FB8960DB6358B005FB8A6B8C63D8B005FB80001A48589005F00FFED0635E900000000000000000000000000000000010000000000
+			executable := jelan.executable(Addrs, RegionSize)
+			}
 else if (코드 = "2무바"){
-Addrs := 0x005FB740
-RegionSize := 0x600
-target = 1D89005FB923A3430D89005FB933B9531589005FB95FB9633589005F005FB9733D89000058DAD4058B6039000001A5808B840F005FB90B05B90BA30000015F5FB91B3D83005F000027840F0000005FB91B3D830000000092840F0102005FB91B3D8383000000A0840F0F03005FB91B3D05FF0000010B841F3D83005FB91F138C0F03005FB9B91F05C7000001B800000001005F0001BB000000F800000000BE0000FFEFDEDCE81E6A8BFFED62F9E8598D53E8FF438DF8448D194788FFE81C24448D50242466FFE677D3E8504789661824448B662424448B661AC8E8C78B1C4789B91B05C7FFED6E6A00000001005FE80058DAD4BF001B05C7FFEB853700000002005FB905FF00000093E91F3D83005FB91F808C0F03005FB9B91F05C7000000B800000001005F0001BB000000F800000000BE0000FFEFDE49E81E6A8BFFED6266E8598CC0E8FF438DF8448D194788FFE81C24448D50242466FFE67740E8504789661824448B662424448B661A35E8C78B1C4789B91B05C7FFED6E6A00000003005FE80058DAD4BF011B05C7FFEB84A400000000005FB98B6100000000E91D8B005FB92305430D8B005FB933B953158B005FB95FB963358B005F005FB9733D8B00E9000001A48589000000FFED058800000000000000000000000000000000000100000000000000000000
-executable := jelan.executable(Addrs, RegionSize)
-}
+			Addrs := 0x005FB740
+			RegionSize := 0x600
+			target = 1D89005FB923A3430D89005FB933B9531589005FB95FB9633589005F005FB9733D89000058DAD4058B6039000001A5808B840F005FB90B05B90BA30000015F5FB91B3D83005F000027840F0000005FB91B3D830000000092840F0102005FB91B3D8383000000A0840F0F03005FB91B3D05FF0000010B841F3D83005FB91F138C0F03005FB9B91F05C7000001B800000001005F0001BB000000F800000000BE0000FFEFDEDCE81E6A8BFFED62F9E8598D53E8FF438DF8448D194788FFE81C24448D50242466FFE677D3E8504789661824448B662424448B661AC8E8C78B1C4789B91B05C7FFED6E6A00000001005FE80058DAD4BF001B05C7FFEB853700000002005FB905FF00000093E91F3D83005FB91F808C0F03005FB9B91F05C7000000B800000001005F0001BB000000F800000000BE0000FFEFDE49E81E6A8BFFED6266E8598CC0E8FF438DF8448D194788FFE81C24448D50242466FFE67740E8504789661824448B662424448B661A35E8C78B1C4789B91B05C7FFED6E6A00000003005FE80058DAD4BF011B05C7FFEB84A400000000005FB98B6100000000E91D8B005FB92305430D8B005FB933B953158B005FB95FB963358B005F005FB9733D8B00E9000001A48589000000FFED058800000000000000000000000000000000000100000000000000000000
+			executable := jelan.executable(Addrs, RegionSize)
+			}
 else if (코드 = "3무바"){
-Addrs := 0x005FB740
-RegionSize := 0x600
-target = 1D89005FB9D0A3F00D89005FB9E0BA001589005FB95FBA103589005F005FBA203D89000058DAD4058B6039000001A5808B840F005FB9B805B9B8A30000020C5FB9C83D83005F000041840F0000005FB9C83D8300000000AC840F0102005FB9C83D8383000000BA840F0F03005FB9C83D3D830000012584840F04005FB9C8C83D83000001339E840F05005FB9B9CC05FF0000015FB9CC3D83005F0001A68C0F0300005FB9CC05C70000F8B80000000100000001BB00001E6A00000000BEE859FFEFDEC2E88DF88BFFED62DFFFE88D39E8FF432424448D194788E8501C24448D50448B66FFE677B9661A47896618244789662424448BED6EAEE8C78B1C005FB9C805C7FFBF006A00000001851DE80058DAD45FB9C805C7FFEB26E90000000200B9CC05FF0000015FB9CC3D83005F0001138C0F0300005FB9CC05C70000F8B80000000100000001BB00001E6A00000000BEE859FFEFDE2FE88DF88BFFED624CFFE88CA6E8FF432424448D194788E8501C24448D50448B66FFE67726661A47896618244789662424448BED6E1BE8C78B1C005FB9C805C7FFBF016A00000003848AE80058DAD45FB9C805C7FFEB93E90000000400B9CC05FF0000005FB9CC3D83005F0000808C0F0300005FB9CC05C70000F8B80000000100000001BB00001E6A00000000BEE859FFEFDD9CE88DF88BFFED61B9FFE88C13E8FF432424448D194788E8501C24448D50448B66FFE67693661A47896618244789662424448BED6D88E8C78B1C005FB9C805C7FFBF026A0000000583F7E80058DAD45FB9C805C7FFEB00E90000000000D0058B61000000B9E01D8B005FB95FB9F00D8B005F005FBA00158B008B005FBA10358B8589005FBA203D04DBE9000001A40000000000FFED0000000000000000000000000000000000000001000000000000000000000000000000
-executable := jelan.executable(Addrs, RegionSize)
-}
+			Addrs := 0x005FB740
+			RegionSize := 0x600
+			target = 1D89005FB9D0A3F00D89005FB9E0BA001589005FB95FBA103589005F005FBA203D89000058DAD4058B6039000001A5808B840F005FB9B805B9B8A30000020C5FB9C83D83005F000041840F0000005FB9C83D8300000000AC840F0102005FB9C83D8383000000BA840F0F03005FB9C83D3D830000012584840F04005FB9C8C83D83000001339E840F05005FB9B9CC05FF0000015FB9CC3D83005F0001A68C0F0300005FB9CC05C70000F8B80000000100000001BB00001E6A00000000BEE859FFEFDEC2E88DF88BFFED62DFFFE88D39E8FF432424448D194788E8501C24448D50448B66FFE677B9661A47896618244789662424448BED6EAEE8C78B1C005FB9C805C7FFBF006A00000001851DE80058DAD45FB9C805C7FFEB26E90000000200B9CC05FF0000015FB9CC3D83005F0001138C0F0300005FB9CC05C70000F8B80000000100000001BB00001E6A00000000BEE859FFEFDE2FE88DF88BFFED624CFFE88CA6E8FF432424448D194788E8501C24448D50448B66FFE67726661A47896618244789662424448BED6E1BE8C78B1C005FB9C805C7FFBF016A00000003848AE80058DAD45FB9C805C7FFEB93E90000000400B9CC05FF0000005FB9CC3D83005F0000808C0F0300005FB9CC05C70000F8B80000000100000001BB00001E6A00000000BEE859FFEFDD9CE88DF88BFFED61B9FFE88C13E8FF432424448D194788E8501C24448D50448B66FFE67693661A47896618244789662424448BED6D88E8C78B1C005FB9C805C7FFBF026A0000000583F7E80058DAD45FB9C805C7FFEB00E90000000000D0058B61000000B9E01D8B005FB95FB9F00D8B005F005FBA00158B008B005FBA10358B8589005FBA203D04DBE9000001A40000000000FFED0000000000000000000000000000000000000001000000000000000000000000000000
+			executable := jelan.executable(Addrs, RegionSize)
+			}
 else if (코드 = "2벗무바"){
-Addrs := 0x005FB740
-RegionSize := 0x600
-target = 1D89005FB87BA39B0D89005FB88BB8AB1589005FB85FB8BB3589005F005FB8CB3D89000058DAD4058B6039000001A5808B840F005FB86305B863A3000000B75FB8733D83005F00000D840F0000005FB8733D83000000007D840F0183005FB87705FF0F03005FB8773D05C7000000658C000001005FB873005FB87705C70000F8B80000000100000001BB00001E6A00000000BEE859FFEFDEECE88DF88BFFED6309FFE88D63E8FF432424448D194788E8501C24448D50448B66FFE677E3661A47896618244789662424448BED6ED8E8C78B1C6A0000001BE9FFE80058DAD4BF007305C7FFEB854C00000000005FB88B6100000000E91D8B005FB87B059B0D8B005FB88BB8AB158B005FB85FB8BB358B005F005FB8CB3D8B00E9000001A48589000000FFED0630000000000000000000000000000000000001000000
-executable := jelan.executable(Addrs, RegionSize)
-}
+			Addrs := 0x005FB740
+			RegionSize := 0x600
+			target = 1D89005FB87BA39B0D89005FB88BB8AB1589005FB85FB8BB3589005F005FB8CB3D89000058DAD4058B6039000001A5808B840F005FB86305B863A3000000B75FB8733D83005F00000D840F0000005FB8733D83000000007D840F0183005FB87705FF0F03005FB8773D05C7000000658C000001005FB873005FB87705C70000F8B80000000100000001BB00001E6A00000000BEE859FFEFDEECE88DF88BFFED6309FFE88D63E8FF432424448D194788E8501C24448D50448B66FFE677E3661A47896618244789662424448BED6ED8E8C78B1C6A0000001BE9FFE80058DAD4BF007305C7FFEB854C00000000005FB88B6100000000E91D8B005FB87B059B0D8B005FB88BB8AB158B005FB85FB8BB358B005F005FB8CB3D8B00E9000001A48589000000FFED0630000000000000000000000000000000000001000000
+			executable := jelan.executable(Addrs, RegionSize)
+			}
 else if (코드 = "3벗무바"){
-Addrs := 0x005FB740
-RegionSize := 0x600
-target = 1D89005FB92BA34B0D89005FB93BB95B1589005FB95FB96B3589005F005FB97B3D89008B0058DAD4A1600539000001A58069840F005FB9135FB913A3000001005FB9233D830000000027840F0001005FB9233D838300000097840F0F02005FB9233D3D83000000A584840F03005FB9232705FF00000115B9273D83005FB900658C0F03005F5FB92305C7000005C70000000100000001005FB927BB000000F8B8000000BE00000001DED3E81E6A0000ED62F0E859FFEFE8FF438DF88BFF194788FFE88D4A448D502424448DE677CAE8501C24661824448B66FF24448B661A4789C78B1C47896624B3E9FFED6EBFE8D4BF006A000000EB8533E80058DA005FB92305C7FF0098E9000000025FB92705FF0000005FB9273D8300000000858C0F0301005FB92705C70000F8B8000000BE00000001BB00E81E6A0000000062E859FFEFDE45438DF88BFFED6288FFE88CBCE8FF502424448D19473CE8501C24448D24448B66FFE6778B661A478966181C478966242444FFED6E31E8C78B03005FB92305C700001BE900000058DAD4BF016A00C7FFEB849BE8000000005FB9230500000000E900008B005FB92BA1610D8B005FB93B1D5B158B005FB94BB96B358B005FB95FB97B3D8B005F000001A48589000000FFED0580E90000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-executable := jelan.executable(Addrs, RegionSize)
-}
-else if (코드 = "3벗무바1"){
-Addrs := 0x005FB740
-RegionSize := 0x600
-target = 8B0000011DE960850F5E4739624081909000000068B0010000011DBF000056840F0000EB5805FF90900058EB583D83005800005A840F00000058EB583D8300000000A0840F01030058EB583D838300000040840F0F040058EB583D3D830000009584840F060058EB58583D83000000268D840F070058EB640D8B610000000086968B0058F0FFE62568E80000FFE64E6BE9F88B01BB000000F8B8000000BE000000EFDEDBE81E6A00FFED62F8E859FF52E8FF438DF88B8D194788FFE88D24448D50242444FFE677D2E8501C89661824448B662424448B661A47E8C78B1C4789666A94EBFFED6EC70058DAD43D8B0085EBFFEB853DE858DAD43D8B016AE9FFEB852EE8008B006AFFFFFF731CE80058DAD43DEB5805C7FFEB85E9000000010058D4058BFFFFFF578504CF390058DAFED0E9FFFFFF490000000000FFFF
-executable := jelan.executable(Addrs, RegionSize)
-}
+			Addrs := 0x005FB740
+			RegionSize := 0x600
+			target = 1D89005FB92BA34B0D89005FB93BB95B1589005FB95FB96B3589005F005FB97B3D89008B0058DAD4A1600539000001A58069840F005FB9135FB913A3000001005FB9233D830000000027840F0001005FB9233D838300000097840F0F02005FB9233D3D83000000A584840F03005FB9232705FF00000115B9273D83005FB900658C0F03005F5FB92305C7000005C70000000100000001005FB927BB000000F8B8000000BE00000001DED3E81E6A0000ED62F0E859FFEFE8FF438DF88BFF194788FFE88D4A448D502424448DE677CAE8501C24661824448B66FF24448B661A4789C78B1C47896624B3E9FFED6EBFE8D4BF006A000000EB8533E80058DA005FB92305C7FF0098E9000000025FB92705FF0000005FB9273D8300000000858C0F0301005FB92705C70000F8B8000000BE00000001BB00E81E6A0000000062E859FFEFDE45438DF88BFFED6288FFE88CBCE8FF502424448D19473CE8501C24448D24448B66FFE6778B661A478966181C478966242444FFED6E31E8C78B03005FB92305C700001BE900000058DAD4BF016A00C7FFEB849BE8000000005FB9230500000000E900008B005FB92BA1610D8B005FB93B1D5B158B005FB94BB96B358B005FB95FB97B3D8B005F000001A48589000000FFED0580E90000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+			executable := jelan.executable(Addrs, RegionSize)
+			}
 else if (코드 = "4벗무바"){
-Addrs := 0x005FB740
-RegionSize := 0x600
-target = 1D89005FB9D5A3F50D89005FB9E5BA051589005FB95FBA153589005F005FBA253D89000058DAD4058B6039000001A5808B840F005FB9BD05B9BDA3000002115FB9CD3D83005F000041840F0000005FB9CD3D8300000000B1840F0102005FB9CD3D8383000000BF840F0F03005FB9CD3D3D830000012A84840F04005FB9CDCD3D8300000138A3840F05005FB9B9D105FF0000015FB9D13D83005F0000658C0F0300005FB9CD05C700D105C70000000100000001005FB901BB000000F8B8000000BE000000EFDEB8E81E6A00FFED62D5E859FF2FE8FF438DF88B8D194788FFE88D24448D50242444FFE677AFE8501C89661824448B662424448B661A47E8C78B1C4789660141E9FFED6EA4DAD4BF006A0000FFEB8518E8005802005FB9CD05C7000126E9000000005FB9D105FF0003005FB9D13D83C7000001138C0F0001005FB9D105000000F8B8000000BE00000001BB2AE81E6A0000006247E859FFEFDEFF438DF88BFFED4788FFE88CA1E88D502424448D197721E8501C24441824448B66FFE6448B661A4789668B1C4789662424C7FFED6E16E8C70003005FB9CD05DAD4BF016A0000FFEB8485E8005804005FB9CD05C7000093E9000000005FB9D105FF0003005FB9D13D83C7000000808C0F0001005FB9D105000000F8B8000000BE00000001BB97E81E6A00000061B4E859FFEFDDFF438DF88BFFED4788FFE88C0EE88D502424448D19768EE8501C24441824448B66FFE6448B661A4789668B1C4789662424C7FFED6D83E8C70005005FB9CD05DAD4BF026A0000FFEB83F2E8005800005FB9CD05C7000000E90000005FB9D5058B6100005FB9E51D8B008B005FB9F50D8B358B005FBA0515253D8B005FBA1501A48589005FBAFFED04D6E9000000000000000000000000000000000100000000000000000000000000
-executable := jelan.executable(Addrs, RegionSize)
-}
+			Addrs := 0x005FB740
+			RegionSize := 0x600
+			target = 1D89005FB9D5A3F50D89005FB9E5BA051589005FB95FBA153589005F005FBA253D89000058DAD4058B6039000001A5808B840F005FB9BD05B9BDA3000002115FB9CD3D83005F000041840F0000005FB9CD3D8300000000B1840F0102005FB9CD3D8383000000BF840F0F03005FB9CD3D3D830000012A84840F04005FB9CDCD3D8300000138A3840F05005FB9B9D105FF0000015FB9D13D83005F0000658C0F0300005FB9CD05C700D105C70000000100000001005FB901BB000000F8B8000000BE000000EFDEB8E81E6A00FFED62D5E859FF2FE8FF438DF88B8D194788FFE88D24448D50242444FFE677AFE8501C89661824448B662424448B661A47E8C78B1C4789660141E9FFED6EA4DAD4BF006A0000FFEB8518E8005802005FB9CD05C7000126E9000000005FB9D105FF0003005FB9D13D83C7000001138C0F0001005FB9D105000000F8B8000000BE00000001BB2AE81E6A0000006247E859FFEFDEFF438DF88BFFED4788FFE88CA1E88D502424448D197721E8501C24441824448B66FFE6448B661A4789668B1C4789662424C7FFED6E16E8C70003005FB9CD05DAD4BF016A0000FFEB8485E8005804005FB9CD05C7000093E9000000005FB9D105FF0003005FB9D13D83C7000000808C0F0001005FB9D105000000F8B8000000BE00000001BB97E81E6A00000061B4E859FFEFDDFF438DF88BFFED4788FFE88C0EE88D502424448D19768EE8501C24441824448B66FFE6448B661A4789668B1C4789662424C7FFED6D83E8C70005005FB9CD05DAD4BF026A0000FFEB83F2E8005800005FB9CD05C7000000E90000005FB9D5058B6100005FB9E51D8B008B005FB9F50D8B358B005FBA0515253D8B005FBA1501A48589005FBAFFED04D6E9000000000000000000000000000000000100000000000000000000000000
+			executable := jelan.executable(Addrs, RegionSize)
+			}
+
 ContentLength := StrLen(target)
 LoopCount := ContentLength // 14
 LastLoopLength := ContentLength - (LoopCount * 14)
@@ -24529,64 +30232,6 @@ writememory2("0x"H9, Addrs+56, PID)
 writememory2("0x"H10, Addrs+63, PID)
 writememory2("0x"H11, Addrs+70, PID)
 writememory2("0x"H12, Addrs+77, PID)
-}
-무바활성화()
-{
-jelan.write(0x004CBE8D, 0xE9, "char", aOffsets*)
-jelan.write(0x004CBE8E, 0xAE, "char", aOffsets*)
-jelan.write(0x004CBE8F, 0xF8, "char", aOffsets*)
-jelan.write(0x004CBE90, 0x12, "char", aOffsets*)
-jelan.write(0x004CBE91, 0x00, "char", aOffsets*)
-jelan.write(0x004CBE92, 0xC3, "char", aOffsets*)
-}
-무바비활성화()
-{
-jelan.write(0x004CBE8D, 0x89, "char", aOffsets*)
-jelan.write(0x004CBE8E, 0x85, "char", aOffsets*)
-jelan.write(0x004CBE8F, 0xA4, "char", aOffsets*)
-jelan.write(0x004CBE90, 0x01, "char", aOffsets*)
-jelan.write(0x004CBE91, 0x00, "char", aOffsets*)
-jelan.write(0x004CBE92, 0x00, "char", aOffsets*)
-}
-캐릭제거()
-{
-jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
-jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
-jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
-jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
-jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
-}
-캐릭보이기()
-{
-jelan.write(0x0045D28F, 0x0F, "Char", aOffsets*)
-jelan.write(0x0045D290, 0x84, "Char", aOffsets*)
-jelan.write(0x0045D291, 0xC2, "Char", aOffsets*)
-jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
-jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
-}
-포북캐릭()
-{
-jelan.write(0x0045DAA9, 0x90, "Char", aOffsets*)
-jelan.write(0x0045DAAA, 0x90, "Char", aOffsets*)
-jelan.write(0x0045DAAB, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D32E, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D32F, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D330, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D4E7, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D4E8, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D4E9, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D43E, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D43F, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D440, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D422, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D423, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D424, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D98B, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D98C, 0x90, "Char", aOffsets*)
-jelan.write(0x0045D98D, 0x90, "Char", aOffsets*)
-jelan.write(0x0045DA94, 0x90, "Char", aOffsets*)
-jelan.write(0x0045DA95, 0x90, "Char", aOffsets*)
-jelan.write(0x0045DA96, 0x90, "Char", aOffsets*)
 }
 WPD()
 {
@@ -25292,11 +30937,13 @@ ProcHwnd := DllCall("OpenProcess", "Int", 2035711, "Char", 0, "UInt", pid, "UInt
 DllCall("CreateRemoteThread", "Ptr", ProcHwnd, "Ptr", 0, "Ptr", 0, "Ptr", 0x00527B4C, "Ptr", 0, "UInt", 0, "Ptr", 0,"Ptr")
 DllCall("CloseHandle", "int", ProcHwnd)
 }
-GetPrivateWorkingSet(PID)
+useRAS()
 {
-bytes := ComObjGet("winmgmts:") .ExecQuery("Select * from Win32_PerfFormattedData_PerfProc_Process Where IDProcess=" PID) .ItemIndex(0).WorkingSetPrivate
-byte := bytes/1024
-Return
+SETTITLEMATCHMODE, 3
+WINGET, pid, PID, ahk_pid %jPID%
+ProcHwnd := DllCall("OpenProcess", "Int", 2035711, "Char", 0, "UInt", pid, "UInt")
+DllCall("CreateRemoteThread", "Ptr", ProcHwnd, "Ptr", 0, "Ptr", 0, "Ptr", UAD, "Ptr", 0, "UInt", 0, "Ptr", 0,"Ptr")
+DllCall("CloseHandle", "int", ProcHwnd)
 }
 FormatNumber(Amount) {
 StringReplace Amount, Amount, -
@@ -25313,25 +30960,58 @@ Else x = %x%%A_LoopField%
 Else Return Sign x "." A_LoopField
 Return Sign x
 }
-TrackWeaponChange(newWeapon)
+GetMemory:
+GMS := GlobalMemoryStatusEx()
+TPM := Round(GMS[2] / 1024**2, 2)
+APM := Round(GMS[3] / 1024**2, 2)
+UPM := Round(TPM - APM, 2)
+UPP := Round(UPM / TPM * 100, 2)
+GuiControl,, TMemory, % TPM . " MB"
+GuiControl,, FMemory, % APM . " MB"
+GuiControl,, UMemory, % UPM . " MB"
+GuiControl,, FreePerc, % Round((100 - (TPM - APM) / TPM * 100), 2) " %"
+GuiControl,, UsedPerc, % Round(((TPM - APM) / TPM * 100), 2) " %"
+GuiControl +Range0-%TPM%, PFMemory
+GuiControl,, PFMemory, % APM
+GuiControl, % ((UPP < 70)? "+c5BB75E" : ((UPP < 80) ? "+cFFC266" : "+cDA4F49")), PFMemory
+GuiControl +Range0-%TPM%, PUMemory
+GuiControl,, PUMemory, % UPM
+GuiControl, % ((UPP < 70)? "+c5BB75E" : ((UPP < 80) ? "+cFFC266" : "+cDA4F49")), PUMemory
+return
+ClearMem()
 {
-global RecentWeapons
-for index, weapon in RecentWeapons
+GMSC := GlobalMemoryStatusEx()
+GMSCA := Round(GMSC[3] / 1024**2, 2)
+ClearMemory()
+FreeMemory()
+GMSC := GlobalMemoryStatusEx()
+GMSCB := Round(GMSC[3] / 1024**2, 2)
+GuiControl,, CMMemory, % Round(GMSCB - GMSCA, 2) . " MB 확보"
+}
+return
+GlobalMemoryStatusEx()
 {
-if (weapon == newWeapon)
+static MEMORYSTATUSEX, init := VarSetCapacity(MEMORYSTATUSEX, 64, 0) && NumPut(64, MEMORYSTATUSEX, "UInt")
+if (DllCall("Kernel32.dll\GlobalMemoryStatusEx", "Ptr", &MEMORYSTATUSEX))
 {
+return { 2 : NumGet(MEMORYSTATUSEX, 8, "UInt64")
+, 3 : NumGet(MEMORYSTATUSEX, 16, "UInt64") }
+}
+}
+ClearMemory()
+{
+for process in ComObjGet("winmgmts:\\.\root\CIMV2").ExecQuery("SELECT * FROM Win32_Process")
+{
+handle := DllCall("Kernel32.dll\OpenProcess", "UInt", 0x001F0FFF, "Int", 0, "Int", process.ProcessID)
+DllCall("Kernel32.dll\SetProcessWorkingSetSize", "UInt", handle, "Int", -1, "Int", -1)
+DllCall("Psapi.dll\EmptyWorkingSet", "UInt", handle)
+DllCall("Kernel32.dll\CloseHandle", "Int", handle)
+}
 return
 }
-}
-RecentWeapons.InsertAt(1, newWeapon)
-if (RecentWeapons.MaxIndex() > 3)
+FreeMemory()
 {
-RecentWeapons.RemoveAt(4)
-}
-}
-CheckTrackedWeapons() {
-global RecentWeapons
-return RecentWeapons.MaxIndex()
+return DllCall("Psapi.dll\EmptyWorkingSet", "UInt", -1)
 }
 종료:
 Gui, Submit, NoHide
@@ -25339,145 +31019,7 @@ CRITICAL,On
 Gosub, GuiClose
 CRITICAL,OFF
 Return
-포프OID()
-{
-Gui, Submit, Nohide
-SB_SetText("OID 확인 중")
-업데이트체크 := 1
-Sleep,1500
-OID읽기()
-Check_좌표()
-GuiControl, , NPC_version,%NPC_수정version%
-}
-
-Check_좌표()
-{
-Gui, Submit, Nohide
-FormatTime,점검,A_Now,HHmm
-if(A_WDay = 5 && 점검 >= 0920 && 점검 <= 2359)
-{
-if(업데이트체크 = 1)
-{
-Entrance = 0
-RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, 업데이트체크, %업데이트체크%
-if( 파라스방해감지 = 0 )
-{
-GuiControl, ,Gui_HuntAuto, 1
-MsgBox, , OID업데이트, OID 완료 [ 사냥터 자동변경 ], 1
-}
-else
-{
-MsgBox, , OID업데이트, OID 완료 [ 파라스팅으로 사냥터 변경X ], 1
-}
-SB_SetText("업데이트 완료")
-return
-}
-if(업데이트체크 = 0)
-{
-Entrance = 0
-GuiControl, ,Gui_HuntPobuk, 1
-MsgBox, , OID업데이트, OID 실패 [ 포남 > 포북으로 자동변경 ], 1
-SB_SetText("업데이트 실패")
-return
-}
-}
-if(A_WDay != 5)
-{
-업데이트체크 = 0
-}
-}
-아이템읽어오기()
-{
-Gui, Submit, Nohide
-Get_Gold()
-SETFORMAT, integer, D
-invenslot := 0
-아이템갯수 := {}
-loop, 50
-{
-invenslot += 4
-invenitem := jelan.readString(0x0058DAD4, 50, "UTF-16", 0x178, 0xBE, 0x8, invenslot, 0x8, 0x8, 0x0)
-ItemCount := jelan.read(0x0058DAD4, "Uint", 0x178, 0xBE, 0x8, invenslot, 0x8, 0x20)
-if (invenitem = "")
-continue
-아이템갯수[invenitem] := (아이템갯수[invenitem] ? 아이템갯수[invenitem] + ItemCount : ItemCount)
-}
-라깃카운트 := 아이템갯수["라스의깃"]
-정보카운트 := 아이템갯수["정령의보석"]
-골드바카운트 := 아이템갯수["골드바"]
-if(아이템갯수["골드바"] = "")
-{
-GuiControl,, Gui_NowGoldbar, 0
-}
-else
-{
-골드바갯수 := 아이템갯수["골드바"]
-GuiControl,, Gui_NowGoldbar, %골드바갯수%
-}
-if(아이템갯수["라스의깃"] = "")
-{
-GuiControl,, Gui_RasCount, 0
-}
-else
-{
-라스의깃갯수 := 아이템갯수["라스의깃"]
-GuiControl,, Gui_RasCount, %라스의깃갯수%
-}
-if(아이템갯수["정령의보석"] = "")
-{
-GuiControl,, Gui_정보Count, 0
-}
-else
-{
-정령의보석갯수 := 아이템갯수["정령의보석"]
-GuiControl,, Gui_정보Count, %정령의보석갯수%
-}
-SB_SetText("갈리드 / 라깃 / 정보 수량 확인 완료")
-}
-정수체크()
-{
-Gui, Submit, Nohide
-itemnum := 0
-itemnum1 := 0
-itemnum2 := 0
-invenslot := 0
-Loop,50
-{
-SetFormat, integer, H
-invenslot += 4
-itemm := jelan.readString(0x0058DAD4, 50, "UTF-16", 0x178, 0xBE, 0x8, invenslot, 0x8, 0x8, 0x0)
-SetFormat, integer, D
-IfInString,itemm,빛나는결정
-{
-itemnum += 1
-}
-IfInString,itemm,빛나는나뭇가지
-{
-itemnum1 += 1
-}
-IfInString,itemm,빛나는가루
-{
-itemnum2 += 1
-}
-}
-결정갯수 := itemnum
-나무갯수 := itemnum1
-가루갯수 := itemnum2
-return
-}
-^q::
-if( 좌표고정 != 0)
-{
-CoordMode,mouse,Screen
-MouseGetPos,게임시작x,게임시작y
-GuiControl, , 좌표x, %게임시작x%
-GuiControl, , 좌표y, %게임시작y%
-return
-}
-return
 어빌리티탭확인:
-{
-Gui, Submit, Nohide
 Check_SAbilityN()
 Check_SAbility()
 if(Slot1AN != "")
@@ -26226,126 +31768,130 @@ if(Gui_MagicCheck8 = 0)
 MagicAbility8 =
 }
 }
-if(Slot9MN != "")
+return
+
+Check_좌표:
 {
-GuiControl, , Gui_MagicName9, %Slot9MN%
-if(Gui_MagicCheck9 = 1)
+Gui, Submit, Nohide
+FormatTime,점검,A_Now,HHmm
+if(A_WDay = 5)
 {
-MagicAbility9 := Slot9Magic
+if(업데이트체크 = 1)
+{
+Entrance = 0
+SB_SetText("OID 업데이트 완료")
+return
 }
-if(Gui_MagicCheck9 = 0)
+if(업데이트체크 = 0)
 {
-MagicAbility9 =
+Entrance = 0
+MsgBox, , 비정상종료감지, OID리셋, 3
+TMessage := "[ Helancia_Log ]>>" . jTitle "<<: 점검요일. OID 리셋."
+텔레그램메시지보내기(TMessage)
+sleep,10
+OID리셋()
+if(Gui_KON = 1)
+{
+MsgBox, , 자동감응설정, 감응 OFF로 변경, 1
+GuiControl, , Gui_KOFF, 1
+업데이트체크 := 1
 }
-}
-if(Slot10MN != "")
-{
-GuiControl, , Gui_MagicName10, %Slot10MN%
-if(Gui_MagicCheck10 = 1)
-{
-MagicAbility10 := Slot10Magic
-}
-if(Gui_MagicCheck10 = 0)
-{
-MagicAbility10 =
-}
-}
-if(Slot11MN != "")
-{
-GuiControl, , Gui_MagicName11, %Slot11MN%
-if(Gui_MagicCheck11 = 1)
-{
-MagicAbility11 := Slot11Magic
-}
-if(Gui_MagicCheck11 = 0)
-{
-MagicAbility11 =
+SB_SetText("점검 요일로 OID리셋")
+return
 }
 }
-if(Slot12MN != "")
+if(A_WDay != 5)
 {
-GuiControl, , Gui_MagicName12, %Slot12MN%
-if(Gui_MagicCheck12 = 1)
-{
-MagicAbility12 := Slot12Magic
-}
-if(Gui_MagicCheck12 =0)
-{
-MagicAbility12 =
+업데이트체크 = 0
 }
 }
-if(Slot13MN != "")
+아이템읽어오기()
 {
-GuiControl, , Gui_MagicName13, %Slot13MN%
-if(Gui_MagicCheck13 = 1)
+Gui, Submit, Nohide
+Get_Gold()
+SETFORMAT, integer, D
+invenslot := 0
+아이템갯수 := {}
+loop, 50
 {
-MagicAbility13 := Slot13Magic
+invenslot += 4
+invenitem := jelan.readString(0x0058DAD4, 50, "UTF-16", 0x178, 0xBE, 0x8, invenslot, 0x8, 0x8, 0x0)
+ItemCount := jelan.read(0x0058DAD4, "Uint", 0x178, 0xBE, 0x8, invenslot, 0x8, 0x20)
+if (invenitem = "")
+continue
+아이템갯수[invenitem] := (아이템갯수[invenitem] ? 아이템갯수[invenitem] + ItemCount : ItemCount)
 }
-if(Gui_MagicCheck13 = 0)
+RasCount := 아이템갯수["라스의깃"]
+정보카운트 := 아이템갯수["정령의보석"]
+골드바카운트 := 아이템갯수["골드바"]
+if(아이템갯수["골드바"] = "")
 {
-MagicAbility13 =
+GuiControl,, Gui_NowGoldbar, 0
 }
-}
-if(Slot14MN != "")
+else
 {
-GuiControl, , Gui_MagicName14, %Slot14MN%
-if(Gui_MagicCheck14 = 1)
+골드바갯수 := 아이템갯수["골드바"]
+GuiControl,, Gui_NowGoldbar, %골드바갯수%
+}
+if(아이템갯수["라스의깃"] = "")
 {
-MagicAbility14 := Slot14Magic
+GuiControl,, Gui_RasCount, 0
 }
-if(Gui_MagicCheck14 = 0)
+else
 {
-MagicAbility14 =
+라스의깃갯수 := 아이템갯수["라스의깃"]
+GuiControl,, Gui_RasCount, %라스의깃갯수%
 }
-}
-if(Slot15MN != "")
+if(아이템갯수["정령의보석"] = "")
 {
-GuiControl, , Gui_MagicName15, %Slot15MN%
-if(Gui_MagicCheck15 = 1)
+GuiControl,, Gui_정보Count, 0
+}
+else
 {
-MagicAbility15 := Slot15Magic
+정령의보석갯수 := 아이템갯수["정령의보석"]
+GuiControl,, Gui_정보Count, %정령의보석갯수%
 }
-if(Gui_MagicCheck15 = 0)
+SB_SetText("갈리드 / 라깃 / 정보 수량 확인 완료")
+}
+정수체크()
 {
-MagicAbility15 =
-}
-}
-if(Slot16MN != "")
+Gui, Submit, Nohide
+itemnum := 0
+itemnum1 := 0
+itemnum2 := 0
+invenslot := 0
+Loop,50
 {
-GuiControl, , Gui_MagicName16, %Slot16MN%
-if(Gui_MagicCheck16 = 1)
+SetFormat, integer, H
+invenslot += 4
+itemm := jelan.readString(0x0058DAD4, 50, "UTF-16", 0x178, 0xBE, 0x8, invenslot, 0x8, 0x8, 0x0)
+SetFormat, integer, D
+IfInString,itemm,빛나는결정
 {
-MagicAbility16 := Slot16Magic
+itemnum += 1
 }
-if(Gui_MagicCheck16 =0)
+IfInString,itemm,빛나는나뭇가지
 {
-MagicAbility16 =
+itemnum1 += 1
 }
-}
-if(Slot17MN != "")
+IfInString,itemm,빛나는가루
 {
-GuiControl, , Gui_MagicName17, %Slot17MN%
-if(Gui_MagicCheck17 = 1)
+itemnum2 += 1
+}
+}
+결정갯수 := itemnum
+나무갯수 := itemnum1
+가루갯수 := itemnum2
+return
+}
+^g::
+if( 좌표고정 != 0)
 {
-MagicAbility17 := Slot17Magic
-}
-if(Gui_MagicCheck17 = 0)
-{
-MagicAbility17 =
-}
-}
-if(Slot18MN != "")
-{
-GuiControl, , Gui_MagicName18, %Slot18MN%
-if(Gui_MagicCheck18 = 1)
-{
-MagicAbility18 := Slot18Magic
-}
-if(Gui_MagicCheck18 = 0)
-{
-MagicAbility18 =
-}
-}
+CoordMode,mouse,Screen
+MouseGetPos,게임시작x,게임시작y
+GuiControl, , 좌표x, %게임시작x%
+GuiControl, , 좌표y, %게임시작y%
+return
 }
 return
 마법읽어오기()
@@ -26532,142 +32078,29 @@ if( Ability_name = "마력방어향상" )
 }
 }
 파라스대기:
-Gui, Submit, Nohide
 settimer, 파라스대기, off
 파라스타이머시작 := 0
 파라스방해감지 := 0
 CheckPB = 0
-CheckPN = 0
+CheckPN := 0
+countsignal := 0
+랜덤감응 = 0
 MapNumber = 1
+타겟number := 0
 MobNumber = 1
 GuiControl, , Gui_NowState, [포남] 파라스 다시 가보기.
-GuiControl, , Gui_HuntAuto, 1
 SB_SetText("파라스가 풀렸는지 확인")
+   TMessage :="[ Helancia_Log ]>>" jTitle . "<<: 포남이 정상화 됐는지 다시 가봅니다"
+GuiControl, , Gui_HuntAuto, 1
 Step = 8
-CheckPB = 0
-CheckPN = 0
-PostMessage, 0x100, 9, 983041, , ahk_pid %jPID%
-PostMessage, 0x101, 9, 983041, , ahk_pid %jPID%
+랜덤감응 = 0
+keyclick("tab")
 return
-Tab:
-Gui, Submit, Nohide
-GuiControlGet, CurrentTab, , Tabsize
-if( CurrentTab = 1 )
-{
-GuiControl, show, 탭2
-GuiControl, show, 탭3
-GuiControl, show, 탭4
-GuiControl, show, 탭5
-}else
-{
-GuiControl, Hide, 탭2
-GuiControl, Hide, 탭3
-GuiControl, Hide, 탭4
-GuiControl, Hide, 탭5
-}
-if (CurrentTab != 1 && CurrentTab != 2 && CurrentTab != 3)
-{
-Gui, Show, w780 h680, 마개조 똘룸체잠 %ProgramVersion%
-if( 실행창위치 = 0)
-{
-GuiControl, move, Tabsize, w780 h680
-}else if( 실행창위치 = 1 )
-{
-GuiControl, move, Tabsize, w780 h680
-WinMove, ahk_id %Gui_ID%, , 801,0
-}else if( 실행창위치 = 2 )
-{
-GuiControl, move, Tabsize, w780 h680
-WinMove, ahk_id %Gui_ID%, , 368,120
-}else if( 실행창위치 = 3 )
-{
-GuiControl, move, Tabsize, w780 h680
-WinMove, ahk_id %Gui_ID%, , 670,0
-}
-}
-else if (CurrentTab = 1 && 시작탭사이즈 = 0)
-{
-Gui, Show, w780 h680, 마개조 똘룸체잠 %ProgramVersion%
-if( 실행창위치 = 0 && 시작탭사이즈 = 0)
-{
-GuiControl, move, Tabsize, w780 h680
-}else if( 실행창위치 = 1 && 시작탭사이즈 = 0)
-{
-GuiControl, move, Tabsize, w780 h680
-WinMove, ahk_id %Gui_ID%, , 801,0
-}else if( 실행창위치 = 2 && 시작탭사이즈 = 0)
-{
-GuiControl, move, Tabsize, w780 h680
-WinMove, ahk_id %Gui_ID%, , 368,120
-}else if( 실행창위치 = 3 && 시작탭사이즈 = 0)
-{
-GuiControl, move, Tabsize, w780 h680
-WinMove, ahk_id %Gui_ID%, , 670,0
-}
-}
-else if (CurrentTab = 1 && 시작탭사이즈 = 1)
-{
-Gui, Show, w780 h680, 마개조 똘룸체잠 %ProgramVersion%
-if( 실행창위치 = 0 && 시작탭사이즈 = 1)
-{
-GuiControl, move, Tabsize, w780 h680
-}else if( 실행창위치 = 1 && 시작탭사이즈 = 1)
-{
-GuiControl, move, Tabsize, w780 h680
-WinMove, ahk_id %Gui_ID%, , 801,0
-}else if( 실행창위치 = 2 && 시작탭사이즈 = 1)
-{
-GuiControl, move, Tabsize, w780 h680
-WinMove, ahk_id %Gui_ID%, , 368,120
-}else if( 실행창위치 = 3 && 시작탭사이즈 = 1)
-{
-GuiControl, move, Tabsize, w780 h680
-WinMove, ahk_id %Gui_ID%, , 670,0
-}
-}
-else if (CurrentTab = 2)
-{
-Gui, Show, w700 h610, 마개조 똘룸체잠 %ProgramVersion%
-if( 실행창위치 = 0)
-{
-GuiControl, move, Tabsize, w700 h610
-}else if( 실행창위치 = 1 )
-{
-GuiControl, move, Tabsize, w700 h610
-WinMove, ahk_id %Gui_ID%, , 801,0
-}else if( 실행창위치 = 2 )
-{
-GuiControl, move, Tabsize, w700 h610
-WinMove, ahk_id %Gui_ID%, , 368,120
-}else if( 실행창위치 = 3 )
-{
-GuiControl, move, Tabsize, w700 h610
-WinMove, ahk_id %Gui_ID%, , 670,0
-}
-}
-else if (CurrentTab = 3)
-{
-Gui, Show, w700 h610, 마개조 똘룸체잠 %ProgramVersion%
-if( 실행창위치 = 0)
-{
-GuiControl, move, Tabsize, w700 h610
-}else if( 실행창위치 = 1 )
-{
-GuiControl, move, Tabsize, w700 h610
-WinMove, ahk_id %Gui_ID%, , 801,0
-}else if( 실행창위치 = 2 )
-{
-GuiControl, move, Tabsize, w700 h610
-WinMove, ahk_id %Gui_ID%, , 368,120
-}else if( 실행창위치 = 3 )
-{
-GuiControl, move, Tabsize, w700 h610
-WinMove, ahk_id %Gui_ID%, , 670,0
-}
-}
+
 return
 일시정지:
 Gui, Submit, Nohide
+keyclick("tab")
 GuiControl,,Gui_Nowstate, 일시정지 되었습니다.
 GuiControl,Disabled,Gui_StopButton
 GuiControl,Hide,Gui_StopButton
@@ -26683,7 +32116,15 @@ SplashImage, 7: off
 SplashImage, 8: off
 SplashImage, 9: off
 SplashImage, 10: off
-캐릭보이기()
+jelan.write(0x0058FFE0,0,"UInt", aOffsets*)
+jelan.write(0x0058DAD4, 400, "UInt", 0x178, 0x9C)
+jelan.write(0x0058DAD4, 400, "UInt", 0x178, 0x98)
+sleep,100
+jelan.write(0x0045D28F, 0x0F, "Char", aOffsets*)
+jelan.write(0x0045D290, 0x84, "Char", aOffsets*)
+jelan.write(0x0045D291, 0xC2, "Char", aOffsets*)
+jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
+jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
 jelan.write(0x0047AA5B, 0x7d, "Char", aOffsets*)
 jelan.write(0x0047A196, 0x75, "Char", aOffsets*)
 jelan.write(0x0047A18D, 0x75, "Char", aOffsets*)
@@ -26710,20 +32151,23 @@ jelan.write(0x0045D422, 0x89, "Char", aOffsets*)
 jelan.write(0x0045D423, 0x43, "Char", aOffsets*)
 jelan.write(0x0045D424, 0x04, "Char", aOffsets*)
 jelan.write(0x0047AD18, 0x74, "Char", aOffsets*)
-Sleep,2000
-Set_MoveSpeed()
+Sleep,100
+Set_nomalSpeed()
 AltR()
 Pause
 SB_SetText("일시정지 상태")
 return
 재시작:
+keyclick("tab")
 Gui, Submit, Nohide
 GuiControl,,Gui_Nowstate, 곧 재시작 합니다.
 SB_SetText("3초후 재시작합니다.")
+sleep,3000
 GuiControl,Disabled,Gui_RestartButton
 GuiControl,Hide,Gui_RestartButton
 GuiControl,Enable,Gui_StopButton
 GuiControl,Show,Gui_StopButton
+Set_MoveSpeed()
 jelan.write(0x0047AA5B, 0xEB, "Char", aOffsets*)
 jelan.write(0x0047A196, 0xEB, "Char", aOffsets*)
 jelan.write(0x0047A18D, 0xEB, "Char", aOffsets*)
@@ -26734,10 +32178,14 @@ if(HuntPlace = 2)
 }
 else if(HuntPlace = 1)
 {
-캐릭제거()
+포북캐릭()
+}
+else if(HuntPlace = 3)
+{
+머미캐릭()
 }
 jelan.write(0x0047AD18, 0xEB, "Char", aOffsets*)
-Sleep, 3000
+Sleep, 100
 Set_MoveSpeed()
 AltR()
 Pause
@@ -26768,36 +32216,32 @@ FoodADD := FoodADD + 0x120 + 0xCC24
 value := jelan.write(FoodADD, 100, "UInt")
 }
 return
-차원체크:
-Gui, Submit, Nohide
-if( 랜덤차원 = 1 )
-{
-if(Gui_CheckUseParty = 0)
-{
-Random, CountPortal, 0, 2
+차원체크() {
+    Gui, Submit, Nohide
+    if (랜덤차원 = 1) {
+        if (Gui_CheckUseParty = 0) {
+            Random, CountPortal, 0, 2
+        }
+        현재차원 := CountPortal
+    }
+    if (알파차원 = 1) {
+        CountPortal := 0
+        현재차원 := CountPortal
+    }
+    if (베타차원 = 1) {
+        CountPortal := 1
+        현재차원 := CountPortal
+    }
+    if (감마차원 = 1) {
+        CountPortal := 2
+        현재차원 := CountPortal
+    }
+    if (Gui_PartyON = 1 && 차원 = 1) {
+        RandomRadio()
+        MsgBox, 48, 차원설정, 파티를 사용하기 위해 따악 좋은 위치 추천해준다., 1
+    }
 }
-현재차원 := CountPortal
-}
-if ( 알파차원 = 1 )
-{
-CountPortal = 0
-현재차원 := CountPortal
-}
-if ( 베타차원 = 1 )
-{
-CountPortal = 1
-현재차원 := CountPortal
-}
-if ( 감마차원 = 1 )
-{
-CountPortal = 2
-현재차원 := CountPortal
-}
-if( Gui_PartyON = 1 && 차원 = 1 )
-{
-MsgBox,48, 차원설정,파티를 사용하려면 차원을 지정해주세요.
-}
-return
+
 원격파티사용:
 Gui, Submit, Nohide
 if( Gui_PartyOff = 1 && Gui_CheckUseParty = 1)
@@ -26806,18 +32250,52 @@ MsgBox,48, 원격파티,파티설정을 자동으로 ON으로 변경합니다.`n
 GuiControl,, Gui_PartyON,1
 }
 return
+원격마법설명서:
+Gui, Submit, Nohide
+MsgBox,576, 원격파티,
+(
+	<원격마법 사용법>`n`n
+1. 체크시 원격마법사용 체크 해라.`n
+2. 1번엔 (엘)리메듐을 놓고, 2번엔 브렐을 놔라, 아몰랑과 만능링을 끼면 좋다.
+   무기는 스태프와 하프 등 사용해라.[마법사,악사 계열만 원격마법을 사용가능]`n
+3. HP가 어느정도 되면 체력을 회복할지 적어라. 그리고 인게임 내 스펠슬롯 칸 어디까지 사용할 건지를 체크해라. 병원회복설정 해뒀으면 그거보다 체력이 높게 설정해라`n
+4. 엘리메듐과 나프작 어느정도 어빌 셋팅은 기본적으로 되어있는게 좋다.`n
+   나머진 나도 안해봐서 하면서 공유해라ㅋ
+)
+return
 원격파티설명서:
 Gui, Submit, Nohide
 MsgBox,576, 원격파티,
 (
 	<원격파티 사용법>`n`n
-1. 해당 VMWARE 안에다가 파티할캐릭터 키기.`n
-2. 닉네임을 정확하게 입력 후 해당 캐릭터번호를 선택하기.
+1. 해당 VMWARE 안에다가 파티할캐릭터 켜라.`n
+2. 닉네임을 정확하게 입력 후 해당 캐릭터번호를 선택해라.
    캐릭터번호는 ( 캐릭터선택창 순서 입니다. )`n
 3. 차원설정을 파티캐릭터위치에 맞게 설정하기
-   예를들어서 파티캐릭터들이 베타에있으면`n   차원설정도 베타로설정하기.
+   예를들어서 파티캐릭터들이 베타에있으면`n   차원설정도 베타로설정해라.
 
-차원설정이 안맞으면 프로그램 오류납니다.
+[차원설정이 안맞으면 프로그램 오류]`n
+[파티캘은 점검시에도 모두 재접속해줍니다]
+
+)
+return
+텔레그램메시지사용법:
+Gui, Submit, Nohide
+GuiControl, , jTitle, %jTitle%
+TMessage := "[ Helancia_Log ]>>" . jTitle "<< : [테스트성공] 테스트 메세지 발송."
+텔레그램메시지보내기(TMessage)
+sleep,100
+MsgBox,576, 원격파티,
+(
+	<텔레그램 사용법>`n`n
+해당 시스템은 광피, 혹은 거래방해 등 여러 방해들이나 체력상승 상황을 확인 할 수 있는 유용한 텔레그램 알리미이다. `n
+1. 텔레그램 HelanciaBot을 친추해라.`n
+2. 친추한 Bot이 번호를 줄거다 예:) 12345678910. 준 번호를 가지고 입력해라.`n
+3. 입력을 정확히 했으면 외부에 나와있을때도 텍스트알림으로 상황들을 알 수 있다. 오류, 광피 등 피해를 입을 경우 해당 알람이 간다.`n
+
+Bot 가상 번호를 지우면 알람이 안간다. `n
+가상번호를 입력 후 해당 사용법을 누를 경우 테스트메세지가 발송된다.
+그걸로 테스트완료가 뜬다면 적용 완료다.
 
 )
 return
@@ -26879,6 +32357,12 @@ GuiControl, , Gui_WeaponCheck53, 0
 GuiControl, , Gui_WeaponCheck54, 0
 GuiControl, , Gui_WeaponCheck55, 0
 GuiControl, , Gui_WeaponCheck56, 0
+GuiControl, , Gui_MagicCheck3, 0
+GuiControl, , Gui_MagicCheck4, 0
+GuiControl, , Gui_MagicCheck5, 0
+GuiControl, , Gui_MagicCheck6, 0
+GuiControl, , Gui_MagicCheck7, 0
+GuiControl, , Gui_MagicCheck8, 0
 return
 어빌선택:
 Gui, Submit, Nohide
@@ -26938,6 +32422,13 @@ GuiControl, , Gui_WeaponCheck53, 1
 GuiControl, , Gui_WeaponCheck54, 1
 GuiControl, , Gui_WeaponCheck55, 1
 GuiControl, , Gui_WeaponCheck56, 1
+GuiControl, , Gui_WeaponCheck56, 1
+GuiControl, , Gui_MagicCheck3, 1
+GuiControl, , Gui_MagicCheck4, 1
+GuiControl, , Gui_MagicCheck5, 1
+GuiControl, , Gui_MagicCheck6, 1
+GuiControl, , Gui_MagicCheck7, 1
+GuiControl, , Gui_MagicCheck8, 1
 return
 소각갱신:
 Gui, Submit, Nohide
@@ -26957,8 +32448,8 @@ gui,submit,nohide
 value := jelan.write(0x00590600, X, "UInt", aOffsets*)
 value := jelan.write(0x00590604, Y, "UInt", aOffsets*)
 value := jelan.write(0x00590608, Z, "UInt", aOffsets*)
-}
 return
+}
 타겟팅:
 {
 Gui, Submit, Nohide
@@ -27149,7 +32640,8 @@ width := ImageW,  height := ImageH
 AnimatedGifControl_GetSysColor(d_element) {
 A_FI:=A_FormatInteger
 SetFormat, Integer, Hex
-BGR:=DllCall("GetSysColor",Int,d_element)+0x1000000
+BGR:=DllCall("GetSysColor"
+,Int,d_element)+0x1000000
 SetFormat,Integer,%A_FI%
 StringMid,R,BGR,8,2
 StringMid,G,BGR,6,2
@@ -27159,64 +32651,241 @@ StringUpper,RGB,RGB
 Return RGB
 }
 
-; ---------------------------
-TryLoginFail:
-    GuiControl, , 로그인상태정보, [로그인] - 실패 ( %reason% )
-    SB_SetText("인터넷 로그인 실패: " . reason)
-
-    WinClose, Elancia
-    WinKill, ahk_exe MRMsph.exe
-
-    Gosub, CleanChrome
-
-    Gui_Enable()
-    GuiControl, , jTitle, %jTitle%
-
-    SetTimer, Hunt, Off
-    SetTimer, AttackCheck, Off
-    SetTimer, incineration, Off
-    SetTimer, 타겟팅, Off
-
-    CheckPN := 0
-    CheckPB := 0
-    countsignal := 0
-    랜덤감응 := 0
-return
-
-CleanChrome:
-    Try {
-        PageInst.Evaluate("inface.auth.gotoSignOut();")
-        Sleep, 1000
-        PageInst.WaitForLoad()
-        PageInst.Evaluate(removeCookiesScript)
-        PageInst.Call("Browser.close")
-        PageInst.Disconnect()
-    } Catch e {
-        ; 무시
-    }
-    PageInst := ""
-    Try ChromeInst.Close()
-    ChromeInst := ""
-return
-
-; ▼ 크롬 인스턴스 정리 루틴
-CleanChrome(ByRef page, ByRef chrome)
+PixelColor(pc_x, pc_y, pc_wID)
 {
-    Try {
-        page.Evaluate("inface.auth.gotoSignOut();")
-        Sleep, 1000
-        page.WaitForLoad()
-        page.Evaluate(removeCookiesScript)
-        page.Call("Browser.close")
-        page.Disconnect()
-    } Catch e {
-        ; 무시
-    }
-    page := ""
-    Try chrome.Close()
-    chrome := ""
+	If pc_wID
+	{
+		pc_hDC := DllCall("GetDC", "UInt", pc_wID)
+		WinGetPos, , , pc_w, pc_h, ahk_id %pc_wID%
+		pc_hCDC := CreateCompatibleDC(pc_hDC)
+		pc_hBmp := CreateCompatibleBitmap(pc_hDC, pc_w, pc_h)
+		pc_hObj := SelectObject(pc_hCDC, pc_hBmp)
+
+		pc_hmCDC := CreateCompatibleDC(pc_hDC)
+		pc_hmBmp := CreateCompatibleBitmap(pc_hDC, 1, 1)
+		pc_hmObj := SelectObject(pc_hmCDC, pc_hmBmp)
+
+		DllCall("PrintWindow", "UInt", pc_wID, "UInt", pc_hCDC, "UInt", 0)
+		DllCall("BitBlt" , "UInt", pc_hmCDC, "Int", 0, "Int", 0, "Int", 1, "Int", 1, "UInt", pc_hCDC, "Int", pc_x, "Int", pc_y, "UInt", 0xCC0020)
+		pc_fmtI := A_FormatInteger
+		SetFormat, Integer, Hex
+		DllCall("GetBitmapBits", "UInt", pc_hmBmp, "UInt", VarSetCapacity(pc_bits, 4, 0), "UInt", &pc_bits)
+		pc_c := NumGet(pc_bits, 0)
+		SetFormat, Integer, %pc_fmtI%
+
+		DeleteObject(pc_hBmp), DeleteObject(pc_hmBmp)
+		DeleteDC(pc_hCDC), DeleteDC(pc_hmCDC)
+		DllCall("ReleaseDC", "UInt", pc_wID, "UInt", pc_hDC)
+		Return pc_c
+	}
 }
 
+
+CreateCompatibleDC(hdc=0) {
+	return DllCall("CreateCompatibleDC", "UInt", hdc)
+}
+
+CreateCompatibleBitmap(hdc, w, h) {
+	return DllCall("CreateCompatibleBitmap", UInt, hdc, Int, w, Int, w)
+}
+
+SelectObject(hdc, hgdiobj) {
+	return DllCall("SelectObject", "UInt", hdc, "UInt", hgdiobj)
+}
+
+DeleteObject(hObject) {
+   Return, DllCall("DeleteObject", "UInt", hObject)
+}
+
+DeleteDC(hdc) {
+	Return, DllCall("DeleteDC", "UInt", hdc)
+}
+
+일랜시아창크기구하기:
+{
+	IfWinNotActive, %TargetTitle%
+	{
+		WinActivate,%TargetTitle%
+		sleep,1000
+	}
+	WinGetPos, OutX, OutY, OutWidth, OutHeight, A
+	Multiplyer := round(OutWidth/100,0)*100 / 800
+	Multiplyer := round(Multiplyer,2)
+	if Multiplyer < 1
+	{
+		Multiplyer := 0
+		MSGBOX, 해상도 구하기 실패
+		return
+	}
+	SB_SetText("해상도:" OutWidth " * " OutHeight , 2)
+	GuiControl,, Multiplyer, %Multiplyer%
+	return
+}
+CheatEngine_GameSpeedTo(배속)
+		{
+			/*
+			MRM 님의 블로그에 공유해주신 스피드핵 CT 입니다.
+				define(speedhack,58FF80)
+				fullaccess(speedhack,200)
+				define(time,58FF9A)
+				define(ChangeSpeed,0058FFE0)
+				registersymbol(ChangeSpeed)
+
+				0040FB07:
+				jmp speedhack
+
+				speedhack:
+				mov edi,[ChangeSpeed]
+				add [time],edi
+				add eax,[time]
+				mov [esi+6C],eax
+				jmp 0040FB49
+
+				time:
+				dd 0 0
+
+				ChangeSpeed:
+				dd #0
+
+			0040FB07 를 E9 74 04 18 00 로 변경해야함
+			만약 0040FB07 의 값이 402945257 이 아니라면
+			0040FB07의 값을 바꿔야함
+			그리고 배속함수를 써줘야함
+			시간 0058FF9A 32bytes
+			배속 0058FFE0 4bytes
+			배속 0 추천이동속도 180
+			배속 40 추천이동속도 1650
+			유져가 배속을 변경했거나 혹은 추천이동속도가 게임내에서 자동으로 변경되었다면,
+			해당 변경사항을 게임에 적용해야함
+			현재 게임 속도를 읽어서 0058FFE0 가 설정된 게임 배속이 아니라면 다시 변경하고
+			이동속도도 동일
+			예제결과물 )
+			if ( mem.read(0x0040FB07,"Uint", aOffsets*) != 402945257 ) ; 0x180474E9
+			{
+			mem.write(0x0040FB07,0xE9,"Char", aOffsets*)
+			mem.write(0x0040FB08,0x74,"Char", aOffsets*)
+			mem.write(0x0040FB09,0x04,"Char", aOffsets*)
+			mem.write(0x0040FB0A,0x18,"Char", aOffsets*)
+			mem.write(0x0040FB0B,0x00,"Char", aOffsets*)
+			WriteExecutableMemory("게임내시간제어")
+			CheatEngine_GameSpeedTo(게임배속)
+			}
+			*/
+
+			if (jelan.read(0x0058FFE0,"UInt", aOffsets*) != 배속)
+			{
+				jelan.write(0x0058FFE0,배속,"UInt", aOffsets*)
+			}
+		}
+
+
+	IsNumber(value) {
+    return RegExMatch(value, "^\d+$") > 0
+	}
+
+OID리셋() {
+    SetFormat, integer, H
+    A리노아 := 0x0
+    A동파 := 0x0
+    A서파 := 0x0
+    B리노아 := 0x0
+    B동파 := 0x0
+    B서파 := 0x0
+    G리노아 := 0x0
+    G동파 := 0x0
+    G서파 := 0x0
+    A길잃파 := 0x0
+    B길잃파 := 0x0
+    G길잃파 := 0x0
+    SetFormat, integer, D
+
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA리노아, %A리노아%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA동파, %A동파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA서파, %A서파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB리노아, %B리노아%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB동파, %B동파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB서파, %B서파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG리노아, %G리노아%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG동파, %G동파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG서파, %G서파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA길잃파, %A길잃파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB길잃파, %B길잃파%
+    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG길잃파, %G길잃파%
+
+    GuiControl,, A리노아, %A리노아%
+    GuiControl,, A동파, %A동파%
+    GuiControl,, A서파, %A서파%
+    GuiControl,, B리노아, %B리노아%
+    GuiControl,, B동파, %B동파%
+    GuiControl,, B서파, %B서파%
+    GuiControl,, G리노아, %G리노아%
+    GuiControl,, G동파, %G동파%
+    GuiControl,, G서파, %G서파%
+    GuiControl,, A길잃파, %A길잃파%
+    GuiControl,, B길잃파, %B길잃파%
+    GuiControl,, G길잃파, %G길잃파%
+    GuiControl,, Gui_KOFF, 1
+}
+
+Check_Chat()
+{
+Chat := jelan.read(0x0058DAD4, "UInt", 0x1AC)
+}
+
+RandomRadio() {
+    RadioList := ["알파차원", "베타차원", "감마차원"]
+    Random, RandIndex, 1, 3
+    SelectedRadio := RadioList[RandIndex]
+    GuiControl,, %SelectedRadio%, 1
+}
+
+px(color) {
+    static hdc, hbm, obm, pBits
+    if !hdc {
+        ; Device Context 및 Bitmap 생성
+        hdc := DllCall("CreateCompatibleDC", "ptr", 0, "ptr")
+        VarSetCapacity(bi, 40, 0)
+        NumPut(40, bi, 0, "uint")              ; BITMAPINFOHEADER 크기
+        NumPut(A_ScreenWidth, bi, 4, "uint")   ; 너비
+        NumPut(-A_ScreenHeight, bi, 8, "int")  ; 높이 (위에서 아래로)
+        NumPut(1, bi, 12, "ushort")            ; 평면 수
+        NumPut(16, bi, 14, "ushort")           ; 비트 카운트 (16비트 색상)
+        hbm := DllCall("CreateDIBSection", "ptr", hdc, "ptr", &bi, "uint", 0, "ptr*", pBits:=0, "ptr", 0, "uint", 0, "ptr")
+        obm := DllCall("SelectObject", "ptr", hdc, "ptr", hbm, "ptr")
+    }
+
+    ; Retrieve the device context for the screen.
+    static sdc := DllCall("GetDC", "ptr", 0, "ptr")
+
+    ; Copies a portion of the screen to a new device context.
+    DllCall("gdi32\BitBlt"
+        , "ptr", hdc, "int", 0, "int", 0, "int", A_ScreenWidth, "int", A_ScreenHeight
+        , "ptr", sdc, "int", 0, "int", 0, "uint", 0x00CC0020 | 0x40000000) ; SRCCOPY | CAPTUREBLT
+
+    static bin := 0
+    if !bin {
+        ; C source code - https://godbolt.org/z/oYx39nr5s
+        code := (A_PtrSize == 4)
+        ? "VYnli1UIi0UMi00QjQSCOcJzDTkKdQSJ0OsFg8IE6+9dww=="
+        : "idJIjQSRSDnBcw9EOQF1BInI6wZIg8EE6+zD"
+        padding := (code ~= "==$") ? 2 : (code ~= "=$") ? 1 : 0
+        size := 3 * (StrLen(code) / 4) - padding
+        bin := DllCall("GlobalAlloc", "uint", 0, "uptr", size, "ptr")
+        DllCall("VirtualProtect", "ptr", bin, "ptr", size, "uint", 0x40, "uint*", old:=0)
+        DllCall("crypt32\CryptStringToBinary", "str", code, "uint", 0, "uint", 0x1, "ptr", bin, "uint*", size, "ptr", 0, "ptr", 0)
+    }
+
+    ; Pass the width * height, but the size is returned due to C interpreting Scan0 as an integer pointer.
+    ; For 16-bit color, use 2 bytes per pixel.
+    byte := DllCall(bin, "ptr", pBits, "uint", A_ScreenWidth * A_ScreenHeight * 2, "uint", color, "int")
+    if (byte == pBits + A_ScreenWidth * A_ScreenHeight * 2)
+        throw Exception("pixel not found")
+    PX := mod((byte - pBits) / 2, A_ScreenWidth)
+    PY := ((byte - pBits) / 2) // A_ScreenWidth
+    MsgBox, Pixel found at: X=%PX% Y=%PY%
+    return
+}
+return
 
 OID저장() {
     SetFormat, integer, H
@@ -27263,49 +32932,7 @@ OID저장() {
     SetFormat, integer, D
 }
 
-OID리셋() {
-    SetFormat, integer, H
-    A리노아 := 0x0
-    A동파 := 0x0
-    A서파 := 0x0
-    B리노아 := 0x0
-    B동파 := 0x0
-    B서파 := 0x0
-    G리노아 := 0x0
-    G동파 := 0x0
-    G서파 := 0x0
-    A길잃파 := 0x0
-    B길잃파 := 0x0
-    G길잃파 := 0x0
-    SetFormat, integer, D
 
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA리노아, %A리노아%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA동파, %A동파%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA서파, %A서파%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB리노아, %B리노아%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB동파, %B동파%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB서파, %B서파%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG리노아, %G리노아%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG동파, %G동파%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG서파, %G서파%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SA길잃파, %A길잃파%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SB길잃파, %B길잃파%
-    RegWrite, REG_DWORD, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, SG길잃파, %G길잃파%
-
-    GuiControl,, A리노아, %A리노아%
-    GuiControl,, A동파, %A동파%
-    GuiControl,, A서파, %A서파%
-    GuiControl,, B리노아, %B리노아%
-    GuiControl,, B동파, %B동파%
-    GuiControl,, B서파, %B서파%
-    GuiControl,, G리노아, %G리노아%
-    GuiControl,, G동파, %G동파%
-    GuiControl,, G서파, %G서파%
-    GuiControl,, A길잃파, %A길잃파%
-    GuiControl,, B길잃파, %B길잃파%
-    GuiControl,, G길잃파, %G길잃파%
-    GuiControl,, Gui_KOFF, 1
-}
 OID읽기() {
     SetFormat, integer, H
     RegRead, 업데이트체크, HKEY_CURRENT_USER, Software\Nexon\MRMChezam, S업데이트체크
@@ -27339,100 +32966,2347 @@ OID읽기() {
     SetFormat, integer, D
 }
 
-감응() {
-    ; 전역 변수 사용 선언
-    Gui, Submit, Nohide
+캐릭제거()
+{
+jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
+jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
+jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
+jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
+jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
+}
+캐릭보이기()
+{
+jelan.write(0x0045D28F, 0x0F, "Char", aOffsets*)
+jelan.write(0x0045D290, 0x84, "Char", aOffsets*)
+jelan.write(0x0045D291, 0xC2, "Char", aOffsets*)
+jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
+jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
+}
+포북캐릭()
+{
+jelan.write(0x0045DAA9, 0x90, "Char", aOffsets*)
+jelan.write(0x0045DAAA, 0x90, "Char", aOffsets*)
+jelan.write(0x0045DAAB, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D32E, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D32F, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D330, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D4E7, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D4E8, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D4E9, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D43E, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D43F, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D440, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D422, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D423, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D424, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D98B, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D98C, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D98D, 0x90, "Char", aOffsets*)
+jelan.write(0x0045DA94, 0x90, "Char", aOffsets*)
+jelan.write(0x0045DA95, 0x90, "Char", aOffsets*)
+jelan.write(0x0045DA96, 0x90, "Char", aOffsets*)
+}
+머미캐릭()
+{
+jelan.write(0x0047B3EC, 0x02, "Char", aOffsets*)
+jelan.write(0x0045DAA9, 0x90, "Char", aOffsets*)
+jelan.write(0x0045DAAA, 0x90, "Char", aOffsets*)
+jelan.write(0x0045DAAB, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D32E, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D32F, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D330, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D4E7, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D4E8, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D4E9, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D43E, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D43F, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D440, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D422, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D423, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D424, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D98B, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D98C, 0x90, "Char", aOffsets*)
+jelan.write(0x0045D98D, 0x90, "Char", aOffsets*)
+jelan.write(0x0045DA94, 0x90, "Char", aOffsets*)
+jelan.write(0x0045DA95, 0x90, "Char", aOffsets*)
+jelan.write(0x0045DA96, 0x90, "Char", aOffsets*)
 
-    if (Gui_KON = 1) {
-        if InStr(Location, "[알파차원] 포프레스네 마을") {
-            Sleep, 100
-            포남입장시간 := A_TickCount
-            countsignal := 0
-            return
-        }
+}
+무바활성화() ;//////////무바활성화
+{
+	jelan.write(0x004CBE8D, 0xE9, "char", aOffsets*)
+	jelan.write(0x004CBE8E, 0xAE, "char", aOffsets*)
+	jelan.write(0x004CBE8F, 0xF8, "char", aOffsets*)
+	jelan.write(0x004CBE90, 0x12, "char", aOffsets*)
+	jelan.write(0x004CBE91, 0x00, "char", aOffsets*)
+	jelan.write(0x004CBE92, 0xC3, "char", aOffsets*)
+}
 
-        if InStr(Location, "[알파차원] 포프레스네 남쪽") {
-            if (countsignal = 0) {
-                jelan.write(0x00527B1C, A동파, "UInt")
-                jelan.write(0x00527B1C, A동파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
-                countsignal := 1
-                호출대상 := "알파 - 동쪽파수꾼"
-                return
-            }
-            if (countsignal = 1) {
-                jelan.write(0x00527B1C, A서파, "UInt")
-                jelan.write(0x00527B1C, A서파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
-                포남입장시간 := A_TickCount
-                countsignal := 0
-                호출대상 := "알파 - 서쪽파수꾼"
-                return
-            }
-        }
+무바비활성화() ;//////////무바비활성화
+{
+	jelan.write(0x004CBE8D, 0x89, "char", aOffsets*)
+	jelan.write(0x004CBE8E, 0x85, "char", aOffsets*)
+	jelan.write(0x004CBE8F, 0xA4, "char", aOffsets*)
+	jelan.write(0x004CBE90, 0x01, "char", aOffsets*)
+	jelan.write(0x004CBE91, 0x00, "char", aOffsets*)
+	jelan.write(0x004CBE92, 0x00, "char", aOffsets*)
+}
 
-        if InStr(Location, "[베타차원] 포프레스네 남쪽") {
-            if (countsignal = 0) {
-                jelan.write(0x00527B1C, B동파, "UInt")
-                jelan.write(0x00527B1C, B동파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
-                countsignal := 1
-                호출대상 := "베타 - 동쪽파수꾼"
-                return
-            }
-            if (countsignal = 1) {
-                jelan.write(0x00527B1C, B서파, "UInt")
-                jelan.write(0x00527B1C, B서파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
-                포남입장시간 := A_TickCount
-                countsignal := 0
-                호출대상 := "베타 - 서쪽파수꾼"
-                return
-            }
-        }
+TrackWeaponChange(newWeapon)
+{
+global RecentWeapons
+for index, weapon in RecentWeapons
+{
+if (weapon == newWeapon)
+{
+return
+}
+}
+RecentWeapons.InsertAt(1, newWeapon)
+if (weapon == newWeapon)
+{
+RecentWeapons.RemoveAt(1)
+; 현재 무기가 newWeapon과 같으면 제거
+}
+if (RecentWeapons.MaxIndex() > 3)
+{
+RecentWeapons.RemoveAt(4)
+}
+}
+CheckTrackedWeapons()
+{
+global RecentWeapons
+return RecentWeapons.MaxIndex()
+}
 
-        if InStr(Location, "[감마차원] 포프레스네 남쪽") {
-            if (countsignal = 0) {
-                jelan.write(0x00527B1C, G동파, "UInt")
-                jelan.write(0x00527B1C, G동파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
-                countsignal := 1
-                호출대상 := "감마 - 동쪽파수꾼"
-                return
-            }
-            if (countsignal = 1) {
-                jelan.write(0x00527B1C, G서파, "UInt")
-                jelan.write(0x00527B1C, G서파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
-                포남입장시간 := A_TickCount
-                countsignal := 0
-                호출대상 := "감마 - 서쪽파수꾼"
-                return
-            }
-        }
+		GetLVRowByResult(result)
+		{
+			loop % LV_GetCount()
+			{
+				LV_GetText(currentResult, A_Index, 10) ; Assuming 'result' is in the 10th column
+				if (currentResult == result)
+					return A_Index
+			}
+			return -1 ; Return -1 if not found
+		}
+
+		GetLVRowByOID(OID)
+		{
+			loop % LV_GetCount()
+			{
+				LV_GetText(currentOID, A_Index, 6) ; Assuming 'result' is in the 10th column
+				if (currentOID == OID)
+					return A_Index
+			}
+			return -1 ; Return -1 if not found
+		}
+
+;메모리서치
+
+목표리스트추가메뉴:
+{
+if (rn=0)
+return
+MouseGetPos, musX, musY
+Menu, DMenu, Show, %musX%,%musY%
+return
+}
+
+플레이어리스트실행:
+{
+gui,listview,플레이어리스트
+RN:=LV_GetNext(0)
+if (rn=0)
+return
+Row := A_EventInfo
+;LV_Add("", "플레이어", 차원, 맵이름, 맵번호, find_name, find_object_id, find_x, find_y, find_z)
+LV_GetText(C1,row,1)
+LV_GetText(C2,row,2)
+LV_GetText(C3,row,3)
+LV_GetText(C4,row,4)
+LV_GetText(C5,row,5)
+LV_GetText(C6,row,6)
+LV_GetText(C7,row,7)
+LV_GetText(C8,row,8)
+LV_GetText(C9,row,9)
+if (A_GuiEvent = "DoubleClick")
+{
+
+}
+if (A_GuiEvent = "DoubleClick")
+{
+gui,listview,플레이어리스트
+}
+if A_GuiEvent = click
+{
+gui,listview,플레이어리스트
+goto,목표리스트추가메뉴
+}
+if A_GuiEvent = Rightclick
+{
+gui,listview,플레이어리스트
+goto,목표리스트추가메뉴
+}
+return
+}
+
+아이템리스트실행:
+{
+gui,listview,아이템리스트
+RN:=LV_GetNext(0)
+if (rn=0)
+return
+Row := A_EventInfo
+;LV_Add("", "플레이어", 차원, 맵이름, 맵번호, find_name, find_object_id, find_x, find_y, find_z)
+LV_GetText(C1,row,1)
+LV_GetText(C2,row,2)
+LV_GetText(C3,row,3)
+LV_GetText(C4,row,4)
+LV_GetText(C5,row,5)
+LV_GetText(C6,row,6)
+LV_GetText(C7,row,7)
+LV_GetText(C8,row,8)
+LV_GetText(C9,row,9)
+if (A_GuiEvent = "DoubleClick")
+{
+gui,listview,아이템리스트
+}
+if A_GuiEvent = click
+{
+gui,listview,아이템리스트
+goto,목표리스트추가메뉴
+}
+if A_GuiEvent = Rightclick
+{
+gui,listview,아이템리스트
+goto,목표리스트추가메뉴
+}
+return
+}
+
+몬스터리스트실행:
+{
+gui,listview,몬스터리스트
+RN:=LV_GetNext(0)
+if (rn=0)
+return
+Row := A_EventInfo
+;LV_Add("", "플레이어", 차원, 맵이름, 맵번호, find_name, find_object_id, find_x, find_y, find_z)
+LV_GetText(C1,row,1)
+LV_GetText(C2,row,2)
+LV_GetText(C3,row,3)
+LV_GetText(C4,row,4)
+LV_GetText(C5,row,5)
+LV_GetText(C6,row,6)
+LV_GetText(C7,row,7)
+LV_GetText(C8,row,8)
+LV_GetText(C9,row,9)
+if (A_GuiEvent = "DoubleClick")
+{
+gui,listview,아이템리스트
+}
+if A_GuiEvent = click
+{
+gui,listview,몬스터리스트
+goto,목표리스트추가메뉴
+}
+if A_GuiEvent = Rightclick
+{
+gui,listview,몬스터리스트
+goto,목표리스트추가메뉴
+}
+return
+}
+
+메모리검색_몬스터:
+;{
+; Constants
+AddressToCheck := 0x005420AC
+ListGUI := "몬스터리스트"
+gui,submit,nohide
+; Initialize ListView
+gui, listview, %ListGUI%
+
+; Read memory and populate MonsterList
+startAddress := 0x005907D4
+endAddress := 0x00590800
+while (startAddress <= endAddress)
+{
+    data := jelan.read(startAddress, "UInt", aOffsets*)
+    if (!IsDataInList(data, MonsterList))
+        MonsterList.Push(data)
+    startAddress += 4
+}
+
+좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
+좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
+좌표Z := jelan.read(0x0058DAD4, "UInt", 0x18)
+
+for index, result in MonsterList
+{
+    resultHex := Format("0x{:08X}", result)
+    addr := jelan.read(resultHex, "UInt", aOffsets*)
+	find_object_id := jelan.read(result + 0x5E, "UInt",aOffsets*)
+	find_object_id := Format("0x{:08X}", find_object_id)
+	LV_Row := GetLVRowByResult(result)
+	gui, listview, %ListGUI%
+	LV_GetText(분류,LV_Row,1)
+	if (addr != AddressToCheck)
+    {
+        MonsterList.RemoveAt(index)
+		gui, listview, %ListGUI%
+		LV_Delete(LV_Row)
+        continue
     }
+    find_x := jelan.read(result + 0x0C, "UInt", aOffsets*)
+	find_y := jelan.read(result + 0x10, "UInt", aOffsets*)
+	find_z := jelan.read(result + 0x14, "UInt", aOffsets*)
+	distanceXYZ := Abs(find_x - 좌표X) + Abs(find_y - 좌표Y) + Abs(find_z - 좌표Z) * 20
+	find_name := jelan.readString(jelan.read(result + 0x62, "UInt", aOffsets*), 20, "UTF-16",aOffsets*)
+	findMID := jelan.read(result + 0x82, "UInt", aOffsets*)
+
+	if (LV_Row > 0)
+	{
+		gui, listview, %ListGUI%
+		LV_Modify(LV_Row,"", kind, 차원, 맵이름, 맵번호, find_name, find_object_id, find_x, find_y, find_z, , , distanceXYZ ,findMID)
+	}
+
+Gui, listview, 몬스터리스트
+i := 1
+loop % LV_GetCount()
+{
+	LV_GetText(몬스터분류,i,1)
+	LV_GetText(몬스터이름,i,5)
+	LV_GetText(몬스터위치X,i,7)
+	LV_GetText(몬스터위치Y,i,8)
+	LV_GetText(몬스터위치Z,i,9)
+	LV_GetText(몬스터주소,i,10)
+	좌표X := jelan.read(0x0058DAD4, "UInt", 0x10)
+	좌표Y := jelan.read(0x0058DAD4, "UInt", 0x14)
+	거리X := ABS(좌표X-몬스터위치X)
+	거리Y := ABS(좌표Y-몬스터위치Y)
+	거리 := 거리X + 거리Y
+	addr := jelan.read(몬스터주소, "UInt", aOffsets*)
+	find_name := jelan.readString(jelan.read(몬스터주소 + 0x62, "UInt", aOffsets*), 20, "UTF-16",aOffsets*)
+	if ((addr != AddressToCheck) || ( find_name != 몬스터이름) || (몬스터분류 != "몬스터"))
+    {
+		LV_Delete(i)
+		continue
+	}
+	LV_Modify(i,"Col12",거리)
+	i++
+}
+}
+return
+;}
+
+몬스터_선택:
+;{
+
+; ListView에서 Col12 가 가장 낮은 값을 찾고, Col5가 WantedList에 포함되며, Col6가 BlackList에 포함되지 않는 항목을 선택합니다.
+gui, listview, 몬스터리스트
+LVCount := LV_GetCount()
+LVSelect := LV_GetNext(0)
+if ((LVSelect != 0) || !(LVCount = 0))
+{
+	LV_GetText(col5Value,LVSelect,5)
+	if (!IsDataInList(col5Value, WantedMonsters) && WantedMonsterlength >= 1)
+	{
+		gui, listview, 몬스터리스트
+		LV_Modify(0,"-Select")
+	}
+}
+
+if (LVSelect != 0)
+	return
+
+lowestCol12Value := 999999 ; 초기 높은 값으로 설정
+selectedRow := 0 ; 선택할 행 초기화
+/*
+	WantedItems
+	WantedMonsters
+	BlackList
+	WantedItemlength := WantedItems.MaxIndex()
+	WantedMonsterlength := WantedMonsters.MaxIndex()
+	BlackListlength := BlackList.MaxIndex()
+blackList := ["값1", "값2", "값3"] ; 블랙리스트 값들의 배열
+wantedList := ["원하는값1", "원하는값2", "원하는값3"] ; 원하는 값들의 배열
+*/
+
+; ListView의 모든 행을 검색합니다
+ ; ListView의 항목 수를 가져옵니다
+
+WantedMonsterLength := 0 ; 기본값을 0으로 설정
+if WantedMonsters.MaxIndex() ; 배열이 비어있지 않은 경우
+    WantedMonsterLength := WantedMonsters.MaxIndex()
+
+DisWantedMonsterLength := 0 ; 기본값을 0으로 설정
+if DisWantedMonsters.MaxIndex() ; 배열이 비어있지 않은 경우
+    DisWantedMonsterLength := DisWantedMonsters.MaxIndex()
+
+
+Loop, %LVCount%
+{
+    thisRow := A_Index
+    LV_GetText(col12Value, thisRow, 12) ; 현재 행의 Col12 값을 가져옵니다
+    LV_GetText(col5Value, thisRow, 5) ; 현재 행의 Col5 값을 가져옵니다
+    LV_GetText(col6Value, thisRow, 6) ; 현재 행의 Col6 값을 가져옵니다
+	;SB_SetText("비교중" A_Index " " WantedMonsterlength, 5)
+	SB_SETTEXT(WantedMonsterlength "/" DisWantedMonsterLength,5)
+    ; Col12 값이 현재 가장 낮은 값보다 낮고, Col5 값이 WantedList에 포함되고, Col6 값이 BlackList에 없는 경우
+    if ((col12Value < lowestCol12Value && !IsDataInList(col6Value, BlackList)) && ((IsDataInList(col5Value, WantedMonsters) && WantedMonsterLength >= 1) || WantedMonsterLength < 1 ) && ((!IsDataInList(col5Value, DisWantedMonsters) && DisWantedMonsterLength>=1) || DisWantedMonsterLength == 0))
+	{
+		lowestCol12Value := col12Value
+		selectedRow := thisRow
+    }
+}
+
+; 가장 낮은 Col12 값을 가지고 WantedList에 포함되며 BlackList에 없는 행을 선택합니다
+if (selectedRow > 0)
+{
+    LV_Modify(selectedRow, "Select") ; 해당 행을 선택합니다
+}
+guicontrol,,몬스터수,몬스터: %LVCount% 마리
+return
+;}
+
+
+RandomMummy2()
+{
+    Global SelectedMummy2
+    MummyList2 := ["왼쪽", "중앙", "오른쪽"]
+    Random, RandIndex, 1, 3
+    SelectedMummy2 := MummyList2[RandIndex]
+}
+
+CharMoveMummy() ;머미이동 함수
+{
+    if(머미맵선택 = 0)
+{
+if(MapNumber = 1)
+{
+RunDirect = 0
+}
+if(MapNumber = 2)
+{
+좌표입력(31,75,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 3)
+{
+좌표입력(30,66,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 4)
+{
+좌표입력(35,67,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 5)
+{
+좌표입력(41,67,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 6)
+{
+좌표입력(48,67,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 7)
+{
+좌표입력(42,77,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 8)
+{
+좌표입력(37,66,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 9)
+{
+좌표입력(31,66,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 10)
+{
+좌표입력(26,66,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 11)
+{
+좌표입력(21,66,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 12)
+{
+좌표입력(18,66,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 13)
+{
+좌표입력(18,62,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 14)
+{
+좌표입력(18,58,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 15)
+{
+좌표입력(198,101,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 16)
+{
+좌표입력(23,58,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 17)
+{
+좌표입력(28,58,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 18)
+{
+좌표입력(35,58,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 19)
+{
+좌표입력(41,58,0)
+RunMemory("좌표이동")
+}
+if (MapNumber = 20)
+{
+    좌표입력(47, 58, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 21)
+{
+    좌표입력(42, 51, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 22)
+{
+    좌표입력(34, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 23)
+{
+    좌표입력(30, 44, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 24)
+{
+    좌표입력(26, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 25)
+{
+    좌표입력(21, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 26)
+{
+    좌표입력(17, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 27)
+{
+    좌표입력(17, 43, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 28)
+{
+    좌표입력(17, 39, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 29)
+{
+    좌표입력(20, 37, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 30)
+{
+    좌표입력(20,33, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 31)
+{
+    좌표입력(20, 29, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 32)
+{
+    좌표입력(24, 29, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 33)
+{
+    좌표입력(28, 29, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 34)
+{
+    좌표입력(31, 29, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 35)
+{
+    좌표입력(38, 30, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 36)
+{
+    좌표입력(47, 30, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 37)
+{
+    좌표입력(41, 24, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 38)
+{
+    좌표입력(43, 18,0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 39)
+{
+    좌표입력(43, 13, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 40)
+{
+    좌표입력(35, 14, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 41)
+{
+    좌표입력(25, 14, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 42)
+{
+    좌표입력(14, 14, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 43)
+{
+    좌표입력(5, 16, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 44)
+{
+    좌표입력(17, 15, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 45)
+{
+    좌표입력(22, 15, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 46)
+{
+    좌표입력(29, 16, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 47)
+{
+    좌표입력(35, 16, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 48)
+{
+    좌표입력(40, 16, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49)
+{
+    좌표입력(43, 22, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50)
+{
+    좌표입력(42, 27, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 51)
+{
+    좌표입력(42, 30, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52)
+{
+    좌표입력(37, 30, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53)
+{
+    좌표입력(31, 32, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54)
+{
+    좌표입력(24, 34, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 55)
+{
+    좌표입력(20, 35, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 56)
+{
+    좌표입력(18, 40, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 57)
+{
+    좌표입력(19, 44, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 58)
+{
+    좌표입력(20, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 59)
+{
+    좌표입력(26, 46, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 60)
+{
+    좌표입력(31, 45, 0)
+    RunMemory("좌표이동")
+    RunDirect = 1
+}
+if (MapNumber = 61)
+{
+    좌표입력(33, 44, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 62)
+{
+    좌표입력(35, 43, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 63)
+{
+    좌표입력(38, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 64)
+{
+    좌표입력(41, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 65)
+{
+    좌표입력(45, 45, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 66)
+{
+    좌표입력(45, 49, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 67)
+{
+    좌표입력(44, 53, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 68)
+{
+    좌표입력(43, 57, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 69)
+{
+    좌표입력(41, 59, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 70)
+{
+    좌표입력(41, 66, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 71)
+{
+    좌표입력(35, 69, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 72)
+{
+    좌표입력(32, 69, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 73)
+{
+    좌표입력(28, 69, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 74)
+{
+    좌표입력(23, 69, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 75)
+{
+    좌표입력(18, 67, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 76)
+{
+    좌표입력(10, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 77)
+{
+    좌표입력(7, 66, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 78)
+{
+    좌표입력(14, 69, 0)
+    RunMemory("좌표이동")
+    RunDirect = 1
+}
+if(RunDirect = 0)
+{
+MapNumber += 1
+Sleep,10
+}
+if(RunDirect = 1)
+{
+MapNumber -= 1
+Sleep,10
+}
+Step = 3025
+}
+
+if(머미맵선택 = 1) ; 중앙
+{
+if(MapNumber = 1)
+{
+RunDirect = 0
+}
+if(MapNumber = 2)
+{
+좌표입력(30,95,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 3)
+{
+좌표입력(26,88,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 4)
+{
+좌표입력(22,88,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 5)
+{
+좌표입력(17,88,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 6)
+{
+좌표입력(11,86,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 7)
+{
+좌표입력(7,88,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 8)
+{
+좌표입력(7,85,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 9)
+{
+좌표입력(13,88,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 10)
+{
+좌표입력(18,88,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 11)
+{
+좌표입력(25,88,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 12)
+{
+좌표입력(34,84,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 13)
+{
+좌표입력(38,87,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 14)
+{
+좌표입력(43,88,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 15)
+{
+좌표입력(49,88,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 16)
+{
+좌표입력(44,88,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 17)
+{
+좌표입력(39,85,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 18)
+{
+좌표입력(34,81,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 19)
+{
+좌표입력(35,76,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 20)
+{
+좌표입력(35,76,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 21)
+{
+좌표입력(40,75,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 22)
+{
+좌표입력(44,75,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 23)
+{
+좌표입력(47,73,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 24)
+{
+좌표입력(51,70,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 25)
+{
+좌표입력(54,70,0)
+RunMemory("좌표이동")
+}if(MapNumber = 26)
+{
+좌표입력(50,73,0)
+RunMemory("좌표이동")
+}if(MapNumber = 27)
+{
+좌표입력(48,77,0)
+RunMemory("좌표이동")
+}if(MapNumber = 28)
+{
+좌표입력(52,78,0)
+RunMemory("좌표이동")
+}if(MapNumber = 29)
+{
+좌표입력(47,78,0)
+RunMemory("좌표이동")
+}if(MapNumber = 30)
+{
+좌표입력(42,74,0)
+RunMemory("좌표이동")
+}if(MapNumber = 31)
+{
+좌표입력(37,77,0)
+RunMemory("좌표이동")
+}if(MapNumber = 32)
+{
+좌표입력(33,74,0)
+RunMemory("좌표이동")
+}if(MapNumber = 33)
+{
+좌표입력(34,69,0)
+RunMemory("좌표이동")
+}if(MapNumber = 35)
+{
+좌표입력(34,65,0)
+RunMemory("좌표이동")
+}if(MapNumber = 36)
+{
+좌표입력(38,63,0)
+RunMemory("좌표이동")
+}if(MapNumber = 37)
+{
+좌표입력(44,62,0)
+RunMemory("좌표이동")
+}if(MapNumber = 38)
+{
+좌표입력(39,63,0)
+RunMemory("좌표이동")
+}if(MapNumber = 39)
+{
+좌표입력(34,64,0)
+RunMemory("좌표이동")
+}if(MapNumber = 40)
+{
+좌표입력(30,65,0)
+RunMemory("좌표이동")
+}if(MapNumber = 41)
+{
+좌표입력(24,69,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 42)
+{
+좌표입력(19,65,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 43)
+{
+좌표입력(12,62,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 44)
+{
+좌표입력(13,59,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 45)
+{
+좌표입력(14,56,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 46)
+{
+좌표입력(14,52,0)
+RunMemory("좌표이동")
+}
+if(MapNumber = 47)
+{
+좌표입력(17,51,0)
+RunMemory("좌표이동")
+}
+if (MapNumber = 48)
+{
+    좌표입력(19, 54, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49)
+{
+    좌표입력(22, 54, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50)
+{
+    좌표입력(25, 52, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 51)
+{
+    좌표입력(29, 52, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52)
+{
+    좌표입력(32, 50, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53)
+{
+    좌표입력(35, 49, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54)
+{
+    좌표입력(40, 49, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 55)
+{
+    좌표입력(42, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 56)
+{
+    좌표입력(45, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 57)
+{
+    좌표입력(48, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 58)
+{
+    좌표입력(52, 46, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 59)
+{
+    좌표입력(53, 42, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 60)
+{
+    좌표입력(52, 38, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 61)
+{
+    좌표입력(49, 36, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 62)
+{
+    좌표입력(44, 35, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 63)
+{
+    좌표입력(40, 35, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 64)
+{
+    좌표입력(37, 37, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 65)
+{
+    좌표입력(34, 40, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 66)
+{
+    좌표입력(31, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 67)
+{
+    좌표입력(27, 40, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 68)
+{
+    좌표입력(24, 40, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 69)
+{
+    좌표입력(20, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 70)
+{
+    좌표입력(16, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 71)
+{
+    좌표입력(12, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 72)
+{
+    좌표입력(7, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 73)
+{
+    좌표입력(11, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 74)
+{
+    좌표입력(19, 40, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 75)
+{
+    좌표입력(23, 38, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 76)
+{
+    좌표입력(23, 34, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 77)
+{
+    좌표입력(23, 30, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 78)
+{
+    좌표입력(19, 29, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 79)
+{
+    좌표입력(14, 30, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 80)
+{
+    좌표입력(11, 29, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 81)
+{
+    좌표입력(9, 29, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 82)
+{
+    좌표입력(9, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 83)
+{
+    좌표입력(13, 27, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 84)
+{
+    좌표입력(17, 27, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 85)
+{
+    좌표입력(20, 28, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 86)
+{
+    좌표입력(24, 28, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 87)
+{
+    좌표입력(30, 28, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 88)
+{
+    좌표입력(33, 28, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 89)
+{
+    좌표입력(37, 28, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 90)
+{
+    좌표입력(40, 27, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 91)
+{
+    좌표입력(41, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 92)
+{
+    좌표입력(45, 24, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 93)
+{
+    좌표입력(41, 25, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 94)
+{
+    좌표입력(36, 29, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 95)
+{
+    좌표입력(32, 31, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 96)
+{
+    좌표입력(27, 29, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 97)
+{
+    좌표입력(24, 30, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 98)
+{
+    좌표입력(24, 31, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 99)
+{
+    좌표입력(24, 35, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 100)
+{
+    좌표입력(22, 37, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 101)
+{
+    좌표입력(22, 40, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 102)
+{
+    좌표입력(25, 43, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 103)
+{
+    좌표입력(32, 43, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 104)
+{
+    좌표입력(32, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 105)
+{
+    좌표입력(36, 39, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 106)
+{
+    좌표입력(41, 35, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 107)
+{
+    좌표입력(46, 35, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 108)
+{
+    좌표입력(44, 36, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 109)
+{
+    좌표입력(40, 36, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 110)
+{
+    좌표입력(36, 38, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 111)
+{
+    좌표입력(34, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 112)
+{
+    좌표입력(30, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 113)
+{
+    좌표입력(25, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 114)
+{
+    좌표입력(19, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 115)
+{
+    좌표입력(17, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 116)
+{
+    좌표입력(17, 44, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 117)
+{
+    좌표입력(18, 44, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 118)
+{
+    좌표입력(21, 44, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 119)
+{
+    좌표입력(26, 44, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 120)
+{
+    좌표입력(31, 43, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 121)
+{
+    좌표입력(36, 43, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 122)
+{
+    좌표입력(37, 39, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 123)
+{
+    좌표입력(44, 39, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 124)
+{
+    좌표입력(49, 40, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 125)
+{
+    좌표입력(53, 43, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 126)
+{
+    좌표입력(50, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 127)
+{
+    좌표입력(40, 46, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 128)
+{
+    좌표입력(XX, YY, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 129)
+{
+    좌표입력(40, 48, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 130)
+{
+    좌표입력(43, 51, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 131)
+{
+    좌표입력(39, 52, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 132)
+{
+    좌표입력(36, 54, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 133)
+{
+    좌표입력(33, 55, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 134)
+{
+    좌표입력(29, 55, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 135)
+{
+    좌표입력(18, 54, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 136)
+{
+    좌표입력(13, 55, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 137)
+{
+    좌표입력(15, 60, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 138)
+{
+    좌표입력(16, 63, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 139)
+{
+    좌표입력(22, 65, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 140)
+{
+    좌표입력(26, 66, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 141)
+{
+    좌표입력(28, 67, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 142)
+{
+    좌표입력(31, 69, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 143)
+{
+    좌표입력(32, 72, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 144)
+{
+    좌표입력(33, 77, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 145)
+{
+    좌표입력(31, 82, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 146)
+{
+    좌표입력(35, 79, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 147)
+{
+    좌표입력(41, 76, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 148)
+{
+    좌표입력(46, 73, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 149)
+{
+    좌표입력(41, 75, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 150)
+{
+    좌표입력(35, 80, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 151)
+{
+    좌표입력(35, 84, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 152)
+{
+    좌표입력(XX, YY, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 153)
+{
+    좌표입력(34, 87, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 154)
+{
+    좌표입력(31, 90, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 155)
+{
+    좌표입력(37, 88, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 156)
+{
+    좌표입력(42, 88, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 157)
+{
+    좌표입력(45, 88, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 158)
+{
+    좌표입력(48, 88, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 159)
+{
+    좌표입력(51, 89, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 160)
+{
+    좌표입력(49, 89, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 161)
+{
+    좌표입력(45, 90, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 162)
+{
+    좌표입력(40, 90, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 163)
+{
+    좌표입력(36, 90, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 164)
+{
+    좌표입력(32, 91, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 165)
+{
+    좌표입력(28, 91, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 166)
+{
+    좌표입력(23, 89, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 167)
+{
+    좌표입력(19, 90, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 168)
+{
+    좌표입력(15, 88, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 169)
+{
+    좌표입력(11, 89, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 170)
+{
+    좌표입력(8, 87, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 171)
+{
+    좌표입력(5, 86, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 172)
+{
+    좌표입력(10, 89, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 173)
+{
+    좌표입력(16, 90, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 174)
+{
+    좌표입력(24, 90, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 175)
+{
+    좌표입력(25, 90, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 176)
+{
+    좌표입력(29, 91, 0)
+    RunMemory("좌표이동")
+    RunDirect = 1
+}
+if(RunDirect = 0)
+{
+MapNumber += 1
+Sleep,10
+}
+if(RunDirect = 1)
+{
+MapNumber -= 1
+Sleep,10
+}
+Step = 3025
+}
+
+if(머미맵선택 = 2)
+{
+if (MapNumber = 1)
+{
+    RunDirect = 0
+}
+if (MapNumber = 2)
+{
+    좌표입력(30, 76, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 3)
+{
+    좌표입력(29, 69, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 4)
+{
+    좌표입력(26, 70, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 5)
+{
+    좌표입력(23, 71, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 6)
+{
+    좌표입력(21, 71, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 7)
+{
+    좌표입력(17, 71, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 8)
+{
+    좌표입력(13, 71, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 9)
+{
+    좌표입력(10, 71, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 10)
+{
+    좌표입력(11, 62, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 11)
+{
+    좌표입력(15, 66, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 12)
+{
+    좌표입력(17, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 13)
+{
+    좌표입력(20, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 14)
+{
+    좌표입력(23, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 15)
+{
+    좌표입력(26, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 16)
+{
+    좌표입력(29, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 17)
+{
+    좌표입력(33, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 18)
+{
+    좌표입력(37, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 19)
+{
+    좌표입력(40, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 20)
+{
+    좌표입력(44, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 21)
+{
+    좌표입력(47, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 22)
+{
+    좌표입력(50, 68, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 23)
+{
+    좌표입력(48, 66, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 24)
+{
+    좌표입력(46, 64, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 25)
+{
+    좌표입력(42, 63, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 26)
+{
+    좌표입력(39, 66, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 27)
+{
+    좌표입력(37, 67, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 28)
+{
+    좌표입력(33, 67, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 29)
+{
+    좌표입력(30, 67, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 30)
+{
+    좌표입력(28, 67, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 31)
+{
+    좌표입력(24, 65, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 32)
+{
+    좌표입력(24, 62, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 33)
+{
+    좌표입력(18, 53, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 34)
+{
+    좌표입력(16, 51, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 35)
+{
+    좌표입력(12, 48, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 36)
+{
+    좌표입력(9, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 37)
+{
+    좌표입력(6, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 38)
+{
+    좌표입력(10, 46, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 39)
+{
+    좌표입력(13, 48, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 40)
+{
+    좌표입력(16, 49, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 41)
+{
+    좌표입력(19, 52, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 42)
+{
+    좌표입력(22, 55, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 43)
+{
+    좌표입력(25, 56, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 44)
+{
+    좌표입력(30, 56, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 45)
+{
+    좌표입력(34, 56, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 46)
+{
+    좌표입력(37, 54, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 47)
+{
+    좌표입력(41, 50, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 48)
+{
+    좌표입력(44, 47, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 49)
+{
+    좌표입력(47, 45, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 50)
+{
+    좌표입력(51, 46, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 51)
+{
+    좌표입력(48, 41, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 52)
+{
+    좌표입력(44, 40, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 53)
+{
+    좌표입력(41, 40, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 54)
+{
+    좌표입력(37, 39, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 55)
+{
+    좌표입력(33, 37, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 56)
+{
+    좌표입력(30, 39, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 57)
+{
+    좌표입력(27, 39, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 58)
+{
+    좌표입력(24, 39, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 59)
+{
+    좌표입력(21, 39, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 60)
+{
+    좌표입력(18, 38, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 61)
+{
+    좌표입력(13, 34, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 62)
+{
+    좌표입력(10, 34, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 63)
+{
+    좌표입력(5, 34, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 64)
+{
+    좌표입력(8, 30, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 65)
+{
+    좌표입력(12, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 66)
+{
+    좌표입력(16, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 67)
+{
+    좌표입력(20, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 68)
+{
+    좌표입력(23, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 69)
+{
+    좌표입력(28, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 70)
+{
+    좌표입력(31, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 71)
+{
+    좌표입력(37, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 72)
+{
+    좌표입력(41, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 73)
+{
+    좌표입력(45, 26, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 74)
+{
+    좌표입력(41, 23, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 75)
+{
+    좌표입력(38, 21, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 76)
+{
+    좌표입력(37, 17, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 77)
+{
+    좌표입력(39, 16, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 78)
+{
+    좌표입력(43, 15, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 79)
+{
+    좌표입력(46, 16, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 80)
+{
+    좌표입력(49, 16, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 81)
+{
+    좌표입력(47, 17, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 82)
+{
+    좌표입력(45, 19, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 83)
+{
+    좌표입력(43, 19, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 84)
+{
+    좌표입력(40, 15, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 85)
+{
+    좌표입력(33, 16, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 86)
+{
+    좌표입력(29, 18, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 87)
+{
+    좌표입력(24, 19, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 88)
+{
+    좌표입력(20, 17, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 89)
+{
+    좌표입력(16, 17, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 90)
+{
+    좌표입력(12, 17, 0)
+    RunMemory("좌표이동")
+}
+if (MapNumber = 91)
+{
+    좌표입력(9, 17, 0)
+    RunMemory("좌표이동")
+    RunDirect = 1
+}
+if(RunDirect = 0)
+{
+MapNumber += 1
+Sleep,10
+}
+if(RunDirect = 1)
+{
+MapNumber -= 1
+Sleep,10
+}
+Step = 3025
+}
+}
+
+ClearChromeHistory()
+{
+    ; Chrome의 쿠키, 캐시, 기록 파일이 있는 폴더 경로 (사용자마다 다를 수 있음)
+    cookiesPath := A_LocalAppData "\Google\Chrome\User Data\Default\Cookies"
+    cachePath := A_LocalAppData "\Google\Chrome\User Data\Default\Cache"
+    historyPath := A_LocalAppData "\Google\Chrome\User Data\Default\History"
+    webCachePath := A_LocalAppData "\Google\Chrome\User Data\Default\Web Data"
+
+    ; 쿠키 삭제
+    if FileExist(cookiesPath)
+    {
+        FileDelete, %cookiesPath%
+    }
+
+    ; 캐시 삭제
+    if FileExist(cachePath)
+    {
+        FileRemoveDir, %cachePath%, 1  ; 하위 폴더까지 모두 삭제
+    }
+
+    ; 히스토리 삭제
+    if FileExist(historyPath)
+    {
+        FileDelete, %historyPath%
+    }
+
+    ; 웹 데이터 삭제 (양식 데이터 등)
+    if FileExist(webCachePath)
+    {
+        FileDelete, %webCachePath%
+    }
+
+    ; DNS 캐시 비우기
+    RunWait, %ComSpec% /c "ipconfig /flushdns"
+}
+
+		CheatEngine_NoAttackMotion() ;게임핵: 공격모션 제거 - 빠른 공격
+		{
+			jelan.write(0x0047C1A9,0x6A,"char",aOffset*)
+			jelan.write(0x0047C1AA,0x00,"char",aOffset*)
+			jelan.write(0x0047C1AB,0x90,"char",aOffset*)
+			jelan.write(0x0047C1AC,0x90,"char",aOffset*)
+			jelan.write(0x0047C1AD,0x90,"char",aOffset*)
+		}
+
+        CheatEngine_NoShowRide() ; 게임핵: 탈것 안보이기 - 이동불가 체력회복용 탈것 장착상태로 이동 가능
+        {
+            jelan.write(0x0046035B, 0x90, "Char", aOffsets*)
+            jelan.write(0x0046035C, 0x90, "Char", aOffsets*)
+            jelan.write(0x0046035D, 0x90, "Char", aOffsets*)
+            jelan.write(0x0046035E, 0x90, "Char", aOffsets*)
+            jelan.write(0x0046035F, 0x90, "Char", aOffsets*)
+            jelan.write(0x00460360, 0x90, "Char", aOffsets*)
+        }
+        CheatEngine_AttackAlwaysMiss() ;게임핵: 항상 Miss 하기 - 0.5배의 데미지
+		{
+			jelan.write(0x004cfbc5,0xb2,"char",aOffset*)
+			jelan.write(0x004d05cd,0xb2,"char",aOffset*)
+		}
+        CheatEngine_ShowBack() ; 게임핵: 배경보기
+		{
+			jelan.write(0x0047A18D,0x75,"char",aOffset*)
+		}
+        CheatEngine_NoShowBlock() ; 게임핵: 환경이미지 제거
+		{
+			jelan.write(0x0047aa20,0xEB,"char",aOffset*)
+		}
+; Ctrl+W, Ctrl+Q, Ctrl+E, Ctrl+R 중 하나를 랜덤으로 보내는 함수
+RandomSendCtrlKey() {
+    Random, randKey, 1, 4  ; 1에서 4 사이의 랜덤 숫자를 생성
+    If (randKey = 1) {
+        Send, ^w  ; Ctrl+W
+    } Else If (randKey = 2) {
+        Send, ^q  ; Ctrl+Q
+    } Else If (randKey = 3) {
+        Send, ^e  ; Ctrl+E
+    } Else If (randKey = 4) {
+        Send, ^r  ; Ctrl+R
+    }
+}
+
+	Check_NPCMsg_address()
+	{
+		SetFormat, Integer, H
+		startAddress := 0x00100000
+		endAddress := 0x00200000
+		sleep, 500
+		NPCMsg_address := jelan.processPatternScan(startAddress, endAddress, 0x3A, 0x00, 0x20, 0x00, 0xE4, 0xB9, 0x6C, 0xD0, 0x5C, 0xB8, 0x20, 0x00, 0x20, 0x00, 0x20, 0x00, 0x20)
+		sleep, 500
+		SetFormat, Integer, D
+		return NPCMsg_address
+	}
+
+GetPrivateWorkingSet(PID)
+{
+    try {
+        wbem := ComObjGet("winmgmts:")
+        query := wbem.ExecQuery("SELECT * FROM Win32_PerfFormattedData_PerfProc_Process WHERE IDProcess=" . PID)
+
+        if query.Count = 0  ; 프로세스가 없으면 0 반환
+            return 0
+
+        bytes := query.ItemIndex(0).WorkingSetPrivate  ; 메모리 점유율 가져오기
+        return bytes / 1024  ; KB 단위로 변환 후 반환
+    } catch e {
+        return 0  ; 예외 발생 시 0 반환
+    }
+}
+
+HandleDialog(evt) {
+    ;ToolTip, 팝업 감지됨: % evt.message  ; 팝업 메시지 확인 (디버깅용)
+    CDP.Call("Page.handleJavaScriptDialog", { "accept": true })  ; 확인 버튼 클릭
+    sleep,500
+    PageInst.Evaluate("document.querySelector('.game_start').click();") ; 넥슨 로그인
+}
+TryLoginFail:
+    GuiControl, , 로그인상태정보, [로그인] - 실패 ( %reason% )
+    SB_SetText("인터넷 로그인 실패: " . reason)
+
+    WinClose, Elancia
+    WinKill, ahk_exe MRMsph.exe
+
+    Gosub, CleanChrome
+
+    Gui_Enable()
+    GuiControl, , jTitle, %jTitle%
+    TMessage := "[ Helancia_Log ]>>" jTitle "<<:자동 로그인 실패 (" . reason . ")"
+    텔레그램메시지보내기(TMessage)
+
+    SetTimer, Hunt, Off
+    SetTimer, AttackCheck, Off
+    SetTimer, AttackMGB, Off
+    SetTimer, incineration, Off
+    SetTimer, GetMemory, Off
+    SetTimer, ClearMem, Off
+    SetTimer, 타겟팅, Off
+
+    CheckPN := 0
+    CheckPB := 0
+    countsignal := 0
+    랜덤감응 := 0
+return
+
+; ---------------------------
+CleanChrome:
+    Try {
+        PageInst.Evaluate("inface.auth.gotoSignOut();")
+        Sleep, 1000
+        PageInst.WaitForLoad()
+        PageInst.Evaluate(removeCookiesScript)
+        PageInst.Call("Browser.close")
+        PageInst.Disconnect()
+    } Catch e {
+        ; 무시
+    }
+    PageInst := ""
+    Try ChromeInst.Close()
+    ChromeInst := ""
+return
+
+; ▼ 크롬 인스턴스 정리 루틴
+CleanChrome(ByRef page, ByRef chrome)
+{
+    Try {
+        page.Evaluate("inface.auth.gotoSignOut();")
+        Sleep, 1000
+        page.WaitForLoad()
+        page.Evaluate(removeCookiesScript)
+        page.Call("Browser.close")
+        page.Disconnect()
+    } Catch e {
+        ; 무시
+    }
+    page := ""
+    Try chrome.Close()
+    chrome := ""
 }
