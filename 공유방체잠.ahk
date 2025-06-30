@@ -6418,6 +6418,8 @@ incineration: ;줍줍 제어 용
 Gui, Submit, Nohide
 if((Step >= 19 and Step < 90) || (Step >= 1013 and Step < 1030) || (Step >= 3023 and Step < 3031)) ; 포남 포북 머미면
 {
+if(jjc = 1)
+{
 IfInString,Location,포프레스네
 {
 Gui, listview, 포프레스네소각
@@ -6464,6 +6466,7 @@ inciNumber += 1
 if(inciNumber > LastRowNum)
 {
 inciNumber = 1
+}
 }
 }
 }
@@ -9311,6 +9314,7 @@ jelan.write(0x004CB508, 0x00, "Char", aOffsets*)
 Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
+jjc = 1
 if(Gui_HuntAuto = 1)
 {
 if(Gui_1Muba = 1)
@@ -10767,6 +10771,7 @@ sleep,100
 CheckPN := 0
 countsignal := 0
 CheckPB = 0
+jjc = 0
 랜덤감응 = 0
 Send, {F16 Down}
 Send, {F16 Up}
@@ -10896,6 +10901,7 @@ Step = 12
 if(Step = 12)
 {
 SB_SetText("파티 설정 중")
+jjc = 1
 Check_State()
 if(State = 1)
 {
@@ -13465,6 +13471,7 @@ value := jelan.write(0x00423073, 0x90, "Char", aOffsets*)
 value := jelan.write(0x00423074, 0x90, "Char", aOffsets*)
 CheckPB = 0
 CheckPN := 0
+jjc = 0
 countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
@@ -14048,6 +14055,7 @@ GuiControl, , Gui_NowState, [수리점] 상점으로 이동 중.
 SB_SetText("무기수리 - 수리점으로 이동 중")
 CheckPB = 0
 CheckPN := 0
+jjc = 0
 countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
@@ -14628,6 +14636,7 @@ SB_SetText("골드바 > 갈리드로 변경하러 가는 중")
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
+jjc = 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -14939,6 +14948,7 @@ SB_SetText("골드바 > 갈리드로 변경하러 가는 중")
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
+jjc = 0
 Send, {F16 Down}
 Send, {F16 Up}
 Send, {F16 Down}
@@ -15247,6 +15257,7 @@ GuiControl, , Gui_NowState, [은행] 상점으로 이동 중.
 SB_SetText("강제그렐 골드바 > 갈리드 이동중")
 CheckPB = 0
 CheckPN := 0
+jjc = 0
 countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
@@ -18486,6 +18497,7 @@ if(nowFP = 0 && FPcount >= 20)
 {
 SB_SetText("FP 확인 중")
 Sleep, 200
+jjc = 1
 Step = 201
 return
 }
