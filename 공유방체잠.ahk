@@ -747,14 +747,14 @@ DllCall( "shlwapi.dll\StrFormatByteSize64A", Int64,TotalPhys, Str,PhysMem, UInt,
 
 filePath := A_ScriptDir . "\NPCOID.ini"
 DllCall("psapi.dll\EmptyWorkingSet", "Ptr", -1)
-IfNotExist,%A_ScriptDir%\CashMemory.exe
-{
-FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
-Loop, %A_ScriptDir%\CashMemory.exe
-{
-break
-}
-}
+;IfNotExist,%A_ScriptDir%\CashMemory.exe
+;{
+;FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
+;Loop, %A_ScriptDir%\CashMemory.exe
+;{
+;break
+;}
+;}
 class _ClassMemory
 {
 static baseAddress, hProcess, PID, currentProgram
@@ -5431,8 +5431,8 @@ return
 
 RL:
 Gui, Submit, NoHide
-Run, *RunAs %A_ScriptDir%\CashMemory.exe
-Sleep,300
+;Run, *RunAs %A_ScriptDir%\CashMemory.exe
+;Sleep,300
 loady = 2
 IfWinExist,ahk_pid %jPID%
 {
@@ -8122,6 +8122,7 @@ GroupAdd, ie_gruop, ahk_exe iexplore.exe
 WinKill, ahk_exe iexplore.exe
 WinKill, ahk_group ie_gruop
 WinKill, ahk_exe MRMsph.exe
+jjc := 0
 countsignal = 0
 MapNumber = 1
 MoveWaitCount = 0
@@ -8885,15 +8886,12 @@ if(Server = 1)
 {
 IfWinExist,ahk_pid %jPID%
 {
-TMessage :="[ Helancia_Log ]>>" jTitle "<<: 접속 오류로 인한 재시작 및 기존 젤랜시아 종료"
-텔레그램메시지보내기(TMessage)
-sleep,10
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMSPH.exe
 }
 GuiControl, , 로그인상태정보, 접속 오류로 대기 후 재시작 합니다.
 Sleep, 60000
-이유 := "서버오류"
+이유 := "서버값 오류 보통 인터넷 연결끊김"
 Step := 10000
 return
 }
@@ -9295,16 +9293,15 @@ GuiControl, , Gui_NowState, 인식한 어빌에 맞춰 체잠 초기 장소 세�
 SB_SetText("체작장소 세팅")
 if(Gui_CheckUseMagic = 1)
 {
-Send, {F17 Down}
-Sleep, 200
-Send, {F17 UP}
-Send, {F17 Down}
-Sleep, 200
-Send, {F17 UP}
+SEND, {F17 Down}
+SLEEP, 50
+SEND, {F17 UP}
+SLEEP, 50
 value := jelan.write(0x00527A4C, 3, "UInt")
 Stack_MN()
 CritHP := Gui_CHP
 Crit_HM()
+jjc = 1
 jelan.write(0x004CB504, 0xE9, "Char", aOffsets*)
 jelan.write(0x004CB505, 0xF7, "Char", aOffsets*)
 jelan.write(0x004CB506, 0xC8, "Char", aOffsets*)
@@ -9314,7 +9311,6 @@ jelan.write(0x004CB508, 0x00, "Char", aOffsets*)
 Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
-jjc = 1
 if(Gui_HuntAuto = 1)
 {
 if(Gui_1Muba = 1)
@@ -10735,11 +10731,12 @@ sleep,100
 CheckPN := 0
 countsignal := 0
 CheckPB = 0
+jjc := 0
 랜덤감응 = 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 Get_Location()
 if(Gui_huntPonam = 1 || Gui_HuntAuto = 1)
 {
@@ -10771,12 +10768,12 @@ sleep,100
 CheckPN := 0
 countsignal := 0
 CheckPB = 0
-jjc = 0
+jjc := 0
 랜덤감응 = 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 차원체크()
 Check_Map()
 sleep,500
@@ -13471,12 +13468,12 @@ value := jelan.write(0x00423073, 0x90, "Char", aOffsets*)
 value := jelan.write(0x00423074, 0x90, "Char", aOffsets*)
 CheckPB = 0
 CheckPN := 0
-jjc = 0
+jjc := 0
 countsignal := 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -14055,12 +14052,12 @@ GuiControl, , Gui_NowState, [수리점] 상점으로 이동 중.
 SB_SetText("무기수리 - 수리점으로 이동 중")
 CheckPB = 0
 CheckPN := 0
-jjc = 0
+jjc := 0
 countsignal := 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -14636,11 +14633,11 @@ SB_SetText("골드바 > 갈리드로 변경하러 가는 중")
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-jjc = 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+jjc := 0
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -14948,11 +14945,11 @@ SB_SetText("골드바 > 갈리드로 변경하러 가는 중")
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-jjc = 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+jjc := 0
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -15257,12 +15254,12 @@ GuiControl, , Gui_NowState, [은행] 상점으로 이동 중.
 SB_SetText("강제그렐 골드바 > 갈리드 이동중")
 CheckPB = 0
 CheckPN := 0
-jjc = 0
+jjc := 0
 countsignal := 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -15552,10 +15549,11 @@ SB_SetText("그레이드 하러 가는 중")
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+jjc := 0
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -17374,10 +17372,11 @@ SB_SetText("스펠 그레이드 하러 가는 중")
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+jjc := 0
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -17893,10 +17892,11 @@ SB_SetText("강제그레이드 - 신전으로 이동 중")
 CheckPB = 0
 CheckPN := 0
 countsignal := 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+jjc := 0
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -18177,11 +18177,12 @@ GuiControl,,상승체력,%CheckUPHP% (%상승체력평균값%)
 GuiControl,,경과시간,%RunningTime%
 CheckPB = 0
 CheckPN := 0
+jjc := 0
 countsignal := 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 Step = 1001
 gui_Startmap := 4
 MapNumber := 1
@@ -18191,10 +18192,11 @@ if(Step = 1000 and gui_Startmap = 4)
 GuiControl, , Gui_NowState, [포북] 사냥터로 가기.
 CheckPB = 0
 CheckPN := 0
-Send, {F16 Down}
-Send, {F16 Up}
-Send, {F16 Down}
-Send, {F16 Up}
+jjc := 0
+;Send, {F16 Down}
+;Send, {F16 Up}
+;Send, {F16 Down}
+;Send, {F16 Up}
 if( 랜덤차원 = 1 )
 {
 if(Gui_CheckUseParty = 0)
@@ -18472,6 +18474,7 @@ Step = 1004
 }
 if(Step = 1004)
 {
+jjc = 1
 아이템읽어오기()
 if( Gui_Grade = 1 )
 {
@@ -18497,7 +18500,6 @@ if(nowFP = 0 && FPcount >= 20)
 {
 SB_SetText("FP 확인 중")
 Sleep, 200
-jjc = 1
 Step = 201
 return
 }
