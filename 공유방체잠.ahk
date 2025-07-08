@@ -27,668 +27,2911 @@ if not A_IsAdmin {
     ExitApp  ; 관리자 권한으로 재실행하지 않을 경우 스크립트 종료
 }
 
-class Chrome
+Class RunDriver
 {
-	static DebugPort := 9222
-
-	/*
-		Escape a string in a manner suitable for command line parameters
-	*/
-	CliEscape(Param)
-	{
-		return """" RegExReplace(Param, "(\\*)""", "$1$1\""") """"
-	}
-
-	/*
-		Finds instances of chrome in debug mode and the ports they're running
-		on. If no instances are found, returns a false value. If one or more
-		instances are found, returns an associative array where the keys are
-		the ports, and the values are the full command line texts used to start
-		the processes.
-
-		One example of how this may be used would be to open chrome on a
-		different port if an instance of chrome is already open on the port
-		you wanted to used.
-
-		```
-		; If the wanted port is taken, use the largest taken port plus one
-		DebugPort := 9222
-		if (Chromes := Chrome.FindInstances()).HasKey(DebugPort)
-			DebugPort := Chromes.MaxIndex() + 1
-		ChromeInst := new Chrome(ProfilePath,,,, DebugPort)
-		```
-
-		Another use would be to scan for running instances and attach to one
-		instead of starting a new instance.
-
-		```
-		if (Chromes := Chrome.FindInstances())
-			ChromeInst := {"base": Chrome, "DebugPort": Chromes.MinIndex()}
-		else
-			ChromeInst := new Chrome(ProfilePath)
-		```
-	*/
-	FindInstances()
-	{
-		static Needle := "--remote-debugging-port=(\d+)"
-		Out := {}
-		for Item in ComObjGet("winmgmts:")
-			.ExecQuery("SELECT CommandLine FROM Win32_Process"
-			. " WHERE Name = 'chrome.exe'")
-			if RegExMatch(Item.CommandLine, Needle, Match)
-				Out[Match1] := Item.CommandLine
-		return Out.MaxIndex() ? Out : False
-	}
-
-	/*
-		ProfilePath - Path to the user profile directory to use. Will use the standard if left blank.
-		URLs        - The page or array of pages for Chrome to load when it opens
-		Flags       - Additional flags for chrome when launching
-		ChromePath  - Path to chrome.exe, will detect from start menu when left blank
-		DebugPort   - What port should Chrome's remote debugging server run on
-	*/
-	__New(ProfilePath:="", URLs:="about:blank", Flags:="", ChromePath:="", DebugPort:="", headless:=False)
-	{
-		; Verify ProfilePath
-		if (ProfilePath != "" && !InStr(FileExist(ProfilePath), "D"))
-			throw Exception("The given ProfilePath does not exist")
-		this.ProfilePath := ProfilePath
-
-		; Verify ChromePath
-		if (ChromePath == "")
-			FileGetShortcut, %A_StartMenuCommon%\Programs\Google Chrome.lnk, ChromePath
-		if (ChromePath == "")
-			RegRead, ChromePath, HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe
-		if !FileExist(ChromePath)
-			throw Exception("Chrome could not be found")
-		this.ChromePath := ChromePath
-
-		; Verify DebugPort
-		if (DebugPort != "")
-		{
-			if DebugPort is not integer
-				throw Exception("DebugPort must be a positive integer")
-			else if (DebugPort <= 0)
-				throw Exception("DebugPort must be a positive integer")
-			this.DebugPort := DebugPort
-		}
-
-		if(headless)
-		{
-			headless_option := " --headless --disable-gpu --window-size=1920x1080"
-		}
-		Else
-		{
-			headless_option := ""
-		}
-
-		; Escape the URL(s)
-		for Index, URL in IsObject(URLs) ? URLs : [URLs]
-			URLString .= " " this.CliEscape(URL)
-
-		Run, % this.CliEscape(ChromePath)
-		. headless_option . " --remote-debugging-port=" this.DebugPort
-		. (ProfilePath ? " --user-data-dir=" this.CliEscape(ProfilePath) : "")
-		. (Flags ? " " Flags : "")
-		. URLString
-		,,, OutputVarPID
-		this.PID := OutputVarPID
-	}
-
-	/*
-		End Chrome by terminating the process.
-	*/
-	Kill()
-	{
-		Process, Close, % this.PID
-	}
-
-	/*
-		Queries chrome for a list of pages that expose a debug interface.
-		In addition to standard tabs, these include pages such as extension
-		configuration pages.
-	*/
-	GetPageList()
-	{
-		http := ComObjCreate("WinHttp.WinHttpRequest.5.1")
-		http.open("GET", "http://127.0.0.1:" this.DebugPort "/json")
-		http.send()
-		return this.Jxon_Load(http.responseText)
-	}
-
-	/*
-		Returns a connection to the debug interface of a page that matches the
-		provided criteria. When multiple pages match the criteria, they appear
-		ordered by how recently the pages were opened.
-
-		Key        - The key from the page list to search for, such as "url" or "title"
-		Value      - The value to search for in the provided key
-		MatchMode  - What kind of search to use, such as "exact", "contains", "startswith", or "regex"
-		Index      - If multiple pages match the given criteria, which one of them to return
-		fnCallback - A function to be called whenever message is received from the page
-	*/
-	GetPageBy(Key, Value, MatchMode:="exact", Index:=1, fnCallback:="", fnClose:="")
-	{
-		Count := 0
-		for n, PageData in this.GetPageList()
-		{
-			if (((MatchMode = "exact" && PageData[Key] = Value) ; Case insensitive
-			|| (MatchMode = "contains" && InStr(PageData[Key], Value))
-			|| (MatchMode = "startswith" && InStr(PageData[Key], Value) == 1)
-			|| (MatchMode = "regex" && PageData[Key] ~= Value))
-			&& ++Count == Index)
-				return new this.Page(PageData.webSocketDebuggerUrl, fnCallback, fnClose)
-		}
-	}
-
-	/*
-		Shorthand for GetPageBy("url", Value, "startswith")
-	*/
-	GetPageByURL(Value, MatchMode:="startswith", Index:=1, fnCallback:="", fnClose:="")
-	{
-		return this.GetPageBy("url", Value, MatchMode, Index, fnCallback, fnClose)
-	}
-
-	/*
-		Shorthand for GetPageBy("title", Value, "startswith")
-	*/
-	GetPageByTitle(Value, MatchMode:="startswith", Index:=1, fnCallback:="", fnClose:="")
-	{
-		return this.GetPageBy("title", Value, MatchMode, Index, fnCallback, fnClose)
-	}
-
-	/*
-		Shorthand for GetPageBy("type", Type, "exact")
-
-		The default type to search for is "page", which is the visible area of
-		a normal Chrome tab.
-	*/
-	GetPage(Index:=1, Type:="page", fnCallback:="", fnClose:="")
-	{
-		return this.GetPageBy("type", Type, "exact", Index, fnCallback, fnClose)
-	}
-
-	/*
-		Connects to the debug interface of a page given its WebSocket URL.
-	*/
-	class Page
-	{
-		Connected := False
-		ID := 0
-		Responses := []
-
-		/*
-			wsurl      - The desired page's WebSocket URL
-			fnCallback - A function to be called whenever message is received
-			fnClose    - A function to be called whenever the page connection is lost
-		*/
-		__New(wsurl, fnCallback:="", fnClose:="")
-		{
-			this.fnCallback := fnCallback
-			this.fnClose := fnClose
-			this.BoundKeepAlive := this.Call.Bind(this, "Browser.getVersion",, False)
-
-			; TODO: Throw exception on invalid objects
-			if IsObject(wsurl)
-				wsurl := wsurl.webSocketDebuggerUrl
-
-			wsurl := StrReplace(wsurl, "localhost", "127.0.0.1")
-			this.ws := {"base": this.WebSocket, "_Event": this.Event, "Parent": this}
-			this.ws.__New(wsurl)
-
-			while !this.Connected
-				Sleep, 50
-		}
-
-		/*
-			Calls the specified endpoint and provides it with the given
-			parameters.
-
-			DomainAndMethod - The endpoint domain and method name for the
-				endpoint you would like to call. For example:
-				PageInst.Call("Browser.close")
-				PageInst.Call("Schema.getDomains")
-
-			Params - An associative array of parameters to be provided to the
-				endpoint. For example:
-				PageInst.Call("Page.printToPDF", {"scale": 0.5 ; Numeric Value
-					, "landscape": Chrome.Jxon_True() ; Boolean Value
-					, "pageRanges: "1-5, 8, 11-13"}) ; String value
-				PageInst.Call("Page.navigate", {"url": "https://autohotkey.com/"})
-
-			WaitForResponse - Whether to block until a response is received from
-				Chrome, which is necessary to receive a return value, or whether
-				to continue on with the script without waiting for a response.
-		*/
-		Call(DomainAndMethod, Params:="", WaitForResponse:=True)
-		{
-			if !this.Connected
-				throw Exception("Not connected to tab")
-
-			; Use a temporary variable for ID in case more calls are made
-			; before we receive a response.
-			ID := this.ID += 1
-			this.ws.Send(Chrome.Jxon_Dump({"id": ID
-			, "params": Params ? Params : {}
-			, "method": DomainAndMethod}))
-
-			if !WaitForResponse
-				return
-
-			; Wait for the response
-			this.responses[ID] := False
-			while !this.responses[ID]
-				Sleep, 50
-
-			; Get the response, check if it's an error
-			response := this.responses.Delete(ID)
-			if (response.error)
-				throw Exception("Chrome indicated error in response",, Chrome.Jxon_Dump(response.error))
-
-			return response.result
-		}
-
-		/*
-			Run some JavaScript on the page. For example:
-
-			PageInst.Evaluate("alert(""I can't believe it's not IE!"");")
-			PageInst.Evaluate("document.getElementsByTagName('button')[0].click();")
-		*/
-		Evaluate(JS)
-		{
-			response := this.Call("Runtime.evaluate",
+__New(Location,Parameters:= "--port=0")
+{
+If !FileExist(Location)
+If !InStr(Location,".exe")
+Location .= ".exe"
+SplitPath, Location,Name,Dir,,DriverName
+this.Dir := Dir ? Dir : A_ScriptDir
+this.exe := Name
+If RegExMatch(Parameters, "--port=(\d+)",P)
+this.param := p1 ? p : 0
+this.Name := DriverName
+switch this.Name
+{
+case "chromedriver" :
+this.Options := "goog:chromeOptions"
+this.browser := "chrome"
+If !this.param
+this.param := RegExReplace(Parameters, "(--port)=(\d+)", "$1=9515")
+case "msedgedriver" :
+this.Options := "ms:edgeOptions"
+this.browser := "msedge"
+If !this.param
+this.param := RegExReplace(Parameters, "(--port)=(\d+)", "$1=9516")
+case "geckodriver" :
+this.Options := "moz:firefoxOptions"
+this.browser := "firefox"
+If !this.param
+this.param := RegExReplace(Parameters, "(--port)=(\d+)", "$1=9517")
+case "operadriver" :
+this.Options := "goog:chromeOptions"
+this.browser := "opera"
+If !this.param
+this.param := RegExReplace(Parameters, "(--port)=(\d+)", "$1=9518")
+case "BraveDriver" :
+this.Options := "goog:chromeOptions"
+this.browser := "Brave"
+this.exe := "chromedriver.exe"
+If !this.param
+this.param := RegExReplace(Parameters, "(--port)=(\d+)", "$1=9515")
+Default:
+If !this.param
+this.param := RegExReplace(Parameters, "(--port)=(\d+)", "$1=9519")
+}
+If !FileExist(Location) and this.browser
+{
+If A_Is64bitOS
+Location := this.GetDriver(,"64")
+Else
+Location := this.GetDriver()
+}
+This.Target := Location " " chr(34) this.param chr(34)
+If !FileExist(Location)
+{
+MsgBox 0x40040, ,Rufaydium WebDriver Support,Unable to download driver`nRufaydium exiting
+ExitApp
+}
+If RegExMatch(this.param,"--port=(\d+)",port)
+This.Port := Port1
+Else
+{
+MsgBox 0x40040, ,"Rufaydium WebDriver Support,Unable to download driver from`nURL :" this.DriverUrl "`nRufaydium exiting"
+ExitApp
+}
+PID := this.GetDriverbyPort(this.Port)
+If PID
+{
+this.PID := PID
+}
+Else
+this.Launch()
+}
+__Delete()
+{
+}
+exit()
+{
+Process,close, % This.PID
+}
+Delete()
+{
+Process,close, % This.PID
+FileDelete, % this.Dir "\" this.exe
+}
+Launch()
+{
+Run % this.Target,,Hide,PID
+Process,Wait, % PID
+this.PID := PID
+}
+help(Location)
+{
+Run % comspec " /k " chr(34) Location chr(34) " --help > dir.txt",,Hide,PID
+While !FileExist(this.Dir "\dir.txt")
+sleep, 200
+sleep, 200
+FileRead, Content, % this.Dir "dir.txt"
+While FileExist(this.Dir "\dir.txt")
+FileDelete, % this.Dir "\dir.txt"
+Process,close, % PID
+Return Content
+}
+visible
+{
+get
+{
+Return this.visibility
+}
+set
+{
+If(value = 1) and !this.visibility
+{
+WinShow, % "ahk_pid " this.pid
+this.visibility := 1
+}
+Else
+{
+WinHide, % "ahk_pid " this.pid
+this.visibility := 0
+}
+}
+}
+GetDriver(Version="STABLE",bit="32")
+{
+switch this.Name
+{
+case "chromedriver" :
+this.zip := "chromedriver-win32.zip"
+RegExMatch(Version,"Chrome version ([\d.]+).*\n.*browser version is (\d+)",Dver)
+If RegExMatch(Version,"Chrome version ([\d.]+).*\n.*browser version is (\d+.\d+.\d+)",bver)
+{
+If Dver1 > 115
+{
+uri := "https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
+For k, obj in json.load(this.GetVersion(uri)).versions
+{
+If InStr(obj.version,bver2)
+{
+For i, download in obj.downloads.chromedriver
+{
+If download.platform = "win32"
+{
+this.DriverUrl := download.url
+Break
+}
+}
+Break
+}
+}
+}
+Else
+{
+uri := "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_"  bver2
+DriverVersion := this.GetVersion(uri)
+this.DriverUrl := "https://chromedriver.storage.googleapis.com/" DriverVersion "/" this.zip
+}
+}
+Else
+{
+uri := "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json"
+DriverVersion := json.load(this.GetVersion(uri)).channels.Stable.version
+this.DriverUrl := "https://storage.googleapis.com/chrome-for-testing-public/" DriverVersion "/win32/chromedriver-win32.zip"
+}
+case "BraveDriver" :
+this.zip := "chromedriver_win32.zip"
+If RegExMatch(Version,"Chrome version ([\d.]+).*\n.*browser version is (\d+.\d+.\d+)",bver)
+uri := "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_"  bver2
+Else
+uri := "https://chromedriver.storage.googleapis.com/LATEST_RELEASE", bver1 := "unknown"
+DriverVersion := this.GetVersion(uri)
+this.DriverUrl := "https://chromedriver.storage.googleapis.com/" DriverVersion "/" this.zip
+case "msedgedriver" :
+If InStr(bit,"64")
+this.zip := "edgedriver_win64.zip"
+Else
+this.zip := "edgedriver_win32.zip"
+If RegExMatch(Version,"version ([\d.]+).*\n.*browser version is (\d+)",bver)
+uri := "https://msedgedriver.azureedge.net/LATEST_" "RELEASE_" bver2
+Else If(Version != "STABLE")
+uri := "https://msedgedriver.azureedge.net/LATEST_RELEASE_" Version
+Else
+uri := "https://msedgedriver.azureedge.net/LATEST_" Version, bver1 := "unknown"
+DriverVersion := this.GetVersion(uri)
+this.DriverUrl := "https://msedgedriver.azureedge.net/" DriverVersion "/" this.zip
+case "geckodriver" :
+uri := "https://api.github.com/repos/mozilla/geckodriver/releases/latest"
+For i, asset in json.load(this.GetVersion(uri)).assets
+{
+If InStr(asset.name,"win64.zip") and InStr(bit,"64")
+{
+this.DriverUrl := asset.browser_download_url
+this.zip := asset.name
+}
+Else If InStr(asset.name,"win32.zip")
+{
+this.DriverUrl := asset.browser_download_url
+this.zip := asset.name
+}
+}
+case "operadriver" :
+If RegExMatch(Version,"Chrome version ([\d.]+).*\n.*browser version is (\d+.\d+.\d+)",bver)
+{
+uri := "https://api.github.com/repos/operasoftware/operachromiumdriver/releases"
+For i, asset in json.load(this.GetVersion(uri)).assets
+{
+If InStr(asset.name,bver1)
+{
+uri := "https://api.github.com/repos/operasoftware/operachromiumdriver/releases/tags/" asset.tag_name
+}
+}
+}
+Else
+uri := "https://api.github.com/repos/operasoftware/operachromiumdriver/releases/latest", bver1 := "unknown"
+For i, asset in json.load(this.GetVersion(uri)).assets
+{
+If InStr(asset.name,"win64.zip") and InStr(bit,"64")
+{
+this.DriverUrl := asset.browser_download_url
+this.zip := asset.name
+}
+Else If InStr(asset.name,"win32.zip")
+{
+this.DriverUrl := asset.browser_download_url
+this.zip := asset.name
+}
+}
+}
+If InStr(this.DriverVersion, "NoSuchKey"){
+MsgBox 0x40010,Testing,Error`nDriverVersion
+Return false
+}
+If !FileExist(this.Dir "\Backup")
+FileCreateDir, % this.Dir "\Backup"
+While FileExist(this.Dir "\" this.exe)
+{
+Process,close, % this.GetDriverbyPort(this.Port)
+FileMove, % this.Dir "\" this.exe, % this.Dir "\Backup\" this.name " Version " bver1 ".exe", 1
+}
+this.zip := this.dir "\" this.zip
+Return this.DownloadnExtract()
+}
+GetVersion(uri)
+{
+If(this.Name = "msedgedriver")
+{
+WebRequest := ComObjCreate("WinHttp.WinHttpRequest.5.1")
+WebRequest.Open("GET", uri, false)
+WebRequest.SetRequestHeader("Content-Type","application/json")
+WebRequest.Send()
+bytes := WebRequest.Responsebody
+Loop, % WebRequest.GetResponseHeader("Content-Length")
+text .= chr(bytes[A_Index-1])
+Return SubStr(text, 3)
+}
+WebRequest := ComObjCreate("Msxml2.XMLHTTP")
+WebRequest.open("GET", uri, False)
+WebRequest.SetRequestHeader("Content-Type","application/json")
+WebRequest.Send()
+Return WebRequest.responseText
+}
+DownloadnExtract()
+{
+URLDownloadToFile, % this.DriverUrl,  % this.zip
+AppObj := ComObjCreate("Shell.Application")
+FolderObj := AppObj.Namespace(this.zip)
+FileObj := FolderObj.ParseName(this.exe)
+If !isobject(FileObj)
+For Item in FolderObj.Items
+{
+FileObj := FolderObj.ParseName(Item.Name "\" this.exe)
+If isobject(FileObj)
+Break
+}
+AppObj.Namespace(this.Dir "\").CopyHere(FileObj, 4|16)
+FileDelete, % this.zip
+Return this.Dir "\" this.exe
+}
+GetDriverbyPort(Port)
+{
+For process in ComObjGet("winmgmts:").ExecQuery("SELECT * FROM Win32_Process WHERE Name = '" this.exe "'")
+{
+RegExMatch(process.CommandLine, "(--port)=(\d+)",$)
+If (Port != $2)
+continue
+Else
+Return Process.processId
+}
+}
+GetPIDbyName(name)
+{
+For Process in ComObjGet("winmgmts:\\.\root\cimv2").ExecQuery("SELECT * FROM Win32_Process WHERE Name = '" name "'")
+Return Process.processId
+}
+GetPortbyPID(PID)
+{
+For process in ComObjGet("winmgmts:\\.\root\cimv2").ExecQuery("Select * from Win32_Process where ProcessId=" PID)
+{
+RegExMatch(process.CommandLine, "(--port)=(\d+)",$)
+Return $2
+}
+}
+GetPath()
+{
+If this.PID
+For process in ComObjGet("winmgmts:").ExecQuery("Select * FROM Win32_Process WHERE ProcessId=" This.PID)
+{
+Return process.ExecutablePath
+}
+}
+}
+class CDP
+{
+__new(Address)
+{
+this.address := Address
+root := this.call("DOM.getDocument",{"depth": 0})
+this.nodeId := root.root.nodeId
+FrameData := this.call("Page.getFrameTree").frametree
+If FrameData.frame
+this.framedetail := FrameData.frame
+If FrameData.childFrames
+this.childFrames := FrameData.childFrames
+}
+FramesLength()
+{
+Return this.childFrames.length()
+}
+Frame(i)
+{
+frameId := this.childFrames[i +1].frame.id
+this.ParentNodeID := this.Nodeid
+If frameId
+{
+nodeid := this.call("DOM.getFrameOwner",{"frameId":frameId}).nodeid
+backendNodeId := this.call("DOM.describeNode",{"nodeId":nodeid}).node.contentDocument.backendNodeId
+contentDocObject := this.call("DOM.resolveNode",{"backendNodeId":backendNodeId}).object.objectId
+this.nodeid := this.call("DOM.requestNode",{"objectId":contentDocObject}).nodeId
+}
+}
+ParentFrame()
+{
+this.Nodeid := this.ParentNodeID
+}
+send(url,Method,Payload:= 0,WaitForResponse:=1)
+{
+If !InStr(url,"HTTP")
+url := this.address "/" url
+If !Payload and (Method = "POST")
+Payload := Json.null
+try r := Json.load(Rufaydium.Request(url,Method,Payload,WaitForResponse)).value
+If(r.error = "chrome not reachable")
+this.quit()
+If r
+Return r
+}
+Call(DomainAndMethod, Params:="")
+{
+Payload := { "params": Params ? Params : {"":""}, "cmd": DomainAndMethod}
+response := this.Send("goog/cdp/execute"
+,"POST"
+,Payload
+,1)
+Return response
+}
+Evaluate(JS)
+{
+response := this.Call("Runtime.evaluate",
 			( LTrim Join
 			{
 				"expression": JS,
 				"objectGroup": "console",
-				"includeCommandLineAPI": Chrome.Jxon_True(),
-				"silent": Chrome.Jxon_False(),
-				"returnByValue": Chrome.Jxon_False(),
-				"userGesture": Chrome.Jxon_True(),
-				"awaitPromise": Chrome.Jxon_False()
+				"includeCommandLineAPI": Json.true,
+				"silent": Json.false,
+				"ReturnByValue": Json.false,
+				"userGesture": Json.true,
+				"awaitPromise": Json.false
 			}
-			))
-
-			if (response.exceptionDetails)
-				throw Exception(response.result.description, -1
-					, Chrome.Jxon_Dump({"Code": JS
-					, "exceptionDetails": response.exceptionDetails}))
-
-			return response.result
-		}
-
-		/*
-			Waits for the page's readyState to match the DesiredState.
-
-			DesiredState - The state to wait for the page's ReadyState to match
-			Interval     - How often it should check whether the state matches
-		*/
-		WaitForLoad(DesiredState:="complete", Interval:=100)
-		{
-			while this.Evaluate("document.readyState").value != DesiredState
-				Sleep, Interval
-		}
-
-		/*
-			Internal function triggered when the script receives a message on
-			the WebSocket connected to the page.
-		*/
-		Event(EventName, Event)
-		{
-			; If it was called from the WebSocket adjust the class context
-			if this.Parent
-				this := this.Parent
-
-			; TODO: Handle Error events
-			if (EventName == "Open")
-			{
-				this.Connected := True
-				BoundKeepAlive := this.BoundKeepAlive
-				SetTimer, %BoundKeepAlive%, 15000
-			}
-			else if (EventName == "Message")
-			{
-				data := Chrome.Jxon_Load(Event.data)
-
-				; Run the callback routine
-				fnCallback := this.fnCallback
-				if (newData := %fnCallback%(data))
-					data := newData
-
-				if this.responses.HasKey(data.ID)
-					this.responses[data.ID] := data
-			}
-			else if (EventName == "Close")
-			{
-				this.Disconnect()
-				fnClose := this.fnClose
-				%fnClose%(this)
-			}
-		}
-
-		/*
-			Disconnect from the page's debug interface, allowing the instance
-			to be garbage collected.
-
-			This method should always be called when you are finished with a
-			page or else your script will leak memory.
-		*/
-		Disconnect()
-		{
-			if !this.Connected
-				return
-
-			this.Connected := False
-			this.ws.Delete("Parent")
-			this.ws.Disconnect()
-
-			BoundKeepAlive := this.BoundKeepAlive
-			SetTimer, %BoundKeepAlive%, Delete
-			this.Delete("BoundKeepAlive")
-		}
-
-		class WebSocket
-{
-	__New(WS_URL)
-	{
-		static wb
-
-		; Create an IE instance
-		Gui, +hWndhOld
-		Gui, New, +hWndhWnd
-		this.hWnd := hWnd
-		Gui, Add, ActiveX, vWB, Shell.Explorer
-		Gui, %hOld%: Default
-
-		; Write an appropriate document
-		WB.Navigate("about:<!DOCTYPE html><meta http-equiv='X-UA-Compatible'"
-		. "content='IE=edge'><body></body>")
-		while (WB.ReadyState < 4)
-			sleep, 50
-		this.document := WB.document
-
-		; Add our handlers to the JavaScript namespace
-		this.document.parentWindow.ahk_savews := this._SaveWS.Bind(this)
-		this.document.parentWindow.ahk_event := this._Event.Bind(this)
-		this.document.parentWindow.ahk_ws_url := WS_URL
-
-		; Add some JavaScript to the page to open a socket
-		Script := this.document.createElement("script")
-		Script.text := "ws = new WebSocket(ahk_ws_url);`n"
-		. "ws.onopen = function(event){ ahk_event('Open', event); };`n"
-		. "ws.onclose = function(event){ ahk_event('Close', event); };`n"
-		. "ws.onerror = function(event){ ahk_event('Error', event); };`n"
-		. "ws.onmessage = function(event){ ahk_event('Message', event); };"
-		this.document.body.appendChild(Script)
-	}
-
-	; Called by the JS in response to WS events
-	_Event(EventName, Event)
-	{
-		this["On" EventName](Event)
-	}
-
-	; Sends data through the WebSocket
-	Send(Data)
-	{
-		this.document.parentWindow.ws.send(Data)
-	}
-
-	; Closes the WebSocket connection
-	Close(Code:=1000, Reason:="")
-	{
-		this.document.parentWindow.ws.close(Code, Reason)
-	}
-
-	; Closes and deletes the WebSocket, removing
-	; references so the class can be garbage collected
-	Disconnect()
-	{
-		if this.hWnd
-		{
-			this.Close()
-			Gui, % this.hWnd ": Destroy"
-			this.hWnd := False
-		}
-	}
+))
+Return response.result
 }
-
-	}
-
-	Jxon_Load(ByRef src, args*)
+Activate
 {
-	static q := Chr(34)
-
-	key := "", is_key := false
-	stack := [ tree := [] ]
-	is_arr := { (tree): 1 }
-	next := q . "{[01234567890-tfn"
-	pos := 0
-	while ( (ch := SubStr(src, ++pos, 1)) != "" )
+set
+{
+Page.Call("Page.bringToFront")
+}
+}
+GetlocalStorage(url)
+{
+LocalStoarge :=  this.call("DOMStorage.getDOMStorageItems",{"storageId":{"securityOrigin":url,"isLocalStorage":json.true}}).entries
+enrties := {}
+For k, v in LocalStoarge
+{
+key := "", Value := ""
+For i, j in v
+{
+If i = 1
+key := j
+Else If i = 2
+Value := j
+}
+enrties[key] := Value
+}
+Return enrties
+}
+createBrowserContext()
+{
+Return this.call("Target.createBrowserContext")
+}
+disposeBrowserContext()
+{
+Return this.call("Target.disposeBrowserContext")
+}
+getBrowserContexts()
+{
+Return this.call("Target.getBrowserContexts")
+}
+CreateTarget(url)
+{
+Return this.call("Target.createTarget",{"url":url})
+}
+closeTarget(targetId)
+{
+Return this.call("Target.closeTarget",{"targetId":targetId})
+}
+Switch(targetId)
+{
+Return this.call("Target.activateTarget",{"targetId":targetId})
+}
+GetTargets()
+{
+Return this.call("Target.getTargets")
+}
+AttachTarget(targetId)
+{
+Return this.call("Target.attachToTarget",{"targetId":targetId})
+}
+DetachTarget(targetId)
+{
+Return this.call("Target.detachFromTarget",{"targetId":targetId})
+}
+requestNode(Objectid)
+{
+obj := this.call("DOM.requestNode",{"objectId":Objectid})
+If obj.nodeId
+this.nodeId := obj.nodeId
+Return obj
+}
+resolveNode()
+{
+Obj := this.call("DOM.resolveNode",{"nodeId":this.nodeId}).ObjectID
+If Obj.objectId
+this.ObjectID  := Obj.objectId
+Return obj
+}
+Navigate(url)
+{
+Return this.call("Page.navigate",{"url":url})
+}
+Reload()
+{
+Return this.call("Page.reload")
+}
+WaitForLoad(DesiredState:="complete", Interval:=100)
+{
+While this.Evaluate("document.readyState").value != DesiredState
+{
+Sleep, Interval
+}
+}
+FindElement(Path)
+{
+Return this.call("DOM.querySelector",{"nodeId":this.nodeId,"selector":path})
+}
+FindElements(Path)
+{
+Return this.call("DOM.querySelectorAll",{"nodeId":this.nodeId,"selector":path})
+}
+querySelector(Path)
+{
+Return New CDPElement(xx:=this.FindElement(Path).nodeId,this.address)
+}
+getElementByID(ID)
+{
+Return New CDPElement(this.FindElement("#" ID).nodeId,this.address)
+}
+querySelectorAll(path)
+{
+e := []
+For i, NodeID in this.FindElements(Path).nodeIDs
+{
+e[i -1] := New CDPElement(NodeID,this.address)
+}
+Return e
+}
+getElementsbyClassName(Class)
+{
+e := []
+path = [class='%Class%']
+Return this.querySelectorAll(path)
+}
+getElementsbyName(Name)
+{
+e := []
+path = [Name='%Name%']
+Return this.querySelectorAll(path)
+}
+GetelementbyJS(JS)
+{
+result := this.Evaluate(JS)
+If (result.className = "NodeList")
+{
+objectId := result.objectId
+e := []
+i := 0
+results := this.call("Runtime.getProperties",{"objectId":Objectid}).result
+For key, obj in results
+{
+For k, v in obj
+{
+If (v.subtype = "Node")
+{
+nodeId := this.call("DOM.requestNode",{"objectId":v.Objectid}).nodeId
+e[i++] := New CDPElement(nodeId,this.address)
+}
+}
+}
+Return e
+}
+Else
+{
+objectId := result.objectId
+nodeId := this.call("DOM.requestNode",{"objectId":Objectid}).nodeId
+Return New CDPElement(nodeId,this.address)
+}
+}
+focus()
+{
+this.call("DOM.focus",{"nodeId":this.nodeId})
+}
+getNodeForLocation(x,y)
+{
+nodeid := this.call("DOM.getNodeForLocation",{"x":x,"y":y}).nodeId
+Return New CDPElement(nodeId,this.address)
+}
+getBoxModel()
+{
+Return this.call("DOM.getBoxModel",{"nodeId":this.nodeId}).model
+}
+getNodeQuads()
+{
+Return this.call("DOM.getContentQuads",{"nodeId":this.nodeId}).quads[1]
+}
+highlightRect(r:=255,g:=0,b:=0,a:=1)
+{
+Model := this.getBoxModel()
+height := Model.height
+width := Model.width
+content :=  Model.border
+toprightx := round(content[1],0)
+toprighty := round(content[2],0)
+color := {"r":r,"g":g,"b":b,"a":a}
+this.call("Overlay.enable")
+this.call("Overlay.highlightRect",{"x":toprightx,"y":toprighty,"width":width,"height":height,"outlineColor":color})
+}
+highlightConfigurations(Type,Subtype,r,g,b,a)
+{
+Basetype := ["contentColor","paddingColor","borderColor","marginColor","eventTargetColor","shapeColor","shapeMarginColor","cssGridColor"]
+Gridtype := ["gridBorderColor","cellBorderColor","rowLineColor","columnLineColor","rowGapColor","rowHatchColor","columnGapColor","columnHatchColor","areaBorderColor","gridBackgroundColor"]
+If(Type = "Solid")
+{
+found := 0
+For k, v in Basetype
+{
+If(Subtype == v)
+found := 1
+}
+If found
+{
+this.highlightConfig[Subtype] := {"r":r,"g":g,"b":b,"a":a}
+}
+Else
+{
+MsgBox 0x40010, , Wrong / missing subtype
+}
+}
+Else If(Type = "Grid")
+{
+found := 0
+For k, v in Gridtype
+{
+If(Subtype == v)
+found := 1
+}
+If found
+{
+this.highlightConfig.GridHighlightConfig[Subtype] := {"r":r,"g":g,"b":b,"a":a}
+}
+Else
+{
+MsgBox 0x40010, , Wrong / missing subtype
+}
+}
+Else
+{
+MsgBox 0x40040, , Type Should be "Solid" or "Grid"
+}
+}
+GridSet(Param)
+{
+L := ["showGridExtensionLines"
+,"showPositiveLineNumbers"
+,"showNegativeLineNumbers"
+,"showAreaNames"
+,"showLineNames"
+,"showTrackSizes"
+,"gridBorderDash"
+,"cellBorderDash"
+,"rowLineDash"
+,"columnLineDash"]
+For k, v in L
+{
+If(Param = v)
+found := 1
+}
+If found
+this.highlightConfig.GridHighlightConfig[Param] := Json.true
+Else
+MsgBox 0x40010, ,  % "<" Param "> is wrong parameter"
+}
+highlight(Info:=0,Styles:=0,Rulers:=0,AccInfo:=0,SaveConfig:=0)
+{
+If !this.highlightConfig
+{
+MsgBox 0x40030, , Please Set Highlight Configuration`nusing Element.highlightConfigurations()
+Return
+}
+If Info
+this.highlightConfig["showInfo"] := json.true
+If Styles
+this.highlightConfig["showStyles"] := json.true
+If Rulers
+this.highlightConfig["showRulers"] := json.true
+If AccInfo
+this.highlightConfig["showAccessibilityInfo"] := json.true
+this.call("Overlay.enable")
+x := this.call("Overlay.highlightNode",{"highlightConfig":this.highlightConfig,"nodeId":this.nodeId})
+tooltip % json.Dump(x)
+If(SaveConfig = 0)
+this.highlightConfig := ""
+Return this.highlightConfig
+}
+OuterHTML
+{
+get
+{
+Return this.call("DOM.getOuterHTML",{"nodeId":this.nodeId}).OuterHTML
+}
+set
+{
+this.call("DOM.setOuterHTML",{"nodeId":this.nodeId,"outerHTML":value})
+}
+}
+getAttributes()
+{
+For k, v in this.call("DOM.getAttributes",{"nodeId":this.nodeId}).attributes
+{
+If( mod(a_index, 2) != 1)
+{
+this[key] := v
+}
+key := V
+}
+}
+getAttribute(attrib)
+{
+For k, v in this.call("DOM.getAttributes",{"nodeId":this.nodeId}).attributes
+{
+If( mod(a_index, 2) != 1)
+{
+If(Key = attrib)
+Return v
+}
+key := V
+}
+}
+setAttribute(Name,Value)
+{
+this.call("DOM.setAttributeValue",{"nodeId":this.nodeId,"name":Name,"value":Value}).NodeID
+this[Name] := this.getAttribute(Name)
+Return Value
+}
+SendKey(str,type:="keyDown")
+{
+this.focus()
+For k, v in StrSplit(str)
+{
+this.call("Input.dispatchKeyEvent",{"type":type,"text":v})
+}
+}
+click(relativeX := 10,relativeY := 10)
+{
+Model := this.getBoxModel()
+height := Model.height
+width := Model.width
+content :=  Model.content
+toprightx := content[1]
+toprighty := content[2]
+x := round(toprightx + (width / 2),0)
+y := round(toprighty + ( height / 2),0)
+this.ClickCoord(x,y, delay:= 10)
+}
+ClickCoord(x,y, delay:= 10)
+{
+MouseEvent := {"type":"mousePressed","button":"left","x":x,"y":y,"clickCount":1}
+this.call("Input.dispatchMouseEvent",MouseEvent)
+sleep, % delay
+MouseEvent := {"type":"mouseReleased","button":"left","x":x,"y":y,"clickCount":1}
+this.call("Input.dispatchMouseEvent",MouseEvent)
+}
+}
+Class CDPElement extends CDP
+{
+__new(nodeId,address)
+{
+this.address := address
+Node := this.call("DOM.describeNode",{"nodeId":nodeId}).node
+this.nodeId := nodeId
+this.Name := node.nodeName
+this.localName := node.localName
+this.parentId := node.parentId
+this.backendNodeId := node.backendNodeId
+this.nodeType := node.nodeType
+}
+Value
+{
+set
+{
+this.call("DOM.setAttributeValue",{"nodeId":this.nodeId,"name":"value","value":Value})
+Return value
+}
+get
+{
+Return this.getAttribute("Value")
+}
+}
+Class
+{
+set
+{
+this.call("DOM.setAttributeValue",{"nodeId":this.nodeId,"name":"Class","value":Value})
+Return value
+}
+get
+{
+Return this.getAttribute("Class")
+}
+}
+id
+{
+set
+{
+this.call("DOM.setAttributeValue",{"nodeId":this.nodeId,"name":"id","value":Value})
+Return value
+}
+get
+{
+Return this.getAttribute("id")
+}
+}
+innerText
+{
+get
+{
+d  := ComObjCreate("htmlfile")
+d.write(this.outerHTML)
+Return d.querySelector("*").innerText
+}
+set
+{
+d  := ComObjCreate("htmlfile")
+d.write(ohtml := this.outerHTML)
+iText := d.querySelector("*").innerText
+nHtml := StrReplace(ohtml,itext,value)
+If(ohtml != nHtml)
+this.outerHTML := nHtml
+Return value
+}
+}
+textContent
+{
+get
+{
+d  := ComObjCreate("htmlfile")
+d.write(this.outerHTML)
+Return d.querySelector("*").textContent
+}
+set
+{
+}
+}
+}
+Class CDPPrintOptions
+{
+static A4_Default =
+	( LTrim Join
 	{
-		if InStr(" `t`n`r", ch)
-			continue
-		if !InStr(next, ch, true)
-		{
-			ln := ObjLength(StrSplit(SubStr(src, 1, pos), "`n"))
-			col := pos - InStr(src, "`n",, -(StrLen(src)-pos+1))
-
-			msg := Format("{}: line {} col {} (char {})"
-			,   (next == "")      ? ["Extra data", ch := SubStr(src, pos)][1]
-			  : (next == "'")     ? "Unterminated string starting at"
-			  : (next == "\")     ? "Invalid \escape"
-			  : (next == ":")     ? "Expecting ':' delimiter"
-			  : (next == q)       ? "Expecting object key enclosed in double quotes"
-			  : (next == q . "}") ? "Expecting object key enclosed in double quotes or object closing '}'"
-			  : (next == ",}")    ? "Expecting ',' delimiter or object closing '}'"
-			  : (next == ",]")    ? "Expecting ',' delimiter or array closing ']'"
-			  : [ "Expecting JSON value(string, number, [true, false, null], object or array)"
-			    , ch := SubStr(src, pos, (SubStr(src, pos)~="[\]\},\s]|$")-1) ][1]
-			, ln, col, pos)
-
-			throw Exception(msg, -1, ch)
-		}
-
-		is_array := is_arr[obj := stack[1]]
-
-		if i := InStr("{[", ch)
-		{
-			val := (proto := args[i]) ? new proto : {}
-			is_array? ObjPush(obj, val) : obj[key] := val
-			ObjInsertAt(stack, 1, val)
-
-			is_arr[val] := !(is_key := ch == "{")
-			next := q . (is_key ? "}" : "{[]0123456789-tfn")
-		}
-
-		else if InStr("}]", ch)
-		{
-			ObjRemoveAt(stack, 1)
-			next := stack[1]==tree ? "" : is_arr[stack[1]] ? ",]" : ",}"
-		}
-
-		else if InStr(",:", ch)
-		{
-			is_key := (!is_array && ch == ",")
-			next := is_key ? q : q . "{[0123456789-tfn"
-		}
-
-		else ; string | number | true | false | null
-		{
-			if (ch == q) ; string
-			{
-				i := pos
-				while i := InStr(src, q,, i+1)
-				{
-					val := StrReplace(SubStr(src, pos+1, i-pos-1), "\\", "\u005C")
-					static end := A_AhkVersion<"2" ? 0 : -1
-					if (SubStr(val, end) != "\")
-						break
-				}
-				if !i ? (pos--, next := "'") : 0
-					continue
-
-				pos := i ; update pos
-
-				  val := StrReplace(val,    "\/",  "/")
-				, val := StrReplace(val, "\" . q,    q)
-				, val := StrReplace(val,    "\b", "`b")
-				, val := StrReplace(val,    "\f", "`f")
-				, val := StrReplace(val,    "\n", "`n")
-				, val := StrReplace(val,    "\r", "`r")
-				, val := StrReplace(val,    "\t", "`t")
-
-				i := 0
-				while i := InStr(val, "\",, i+1)
-				{
-					if (SubStr(val, i+1, 1) != "u") ? (pos -= StrLen(SubStr(val, i)), next := "\") : 0
-						continue 2
-
-					; \uXXXX - JSON unicode escape sequence
-					xxxx := Abs("0x" . SubStr(val, i+2, 4))
-					if (A_IsUnicode || xxxx < 0x100)
-						val := SubStr(val, 1, i-1) . Chr(xxxx) . SubStr(val, i+6)
-				}
-
-				if is_key
-				{
-					key := val, next := ":"
-					continue
-				}
-			}
-
-			else ; number | true | false | null
-			{
-				val := SubStr(src, pos, i := RegExMatch(src, "[\]\},\s]|$",, pos)-pos)
-
-			; For numerical values, numerify integers and keep floats as is.
-			; I'm not yet sure if I should numerify floats in v2.0-a ...
-				static number := "number", integer := "integer"
-				if val is %number%
-				{
-					if val is %integer%
-						val += 0
-				}
-			; in v1.1, true,false,A_PtrSize,A_IsUnicode,A_Index,A_EventInfo,
-			; SOMETIMES return strings due to certain optimizations. Since it
-			; is just 'SOMETIMES', numerify to be consistent w/ v2.0-a
-				else if (val == "true" || val == "false")
-					val := %value% + 0
-			; AHK_H has built-in null, can't do 'val := %value%' where value == "null"
-			; as it would raise an exception in AHK_H(overriding built-in var)
-				else if (val == "null")
-					val := ""
-			; any other values are invalid, continue to trigger error
-				else if (pos--, next := "#")
-					continue
-
-				pos += i-1
-			}
-
-			is_array? ObjPush(obj, val) : obj[key] := val
-			next := obj==tree ? "" : is_array ? ",]" : ",}"
-		}
+		"landscape": json.false,
+		"printBackground": json.true,
+		"scale": 1,
+		"paperWidth": 50,
+		"paperHeight": 60,
+ 		"marginTop": 2,
+ 		"marginBottom": 2,
+ 		"marginLeft": 2,
+ 		"marginRight": 2
 	}
-
-	return tree[1]
+)
 }
-
-Jxon_Dump(obj, indent:="", lvl:=1)
+class JSON
 {
-	static q := Chr(34)
-
-	if IsObject(obj)
+static version := "0.4.1-git-built"
+BoolsAsInts[]
+{
+get
+{
+this._init()
+Return NumGet(this.lib.bBoolsAsInts, "Int")
+}
+set
+{
+this._init()
+NumPut(value, this.lib.bBoolsAsInts, "Int")
+Return value
+}
+}
+EscapeUnicode[]
+{
+get
+{
+this._init()
+Return NumGet(this.lib.bEscapeUnicode, "Int")
+}
+set
+{
+this._init()
+NumPut(value, this.lib.bEscapeUnicode, "Int")
+Return value
+}
+}
+_init()
+{
+If (this.lib)
+Return
+this.lib := this._LoadLib()
+NumPut(&this.True, this.lib.objTrue, "UPtr")
+NumPut(&this.False, this.lib.objFalse, "UPtr")
+NumPut(&this.Null, this.lib.objNull, "UPtr")
+this.fnGetObj := Func("Object")
+NumPut(&this.fnGetObj, this.lib.fnGetObj, "UPtr")
+this.fnCastString := Func("Format").Bind("{}")
+NumPut(&this.fnCastString, this.lib.fnCastString, "UPtr")
+}
+_LoadLib32Bit() {
+static CodeBase64 := ""
+. "FLYQAQAAAAEwVYnlEFOB7LQAkItFFACIhXT///+LRUAIixCh4BYASAAgOcIPhKQAcMdFAvQAFADrOIN9DAAAdCGLRfQF6AEAQA+2GItFDIsAAI1I"
+. "AotVDIkACmYPvtNmiRAg6w2LRRAAKlABwQAOiRCDRfQAEAViIACEwHW5AMaZiSBFoIlVpAEhRCQmCABGAAYEjQATBCSg6CYcAAACaRQLXlDHACIA"
+. "DFy4AZfpgK0HAADGRfMAxAgIi1AAkwiLQBAQOcJ1RwATAcdFCuwCuykCHAyLRewAweAEAdCJRbACiwABQAiLVeyDAMIBOdAPlMCIAEXzg0XsAYB9"
+. "EPMAdAuEIkXsfIrGgkUkAgsHu1sBJpgFu3uCmYlOiRiMTQSAvYGnAHRQx0Wi6Auf6AX5KJ/oAAQjhRgCn8dF5AJ7qQULgUGDauSEaqyDfeSwAA+O"
+. "qYAPE6EsDaGhhSlSx0XgiyngqilO4AACRQyCKesnUyAgIVUgZcdF3EIgVMdERdiLItgF/Kgi2EcAAkUMgiKDRdyABBiAO0XcfaQPtoB5gPABhMAP"
+. "hJ/AwIHCeRg5ReR9fOScGItFrMCNALCYiVVKnA2wmAGwZRlEXxfNDxPpgTjKE+nKQgSAIaIcgCEPjZ9C3NQLQOjUBf4oQNQAAkUMRNyhxCyQiVWU"
+. "zSyQYRaUsRiYbivqC+scwwlgi1UQiVTgCOAEVKQkBIEIYBqVCDqtKAN/Q4ctDIP4AXUek0EBLg76FwBhnAIBKKEDBQYPhV7COqzAmIbkICAAgVXH"
+. "RdDLKbjQBQcAB98pwynQAAETJQbCKekqJA4QodzFRgzMSwzMBQxfDEYM7swAASUGQwzHphiBsUMMYshLDMgFEl8MRgzIFwABJQZDDGRCDBiNSBAB"
+. "D7aVg7+siwAoiUwkoSwMjy3N+TD//+kv5BKBLQV1liBCBk8FVsBJ6QRIBYgCdWlAAY1VgCUEVNQUwVzEIho3IhogAItViItFxAHAiI0cAioaD7cT"
+. "ERoExAEFBgHQD7cAgGaFwHW36ZCiZ2LACyXABRcfJeYKwM8AASUGpmcuHIAVv9RGCgbkAAHjyeQPjEj6RP//ZJ4PhLXiFbzt6xW8P6+IC7wAASUG"
+. "BMRv4uLhqGH7CAu0/6iIBbQXgAAVA3RUuCABuDtFqBh8pFpxXVNxfV9xA11xkgmLXfzJw5DOkLEaAgBwiFdWkIizUYoMMBQUcQDHQAjRAdjHQAxS"
+. "DIAECIEEwCEOCJFBwABhH4P4IHQi5dgACnTX2AANdCLJ2AAJdLvYAHsPjIVygjxoBcdFoDIHVkWBj2AAqGMArGEAoYaM8AjQLkAYixWhAJDHRCQg"
+. "4gFEJCCLIAAAjU2QwDMYjdRNoGAAFFABEEGWcAAf8gtwAOMMQFdxAIkUJED/0IPsJItAY0U+sN8N3w3fDd8N1wB9D6yEVARuEgGFEG9DCQFAg/gi"
+. "dAq4YCj/xOm/EAqNRYDxYOEHAeAtaf7//4XAdPoX8wGf8AH/Cf8J/wn/CXXVADrFB0LPBZJplAjfVv2SCMQCFcICiIM4CP1jArCyZ4ABTxRPCk8K"
+. "TwqR1wAsdRIqBelUcBFmkFkWhQl8C18MgCwJQQIxVbCJUAjDqlTDdQLzA1sPhfBFGTYovIVwwUGxIjK5kwB4lgDOfJQA/yj8KI1gkAIiKZ6NEQVf"
+. "KV8pVimFaBED/EW00KbxAq8VrxWvFa8VYdcAXQ+EtpSP9imlkwNA2B/h+9kfFwr1AdXgi+RjArRhArpQFS8Kby8KLwovCtkfFioFgVzplgGACBkg"
+. "XcUJegkfIDUXILQWIFJ1AkQ4D4VMYwPvNYB4ReCSA+DDkAOjBAgA6e8FSxRvDbQH/pEgNwVcD4WqF51NKQdxe+CAAYlV4LsCazsuizkGwATbAlzc"
+. "Aqpd2wIv2wIv3AIv2wKqYtsCCNwCAdsCZtsCqgzcAtPbTW7bAgrcAqql2wJy2wIN3AJ32wIudNsCMR7ZAknbAnUPfIURTT7gA4ADsWVCz+nPwdcw"
+. "AQADoNyJwuEBOhuIL34w2AA5fyLDAoORAlMBAdCD6DCFAwTpgKk1g/hAfi0B2ADAtwBGfx+LReAPtwAAicKLRQiLAEEAkAHQg+g3AXDgIGaJEOtF"
+. "BVhmg1D4YH4tCDRmE+hXEQZ0Crj/AADpbQZEAAACQI1QAgAOiQAQg0XcAYN93BADD44WAD6DReAoAusmAypCBCoQjQpKAioIAEmNSAKJGk0AZhIA"
+. "Ugh9Ig+FAP/8//+LRQyLEkgBJinIAXcMi0AQCIPoBAEp4GbHCgAMeLgAEADp3QUjBBYDSC10JIgGLw8IjrEDig85D4+foYAIx0XYAYInDIArIhSB"
+. "A8dACIEnx0DmDAEDiSh1FIAWAWiKPjGIEDB1IxMghRXpjhELKTB+dQlJf2frCkcBdlCBd2vaCmtAyAAB2bsKgBn3AOMB0YnKi00IAIsJjXECi10I"
+. "AIkzD7cxD7/OAInLwfsfAcgRANqDwNCD0v+LAE0MiUEIiVEMSck+fhoJGX6dRXCrEAQAAJCIBi4PhYalTSyGI2YPbsDAAADKZg9iwWYP1mSFUEAQ"
+. "361BAYAI3VZYwGpBUAUAVNQBVOsAQotV1InQweAAAgHQAcCJRdQBQxVIAotVCIkKAcAbmIPoMImFTIXAD9tDAUXU3vmBErBACN7BhRTIMA7KMCKi"
+. "SANldBJIA0UPHIVVACANMQMHFHUxVQk00MAA2gA00wA0lVEVNMZF00uBE0AEAY3KF+tAzAYIK3URhgxX0IhNMsRiH8KizEGM61Ani1XMh07DUU4B"
+. "ENiJRcxYFb3HRSLIwTDHRcRCChOLhFXIqDHIg0XEQBgAxDtFzHzlgH0Q0wB0E0Mv20XIoaMwWAjrEUcCyUYiFeUoKyR0WCBN2JmJAN8Pr/iJ1g+v"
+. "APEB/vfhjQwWk2FVJFHrHcYGBXVmCibYcApELgMAA3oMAqFqZXQPhasiGsAiGgA3i0XABQcXAAAAD7YAZg++0FEmBTnCdGQqy+1AgwxFwKAexgaE"
+. "wHW6lA+2wIYAQAF0G6UPJ0N4oidDeOssQwMJABCLFeQWgoWJUAhCoUIBAItABKMCiYAUJP/Qg+wEgxcuT2UPhKqFF7yFF7wF6gyaFw6PF7yAF8YG"
+. "mhf76I+JF9yHF0IBgxdBAYsXgpKrlG51f8dFIgOA6zSLRbgFEhMX0gcCF+tYrBa4oBZmBvWgFr3nEeDnEUIB4xFBAQnqEesFIguNZfRbMF5fXcNB"
+. "AgUAIlUAbmtub3duX08AYmplY3RfAA0KCiALIqUBdHJ1ZQAAZmFsc2UAbgh1bGzHBVZhbHUAZV8AMDEyMzQANTY3ODlBQkMAREVGAFWJ5VNAg+xU"
+. "x0X0ZreLAEAUjVX0iVQkIBTHRCQQIitEJKIMwUONVQzAAgjAAQ8AqaAF4HPDFhjHReSpAgVF6MMA7MMA8IMKcBCJReRgAuPOIgwYqItV9MAIIKQL"
+. "HOQAghjhAI1N5IlMgw/fwQyBD8QDwjwgEAQnD2De0hCDNgl1MCEQcE7xBUAIi1UQi1JFAgTE62hmAgN1XGECElESu0AWf7lBBTnDGSjRfBWGAT0g"
+. "AYCJQNCD2P99LvAajTRV4HEPiXAPMR4EJATooQAChcB0EYsETeBGA4kBiVEEAJCLXfzJw5CQAXAVg+xYZsdF7ikTH0XwIBYUARBNDAC6zczMzInI"
+. "9xDiweoDNkopwYkCyhAHwDCDbfQBgSGA9GaJVEXGsAMJ4gL34pAC6AOJRQAMg30MAHW5jUJVoAH0AcABkAIQDYAJCGIRwwko/v//hpBACLMdYMdF"
+. "+EIuBhrkRcAKRfjB4AQgAdCJRdgBAUAYwDlF+A+NRPAZAAsKzlEC2PEMRfTGRQDzAIN99AB5B2GQAAH3XfRQHEMM9KC6Z2ZmZkAM6nAJhPgCUnkp"
+. "2InC/wyog23s8gzs8QymngNAwfkficopoAj0AYEGdaWAffMAdAYOQQMhA8dERaYtHXAnpsAAwA5gAtDGRYbrkCXiJotF5I0hjCDQAdAPtzBn5I3S"
+. "DMEWAcgDOnWQOQgCQABmhcB1GSUBDGUmAQYQBQHrEKG8AnQDUIS8AnQHg0XkAQDrh5CAfesAD2aEoWbhH1XYMJnRLemSyiQuQBwhFYyj4gChwxTU"
+. "xkXjgAvcgwvq3IIF1IQL3I8LCAKFC/sjAYoL44ILvAKBC7wCgQtC3IML4wB0D0oL65AYg0X48n1AEFIL8Nf9//9ySLosvz1iABNyQ2Aj6AWBD90A"
+. "3RpdkC7YswGyDsdF4ONjACIbjUXoUCcwAZEH7KGIED3jQBWhAB1BIXXATCQYjU3YBUFCav8MQeVIFUEhCz8LPwvAATES0QAxBIsAADqJIEmfC3+f"
+. "C58LnwufC58Lnws2O2Q9wAnmkgrSNjQKV0l8GIM1AStMfW6NRahoSib2kEBUD+s3gUN0IACLVbCLRfABwFSNHPBqDHSWDHGWE12xzg2hIcBs8CAQ"
+. "wWzw1gEFA2YntzNzPvR60xMA7IN97AB5bYtMTeyPQY9BuDAQBCk60KpOvr4DpkHCBXWjB+ECwQJAQb4tAOtbX88GzwZfVa8GrwalhCPrQj5CEyeN"
+. "Vb7WVuhnvxO/E7IT6AF8AyYUqWvpNbMqGJIGF3oFUIMimADpyXLcmAXpt5PdKQTkdVaiAxStA1wAVx0JHwYTBmMeBlEZBlxPHwYfBh8GaALpAR4G"
+. "73vTaBMGCB8GHwYfBmYCYgAAgrEA6Z8CAACLRRAgiwCNUAEAcIkQBOmNAogID7cAZgCD+Ax1VoN9DEAAdBSLRQwAjEgAAotVDIkKZsdgAFwA6w0K"
+. "3AJMF6ENTGYA6T0OwisJwoIKPGFuAOnbAQ1hFskCEQRhDTxhcgDpKnmOMGeJMAm8MHQAFOkXjjAFgAgPtgUABAAAAITAdCkRBjYfdgyGBX52B0K4"
+. "ABMA6wW4gAIAoIPgAeszCBQYCBTCE4QFPaAAdw0awBc2bykwjgl1jQkDGw+3AMCLVRCJVCQIAQEKVCQEiQQk6DptgR4rwhHAJ8gRi1UhwAwSZokQ"
+. "jRxFCAICBC+FwA+FOvwU//9TISJNIZDJwwCQkJBVieVTgwTsJIAQZolF2McARfAnFwAAx0UC+AE/6y0Pt0XYAIPgD4nCi0XwAAHQD7YAZg++ANCL"
+. "RfhmiVRFQugBB2bB6AQBDoMARfgBg334A36gzcdF9APBDjOCIQAci0X0D7dcRZLoiiOJ2hAybfRAEBD0AHnHAl6LXfwBwic="
+static Code := false
+If ((A_PtrSize * 8) != 32) {
+Throw Exception("_LoadLib32Bit does not support " (A_PtrSize * 8) " bit AHK, please Run using 32 bit AHK")
+}
+If (!Code) {
+CompressedSize := VarSetCapacity(DecompressionBuffer, 3935, 0)
+If !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1, "Ptr", &DecompressionBuffer, "UInt*", CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
+throw Exception("Failed to convert MCLib b64 to binary")
+If !(pCode := DllCall("GlobalAlloc", "UInt", 0, "Ptr", 9092, "Ptr"))
+throw Exception("Failed to reserve MCLib memory")
+DecompressedSize := 0
+If (DllCall("ntdll\RtlDecompressBuffer", "UShort", 0x102, "Ptr", pCode, "UInt", 9092, "Ptr", &DecompressionBuffer, "UInt", CompressedSize, "UInt*", DecompressedSize, "UInt"))
+throw Exception("Error calling RtlDecompressBuffer",, Format("0x{:08x}", r))
+For k, Offset in [33, 66, 116, 385, 435, 552, 602, 691, 741, 948, 998, 1256, 1283, 1333, 1355, 1382, 1432, 1454, 1481, 1531, 1778, 1828, 1954, 2004, 2043, 2093, 2360, 2371, 3016, 3027, 5351, 5406, 5420, 5465, 5476, 5487, 5540, 5595, 5609, 5654, 5665, 5676, 5725, 5777, 5798, 5809, 5820, 7094, 7105, 7280, 7291, 8610, 8949] {
+Old := NumGet(pCode + 0, Offset, "Ptr")
+NumPut(Old + pCode, pCode + 0, Offset, "Ptr")
+}
+OldProtect := 0
+If !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", 9092, "UInt", 0x40, "UInt*", OldProtect, "UInt")
+Throw Exception("Failed to mark MCLib memory as executable")
+Exports := {}
+For ExportName, ExportOffset in {"bBoolsAsInts": 0, "bEscapeUnicode": 4, "dumps": 8, "fnCastString": 2184, "fnGetObj": 2188, "loads": 2192, "objFalse": 5852, "objNull": 5856, "objTrue": 5860} {
+Exports[ExportName] := pCode + ExportOffset
+}
+Code := Exports
+}
+Return Code
+}
+_LoadLib64Bit() {
+static CodeBase64 := ""
+. "xrUMAQALAA3wVUiJ5RBIgezAAChIiU0AEEiJVRhMiUUAIESJyIhFKEggi0UQSIsABAWVAh0APosASDnCD0SEvABWx0X8AXrrAEdIg30YAHQtAItF"
+. "/EiYSI0VQo0ATkQPtgQAZkUCGAFgjUgCSItVABhIiQpmQQ++QNBmiRDrDwAbICCLAI1QAQEIiRDQg0X8AQU/TQA/AT4QhMB1pQJ9iUWgEEiLTSAC"
+. "Q41FoABJichIicHoRhYjAI4CeRkQaMcAIgoADmW4gVfpFgkAMADGRfuAZYFsUDBJgwNAIABsdVsADAEox0X0Amw1hBAYiwRF9IBMweAFSAGa0IBG"
+. "sIALgAFQEIALGIPAAQANAImUwIgARfuDRfQBgH2Q+wB0EwEZY9AILRR8sgNWLIIPCEG4wlsBMQZBuHsBuw9gBESJj1+AfSgAdFBkx0XwjLvwgpsm"
+. "mhyxu/DAXcMP5hvHXcjHRezCSqUGAidEQQLsSUGog33sAA8sjsqBL5hhLJQxZsfUReiMMeiCIV+AIa8xluiAMcMPH4gx6y+ZJkIglCZ5x0XkgiZo"
+. "KMdF4Mwo4MIYvhpt8SjgwCjDD37AD8UogwRF5MAFMDtF5H0IkA+2wJDwAYTAuA+E6EDpQVwGkTBBmdyNiZxbUL1AAajgB+FoSpjoaJjkaP4fJQoc"
+. "mTQK6f5DVIkK6epgAo3qEzjiE0Fsx0XcrCay3KIeihm/Jq8m3KAjXeMHSuAHCIOFGpCIGpAthBophhrWJCwsDesbp2YK5AlkCb0gewk6UC4Dv04t"
+. "NItAGIP4AU51YTCAEAoQXB4gcReGA2Iw4wQGD4Wf4EMzYwVhswkYoAHgl2nH1EXYbC/YYicXAAR/L01tL9hgL+MH1xdnL+m0iwJpD21AA2QP1GwP"
+. "utRiB6AABH8PbQ/UYA9V4wdgaQ8Pag8BZw/QtWwP0GIHKn8PcA/QYA8p4wfqFmgPk2JyMI00SAFACk1B48AQAExDgAZBColMJCDBNa1g+P//6WjE"
+. "M8I1Bax1H2QFLDtiITs9SQUQAg+Fg6NtqEiNoJVw////4QSKYJoox0XMIhxIIxwuSIiLlXjAA4tFzAAVYAHATI0EABttHEHoD7cQUxzMkAAKBFBd"
+. "AA+3AGaFwHWeVOmqUjzIHBXIEhHdbhUfFR8V7QbIEBXzA5338ANbPCoRb6AO7zMPTtoFDuzQBahI8XYPjET5RP//8VwPhN3iDMTl7AzE4gjwFO8M"
+. "7wwNB/bEAAfzA7DwA1dzMZRyY+sBkskGvMIChs8GzwbOBha8wAbzA0bIBoNFwIFwAcA7RTB8kKyFOl2khX2vha+FqJFIgeLEAQxdw5AKAOyiDgAK"
+. "VcCjMEEsjawkgBVCpI2zpJURJEiLhQthAKAbFLUASMdACNvyEZAJhaICAQpQAArTAAcRUXUBMSmD+CB01REtAQp0wi0BDXSvES0BCXScLQF7D4WO"
+. "KcJUrweiB8dFUMIQKMdFWHQAYHIAiwWOA+E4AT9BowX1/tAAEMdEJEBTAkQkOAGCAI1VMEiJVCSqMIAAUIEAKJABICG3VEG58QFBkha6ogKJUMFB"
+. "/9LwFzhQbGh/zxDPEM8QzxDPEM8QJwF9WA+EwvJHaQGF8IesgV4Bg/gidAq4IBDw/+lmEYEOoblgB8IeAOj3/f//hcB0+iIDAkUBAu8M7wzvDO8M"
+. "l+8M7wwkAToVCsQQDwi3CAhSKMcLOsMLtAOIsgNJsDKLjQMsRWjESQL/YA1/Go8Njw2PDY8Njw0nAZgsdR1vB2MH6cLQC+dAkIwd1Qy6D58QnBCw"
+. "OQIJtjmLVWhIiVAaCLPSfcoDkwVbD4W+ZUJ4PwX0M/LJcAD4dADTUkIQM8P7+TO10QD/M+yNVdDF8zPw/zP/M+AZwtjwM3DHhay07R8aPx8aHxof"
+. "Gh8aHxonAV0PNoRh45803kdQKCfH+pkpJxUOMQLiJouVcQz1UA1wRCftMBgvDS8NLw0BJAH+tQAKdMJIi4XAAAAAAEiLAA+3AEBmg/gNdK8NkAlE"
+. "dJwNSCx1JAdISAiNUAIFGokQg4UCrAAQAemq/v//gpANbl10Crj/AAC46T4NASoTggAJyAAJMGbHAAkBIwELSIuAVXBIiVAIuAALGADpAQo8A1ki"
+. "D4WMEwUaUwUXiYWgAgkdBFiVggaALQc7CADpRFkEDTGFwHWEXYKCDA8/XA+F9gMhP7mEVnU0AAmCPIETiQJC5YA8IpYg6ccKL4Q6FCOqXBcjgBAj"
+. "L5QRL5cRKjmQEWKUEQiXEfICVY8RZpQRDJcRq5ARblWUEQqXEWSQEXKUEQ11lxEdkBF0lBFCuJMR1sIBjxF1D4WFigWOmcHEFQAAx4WcAcvByw47"
+. "gwyBBoARweAEiUeB/UIKT1MvfkJNAjkcfy/HB2IHxwMB0INk6DDpCemuo2sqCEBEfj9NAkZ/LJoKN6mJCutczQdgLwpmPAqmVyoKhHm1CNcpg0Io"
+. "CAGDvcEAAw+OuIlAmkiDIggC6zrjB8J16QcQSI1K5wchitUjPkggPo0DExJQLmCXLJD7QAtFkkgmBynIBkiCFuMCQAhIg+hOBMs8dRcjpdcHbzEt"
+. "xHQubj4PjgyKp+Q+iA+P9eCgx4WYwSDLh6YADxQGqMdAICCwDDx1IuMGoSTfooMGMHUPITjTCk1+cA4wD46JwdACOX9260yGKAC9AInQSMHgAkgB"
+. "gNBIAcBJicBpDCkgNYuVYwwKoAdID6C/wEwBwGAP0AUISyPFTGYfbg5+jiVMUwgGAAAO4S4PheYD2BtIPmYP78DySIwPKsEUYQLyDxHgQBUGMQXA"
+. "M5TEM+tsixKVYQGJ0MAbAdAB7MCJQgP4G5jAOwIG8AUNcADScAASBGYPKMgQ8g9eyjYHEEAIsPIPWME8CFwQFw8kTI5q6h9jAWV0ngJFuA+F+I9N"
+. "/RCzAhRXImP/Ef8RxoWTDyoBKiFNkwEBTwdDB+syPQMr3HUf3gQfLUsRE68hhCEKOrI1jFRa6zqLlduxAMYbQZ8pnBtEER4xA4NfB18HfqDHhYiE"
+. "IojHhYRVBxyLlVEBSygj4QCDAgIBi2IAOyEyBnzWgL2iD3Qq61kh4BfJUCONUQMQIxoilOsolwJIgxoPKvIFePIPWb0k+R3BpdU6i0FSREiYSA+v"
+. "OTjr8jg6AwV1vwawBqEDvwalugYMtyIDAFNToQ98oPh0D4XfkhOAlROMUouyAJAJjRXSEAOAD7YEEGYPvkEK6ZgDOcIlr0taBZ1moQQL8BYWBYAU"
+. "BYTAdZcAD7YFUuT//4T4wHQdyQqoUtI/FRFkhcwVDgMHV0sF/CI2Q1AIiwXu0QCJwf/SBVMPq/+G+GYPhdMJUQ9FfCIPTItFfN3SCeewAv8O+w5b"
+. "/zz3DmhFfAG1BJu0BJAOoLmQDmjjnw5MYZ4OBKMGbZgO8lQHkw7kggGWDsFBLzP4bg+FpZIOeKESBkmLRXjSCQOfDmWXDgeSDut0bw5lDnhbYA6D"
+. "BLoxJ2MOo+wLVSv4yOMLQ+oLNeoL6wUhUgdIgcQwsAldwz6QBwCkKQ8ADwACACJVAG5rbm93bl9PAGJqZWN0XwANCgoQCSLVAHRydWUAAGZhbHNl"
+. "AG4IdWxs5wJWYWx1AGVfADAxMjM0ADU2Nzg5QUJDAERFRgBVSInlAEiDxIBIiU0QAEiJVRhMiUUgaMdF/ANTRcBREVsoAEiNTRhIjVX8AEiJVCQo"
+. "x0QkEiDxAUG5MSxJicgDcRJgAk0Q/9BIx0RF4NIAx0XodADwwbQEIEiJReDgAFOJAaIFTItQMItF/IpIEAVA0wJEJDiFAOIwggCNVeBGB8BXQAcH"
+. "ogdiFXGWTRBB/9Lz0QWE73UeogaBl8IYYAYT5ADRGOtgpwIDdVODtQEBDIBIOdB9QG4V1AK68Bp/Qhs50H9l4FNF8Q/YSXCIUwfooUE2hcB0D6AB"
+. "2LDuBVADUjAGEJBIg+xmgBge8xXsYPEV5BVmo7IREAWJRfigFhSABACLTRiJyrjNzATMzDBTwkjB6CAgicLB6gMmXinBAInKidCDwDCDzLQAbfwB"
+. "icKLRfwASJhmiVRFwIsARRiJwrjNzMwAzEgPr8JIwegAIMHoA4lFGIMAfRgAdalIjVUDAIQArEgBwEgB0ABIi1UgSYnQSACJwkiLTRDoAQD+//+Q"
+. "SIPEYAhdw5AGAFVIieUASIPscEiJTRAASIlVGEyJRSAQx0X8AAAA6a4CAAAASItFEEiLRFAYA1bB4AUBV4k0RdABD2MAYQEdQDAASDnCD42aAQBg"
+. "AGbHRbgCNAAaQAEAUEXwxkXvAEhAg33wAHkIAAoBAEj3XfDHRegUgwBfAJTwSLpnZgMAgEiJyEj36kgArgDB+AJJichJwWD4P0wpwAG8gQngBgIB"
+. "PABrKcFIicoAidCDwDCDbegVgo3og42QmCdIwflSPwAbSCmBXfACR3WAgIB97wB0EIEigYMhx0RFkC0AgKEGkIIHhKGJRcDGRSDnAMdF4IGJi0Uy"
+. "4IAMjRQBcQEPD7cKEAQJDAEJGEgByAAPtwBmOcJ1b4EPFQBmhcB1HokLi4AXhQsGgDIB6zqTGgR0IlMNdAqDReAQAelm/0B2gH3nkAAPhPYCVkUg"
+. "wH6JwC4QuMBkAOkBQAFlCmw4AWyMysMKhWrIqMZF38A52MM52IYb/sjFOYIE0DmNCsU5xwXLOb7fwjlRDcE5UQ3BOdjGORDfAHQSzTjrIIMsRfwA"
+. "cgg5IAI5O/0M//+ApEA6g8RwXWLDwruB7JABBIS8SGvEdsAB6MQB8MEBwLLgAgUCwPIPEADyD6IRQIXHRcCECMjEAXrQwgGNgGdAioADASNIAIsF"
+. "hOb//0iLoABMi1AwQAN2QQMQx0QkQAMNRCQ4hQICiwAfiVQkMMHtlQECKEAGIAEQQbnBBwpBwi26QgWJwUH/sNJIgcQBF/B3QOl3fwAXABmgeKNs"
+. "gSEACOReD0yJm39veW+4MOAHKRzQgyyTv2+pbw+Feg9gOWEIIwhgb8AtAOkegF8T34IfE9qCx0XsCSEu61DgARgAdDYLi6oAC+xCAUyNBAIzYlRg"
+. "K41IQAFhOQpBQQBlZokQ6w/hU4sQAI1QAQEBiRCDWEXsARQJR2OO5VRAWyc85Dsg6TsDExyvD2aAxwAiAOleBEOAKcgP6UpjAhAhDYP4KCJ1ZmMI"
+. "GXIIXADT7hdcDuYDTw7SYwJEDk5cXw5fDsgF6XNQDl8dSg4IXw5fDsYFYgDp2gBQDuxk5EMODF8OXw5hxgVmAOmNwwsqB3l9KgcKLwcvBy8HLwfi"
+. "Am5IAOkaLwfpBioHDR8vBy8HLwcvB+ICcgDptqcwTy0HkzMBJAcJLwcPLwcvBy8H4gJ0AOk0BS8H6aFXD7YFmdZA//+EwHQr1wcfRHYNxwB+dgcT"
+. "ZwVB4jqD4AHrNqkCGoWpAhTFAD2gAHd9A31ABnxfDV8NXg3vAuECdbPvAtQHD7dRUPFyGCBUUInB6IZxCDTDBB43zwRgAGADEo9MAQhFEANxT0IN"
+. "hcAPhab736BtXwnYQT4EQaggJE71TQtgWdVriQBrjQVC8wdwBVBZxKjrMg+3RXAQg+AP0qzAWlBTtrAAZg++kqiSXugRAjBmwegEEQTRgIN9gPwD"
+. "fsjHRfhwOwgA6z9TCiWLRfjASJhED7dE4HwOC5hEicJfD+BbbfjQBDD4AHm7JVr1Cw=="
+static Code := false
+If ((A_PtrSize * 8) != 64) {
+Throw Exception("_LoadLib64Bit does not support " (A_PtrSize * 8) " bit AHK, please Run using 64 bit AHK")
+}
+If (!Code) {
+CompressedSize := VarSetCapacity(DecompressionBuffer, 4249, 0)
+If !DllCall("Crypt32\CryptStringToBinary", "Str", CodeBase64, "UInt", 0, "UInt", 1, "Ptr", &DecompressionBuffer, "UInt*", CompressedSize, "Ptr", 0, "Ptr", 0, "UInt")
+throw Exception("Failed to convert MCLib b64 to binary")
+If !(pCode := DllCall("GlobalAlloc", "UInt", 0, "Ptr", 11168, "Ptr"))
+throw Exception("Failed to reserve MCLib memory")
+DecompressedSize := 0
+If (DllCall("ntdll\RtlDecompressBuffer", "UShort", 0x102, "Ptr", pCode, "UInt", 11168, "Ptr", &DecompressionBuffer, "UInt", CompressedSize, "UInt*", DecompressedSize, "UInt"))
+throw Exception("Error calling RtlDecompressBuffer",, Format("0x{:08x}", r))
+OldProtect := 0
+If !DllCall("VirtualProtect", "Ptr", pCode, "Ptr", 11168, "UInt", 0x40, "UInt*", OldProtect, "UInt")
+Throw Exception("Failed to mark MCLib memory as executable")
+Exports := {}
+For ExportName, ExportOffset in {"bBoolsAsInts": 0, "bEscapeUnicode": 16, "dumps": 32, "fnCastString": 2624, "fnGetObj": 2640, "loads": 2656, "objFalse": 7632, "objNull": 7648, "objTrue": 7664} {
+Exports[ExportName] := pCode + ExportOffset
+}
+Code := Exports
+}
+Return Code
+}
+_LoadLib() {
+Return A_PtrSize = 4 ? this._LoadLib32Bit() : this._LoadLib64Bit()
+}
+Dump(obj, pretty := 0)
+{
+this._init()
+If (!IsObject(obj))
+throw Exception("Input must be object")
+size := 0
+DllCall(this.lib.dumps, "Ptr", &obj, "Ptr", 0, "Int*", size
+, "Int", !!pretty, "Int", 0, "CDecl Ptr")
+VarSetCapacity(buf, size*2+2, 0)
+DllCall(this.lib.dumps, "Ptr", &obj, "Ptr*", &buf, "Int*", size
+, "Int", !!pretty, "Int", 0, "CDecl Ptr")
+Return StrGet(&buf, size, "UTF-16")
+}
+Load(ByRef json)
+{
+this._init()
+_json := " " json
+VarSetCapacity(pJson, A_PtrSize)
+NumPut(&_json, &pJson, 0, "Ptr")
+VarSetCapacity(pResult, 24)
+If (r := DllCall(this.lib.loads, "Ptr", &pJson, "Ptr", &pResult , "CDecl Int")) || ErrorLevel
+{
+throw Exception("Failed to parse JSON (" r "," ErrorLevel ")", -1
+, Format("Unexpected character at position {}: '{}'"
+, (NumGet(pJson)-&_json)//2, Chr(NumGet(NumGet(pJson), "short"))))
+}
+result := ComObject(0x400C, &pResult)[]
+If (IsObject(result))
+ObjRelease(&result)
+Return result
+}
+True[]
+{
+get
+{
+static _ := {"value": true, "name": "true"}
+Return _
+}
+}
+False[]
+{
+get
+{
+static _ := {"value": false, "name": "false"}
+Return _
+}
+}
+Null[]
+{
+get
+{
+static _ := {"value": "", "name": "null"}
+Return _
+}
+}
+}
+Class WDElement extends Session
+{
+__new(Address,Element)
+{
+This.Address := Address
+This.Element := Element
+}
+TagName
+{
+get
+{
+Return this.Send("name","GET")
+}
+}
+Rect()
+{
+Return this.Send("rect","GET")
+}
+enabled()
+{
+Return this.Send("enabled","GET")
+}
+Selected()
+{
+Return this.Send("selected","GET")
+}
+Displayed()
+{
+Return this.Send("displayed","POST",{"":""})
+}
+submit()
+{
+Return this.Send("submit","POST",{"":""})
+}
+SendKey(text)
+{
+Return this.Send("value","POST", {"text":text})
+}
+click(slient:=1)
+{
+If slient
+Return this.Execute("arguments[0].click()")
+Else
+Return this.Send("click","POST",{"":""})
+}
+Move()
+{
+Return this.Send("moveto","POST",{"element_id":this.id})
+}
+onchange()
+{
+Return this.Execute("arguments[0].onchange()")
+}
+Title
+{
+get
+{
+Return this.GetAttribute("title")
+}
+set
+{
+this.Execute("arguments[0].title = '" Value "'")
+}
+}
+Class
+{
+get
+{
+Return this.GetAttribute("class")
+}
+set
+{
+this.Execute("arguments[0].className = '" Value "'")
+}
+}
+Name
+{
+get
+{
+Return this.GetAttribute("name")
+}
+set
+{
+this.Execute("arguments[0].name = '" Value "'")
+}
+}
+id
+{
+get
+{
+Return this.GetAttribute("id")
+}
+set
+{
+this.Execute("arguments[0].id = '" Value "'")
+}
+}
+value
+{
+get
+{
+v := this.Send("value","GET")
+If v.error
+Return this.GetProperty("value")
+Else
+Return v
+}
+Set
+{
+this.Execute("arguments[0].value = '" Value "'")
+}
+}
+checked
+{
+get
+{
+Return  this.Execute("arguments[0].checked")
+}
+set
+{
+}
+}
+href
+{
+get
+{
+Return  this.GetProperty("href")
+}
+set
+{
+this.Execute("arguments[0].href = '" Value "'")
+}
+}
+src
+{
+get
+{
+Return  this.GetProperty("src")
+}
+set
+{
+this.Execute("arguments[0].src = '" Value "'")
+}
+}
+InnerText
+{
+get
+{
+e := this.Send("text","GET")
+If !e
+e := this.Execute("Return arguments[0].InnerText")
+Return e
+}
+set
+{
+this.Execute("arguments[0].innerText = '" Value "'")
+}
+}
+innerHTML
+{
+get
+{
+Return  this.GetProperty("innerHTML")
+}
+set
+{
+this.Execute("arguments[0].innerHTML = '" Value "'")
+}
+}
+outerHTML
+{
+get
+{
+Return  this.GetProperty("outerHTML")
+}
+set
+{
+this.Execute("arguments[0].outerHTML = '" Value "'")
+}
+}
+Clear()
+{
+this.Send("ClearValue","POST")
+this.Execute("arguments[0].value = ''")
+}
+GetAttribute(Name)
+{
+Return this.Send("attribute/" Name,"GET")
+}
+GetProperty(Name)
+{
+Return this.Send("property/" Name,"GET")
+}
+GetCSS(Name)
+{
+Return this.Send("css/" Name,"GET")
+}
+ComputedRole()
+{
+Return this.Send("computedrole","GET")
+}
+ComputedLable()
+{
+Return this.Send("computedlabel","GET")
+}
+Uploadfile(filelocation)
+{
+Return this.Send("file","POST",{})
+}
+focus()
+{
+this.Execute("arguments[0].focus()")
+}
+parentElement
+{
+get
+{
+For i, elementid in this.Execute("Return arguments[0].parentElement")
+{
+address := RegExReplace(this.address "/element/" elementid,"(\/shadow\/.*)\/element","/element")
+address := RegExReplace(address "/element/" elementid,"(\/element\/.*)\/element","/element")
+Return New WDElement(address,i)
+}
+}
+}
+children
+{
+get
+{
+e := []
+For k, element in this.Execute("Return arguments[0].children")
+{
+For i, elementid in element
+{
+address := RegExReplace(this.address "/element/" elementid,"(\/shadow\/.*)\/element","/element")
+address := RegExReplace(address "/element/" elementid,"(\/element\/.*)\/element","/element")
+e[k-1] := New WDElement(address,i)
+}
+}
+If e.count() > 0
+Return e
+Return 0
+}
+}
+Execute(script)
+{
+Origin := this.Address
+RegExMatch(Origin,"(.*)\/element\/(.*)$",i)
+this.address := i1
+r := this.ExecuteSync(script,{This.Element:i2})
+this.address := Origin
+Return r
+}
+Screenshot(location:=0)
+{
+Base64Canvas :=  this.Send("screenshot","GET")
+If Base64Canvas
+{
+nBytes := Base64Dec( Base64Canvas, Bin )
+File := FileOpen(location, "w")
+File.RawWrite(Bin, nBytes)
+File.Close()
+}
+}
+}
+Class ShadowElement extends Session
+{
+__new(Address)
+{
+This.Address := Address
+}
+}
+Class Key
+{
+static Unidentified := "\uE000"
+static Cancel:= "\uE001"
+static Help:= "\uE002"
+static Backspace:= "\uE003"
+static Tab:= "\uE004"
+static Clear:= "\uE005"
+static Return:= "\uE006"
+static Enter:= "\uE007"
+static Shift:= "\uE008"
+static Control:= "\uE009"
+static Ctrl:= "\uE009"
+static Alt:= "\uE00A"
+static Pause:= "\uE00B"
+static Escape:= "\uE00C"
+static Space:= "\uE00D"
+static PageUp:= "\uE00E"
+static PageDown:= "\uE00F"
+static End:= "\uE010"
+static Home:= "\uE011"
+static ArrowLeft:= "\uE012"
+static ArrowUp:= "\uE013"
+static ArrowRight:= "\uE014"
+static ArrowDown:= "\uE015"
+static Insert:= "\uE016"
+static Delete:= "\uE017"
+static F1:= "\uE031"
+static F2:= "\uE032"
+static F3:= "\uE033"
+static F4:= "\uE034"
+static F5:= "\uE035"
+static F6:= "\uE036"
+static F7:= "\uE037"
+static F8:= "\uE038"
+static F9:= "\uE039"
+static F10:= "\uE03A"
+static F11:= "\uE03B"
+static F12:= "\uE03C"
+static Meta:= "\uE03D"
+static ZenkakuHankaku:= "\uE040"
+}
+class Capabilities
+{
+static Simple := {"cap":{"capabilities":{"":""}}}, olduser := {}
+static _ucof := false, _hmode := false, _incog := false, _Uprompt := "dismiss", _Bidi := false
+__new(browser,Options,platform:="windows",notify:=false)
+{
+this.options := Options
+this.cap := {}
+this.cap.capabilities := {}
+this.cap.capabilities.alwaysMatch := { this.options :{"w3c":json.true}}
+this.cap.capabilities.alwaysMatch.webSocketUrl := json.false
+this.cap.capabilities.alwaysMatch.browserName := browser
+this.cap.capabilities.alwaysMatch.platformName := platform
+this.cap.capabilities.alwaysMatch.unhandledPromptBehavior := capabilities._Uprompt
+If(notify = false)
+this.AddexcludeSwitches("enable-automation")
+this.cap.capabilities.firstMatch := [{}]
+this.cap.desiredCapabilities := {}
+this.cap.desiredCapabilities.browserName := browser
+}
+BiDi[]
+{
+Set
+{
+If value
+{
+capabilities._Bidi := true
+this.cap.capabilities.alwaysMatch.webSocketUrl := json.true
+}
+Else
+{
+capabilities._Bidi := false
+this.cap.capabilities.alwaysMatch.webSocketUrl := json.false
+}
+}
+Get
+{
+Return capabilities._Bidi
+}
+}
+UserPrompt[]
+{
+set
+{
+switch Value
+{
+Case "dismiss": capabilities._Uprompt := "dismiss"
+Case "accept": capabilities._Uprompt := "accept"
+Case "dismiss and notify": capabilities._Uprompt := "dismiss and notify"
+Case "accept and notify": capabilities._Uprompt := "accept and notify"
+Case "ignore": capabilities._Uprompt := "ignore"
+Default: unset := 1
+}
+If unset
+{
+Prompt := "Warning: wrong UserPrompt has been passed.`n"
+. "Use following case-sensitive parameters:`n"
+. chr(34) "dismiss" chr(34) "`n"
+. chr(34) "accept" chr(34) "`n"
+. chr(34) "dismiss, and, notify" chr(34) "`n"
+. chr(34) "accept, and, notify" chr(34) "`n"
+. chr(34) "ignore" chr(34) "`n"
+. "`n`nPress OK to continue"
+MsgBox 0x40030, Rufaydium Capabilities Error, % Prompt
+Return
+}
+this.cap.capabilities.alwaysMatch.unhandledPromptBehavior := capabilities._Uprompt
+}
+Get
+{
+Return capabilities._Uprompt
+}
+}
+HeadlessMode[]
+{
+set
+{
+If value
+{
+this.addArg("--headless=new")
+capabilities._hmode := true
+}
+Else
+{
+capabilities._hmode := false
+this.RemoveArg("--headless=new")
+}
+}
+get
+{
+Return capabilities._hmode
+}
+}
+IncognitoMode[]
+{
+set
+{
+If value
+{
+Capabilities.olduser.push(this.RemoveArg("--user-data-dir=","in"))
+Capabilities.olduser.push(this.RemoveArg("--profile-directory=","in"))
+this.addArg("--incognito")
+capabilities._incog := true
+}
+Else
+{
+capabilities._incog := false
+For i, arg in this.cap.capabilities.alwaysMatch[this.Options].args
+If (arg = "--incognito")
+this.RemoveArg(arg)
+For i, arg in Capabilities.olduser
+this.addArg(arg)
+Capabilities.olduser := {}
+}
+}
+get
+{
+Return capabilities._incog
+}
+}
+Setbinary(location)
+{
+this.cap.capabilities.alwaysMatch[this.Options].binary := StrReplace(location, "\", "/")
+}
+Resetbinary()
+{
+this.cap.capabilities.alwaysMatch[this.Options].Delete("binary")
+}
+}
+class ChromeCapabilities extends Capabilities
+{
+setUserProfile(profileName:="Profile 1", userDataDir:="")
+{
+If this.IncognitoMode
+Return
+If !userDataDir
+userDataDir := StrReplace(A_AppData, "\Roaming") "\Local\Google\Chrome\User Data"
+userDataDir := StrReplace(userDataDir, "\", "/")
+this.RemoveArg("--user-data-dir=","in")
+this.RemoveArg("--profile-directory=","in")
+this.addArg("--user-data-dir=" userDataDir)
+this.addArg("--profile-directory=" profileName)
+If !FileExist( userDataDir "\" profileName )
+{
+Prompt := "Warning: Following Profile is Directory does not exist`n"
+. chr(34) userDataDir "\" profileName  chr(34) "`n"
+. "`n`nRufaydium is going to create profile directory Manually ExitApp"
+. "`nPress OK to continue / Manually ExitApp"
+MsgBox 0x40030,Rufaydium Capabilities, % Prompt
+FileCreateDir, % userDataDir "\" profileName
+}
+}
+useCrossOriginFrame[]
+{
+set {
+If value
+{
+this.addArg("--disable-site-isolation-trials")
+this.addArg("--disable-web-security")
+capabilities._ucof := true
+}
+Else
+{
+capabilities._ucof := false
+For i, arg in this.cap.capabilities.alwaysMatch[this.Options].args
+If (arg = "--disable-site-isolation-trials") or (arg = "--disable-web-security")
+this.RemoveArg(arg)
+}
+}
+get
+{
+Return capabilities._ucof
+}
+}
+addArg(arg)
+{
+If !IsObject(this.cap.capabilities.alwaysMatch[this.Options].args)
+this.cap.capabilities.alwaysMatch[this.Options].args := []
+this.cap.capabilities.alwaysMatch[this.Options].args.push(arg)
+}
+AddCustomExtension(Folder)
+{
+this.addArg("--load-extension=" StrReplace(Folder, "\", "/"))
+}
+Addextensions(crxlocation)
+{
+If !IsObject(this.cap.capabilities.alwaysMatch[this.Options].extensions)
+this.cap.capabilities.alwaysMatch[this.Options].extensions := []
+nbytes := Base64Str(Bin,crxlocation)
+this.cap.capabilities.alwaysMatch[this.Options].extensions.push(Base64 := Base64Enc( Bin, nbytes,40001))
+}
+RemoveArg(arg,match="Exact")
+{
+For i, argtbr in this.cap.capabilities.alwaysMatch[this.Options].args
+{
+If match = "Exact"
+{
+If (argtbr = arg)
+Return this.cap.capabilities.alwaysMatch[this.Options].args.RemoveAt(i)
+}
+Else
+{
+If InStr(argtbr, arg)
+Return this.cap.capabilities.alwaysMatch[this.Options].args.RemoveAt(i)
+}
+}
+}
+DebugPort(Port:=9222)
+{
+this.cap.capabilities.alwaysMatch[this.Options].debuggerAddress := "http://127.0.0.1:" Port
+}
+AddexcludeSwitches(switch)
+{
+If !IsObject(this.cap.capabilities.alwaysMatch[this.Options].excludeSwitches)
+this.cap.capabilities.alwaysMatch[this.Options].excludeSwitches := []
+this.cap.capabilities.alwaysMatch[this.Options].excludeSwitches.push(switch)
+}
+}
+class FireFoxCapabilities extends Capabilities
+{
+__new(browser,Options,platform:="windows",notify:=false)
+{
+this.options := Options
+this.cap := {}
+this.cap.capabilities := {}
+this.cap.capabilities.alwaysMatch := { this.options :{"prefs":{"dom.ipc.processCount": 8,"javascript.options.showInConsole": json.false()}},"webSocketUrl": json.true}
+this.cap.capabilities.alwaysMatch.browserName := browser
+this.cap.capabilities.alwaysMatch.platformName := platform
+this.cap.capabilities.log := {}
+this.cap.capabilities.log.level := "trace"
+this.cap.capabilities.env := {}
+}
+DebugPort(Port:=9222)
+{
+MsgBox 0x40010, ,debuggerAddress is not support For FireFoxCapabilities
+}
+addArg(arg)
+{
+arg := StrReplace(arg,"--","-")
+If !IsObject(this.cap.capabilities.alwaysMatch[this.Options].args)
+this.cap.capabilities.alwaysMatch[this.Options].args := []
+this.cap.capabilities.alwaysMatch[this.Options].args.push(arg)
+}
+RemoveArg(arg,match:="Exact")
+{
+arg := StrReplace(arg,"--","-")
+For i, argtbr in this.cap.capabilities.alwaysMatch[this.Options].args
+{
+If match = "Exact"
+{
+If (argtbr = arg)
+Return this.cap.capabilities.alwaysMatch[this.Options].args.RemoveAt(i)
+}
+Else
+{
+If InStr(argtbr, arg)
+Return this.cap.capabilities.alwaysMatch[this.Options].args.RemoveAt(i)
+}
+}
+}
+setUserProfile(profileName:="Profile1",userDataDir:="")
+{
+If this.IncognitoMode
+Return
+If !userDataDir
+userDataDir := A_AppData "\Mozilla\Firefox\"
+profileini := userDataDir "\Profiles.ini"
+If !FileExist( userDataDir "\Profiles\" profileName )
+{
+Prompt := "Warning: Following Profile is Directory does not exist`n"
+. chr(34) userDataDir "\" profileName  chr(34) "`n"
+. "`n`nRufaydium is going to create profile directory Manually ExitApp"
+. "`nPress OK to continue / Manually ExitApp"
+MsgBox 0x40030,Rufaydium Capabilities, % Prompt
+FileCreateDir, % userDataDir "\Profiles\" profileName
+IniWrite, % "Profiles/" profileName , % profileini, % profileName, Path
+IniWrite, % profileName , % profileini, % profileName, Name
+IniWrite, % 1, % profileini, % profileName, IsRelative
+}
+IniRead, profilePath , % profileini, % profileName, Path
+For i, argtbr in this.cap.capabilities.alwaysMatch[this.Options].args
+{
+If (argtbr = "-profile") or InStr(argtbr,"\Mozilla\Firefox\Profiles\")
+this.cap.capabilities.alwaysMatch[this.Options].RemoveAt(i)
+}
+this.addArg("-profile")
+this.addArg(StrReplace(userDataDir "\Profiles\" profileName, "\", "/"))
+}
+Addextensions(crxlocation)
+{
+}
+}
+class EdgeCapabilities extends ChromeCapabilities
+{
+setUserProfile(profileName:="Profile 1", userDataDir:="")
+{
+If this.IncognitoMode
+Return
+If !userDataDir
+userDataDir := StrReplace(A_AppData, "\Roaming") "\Local\Microsoft\Edge\User Data"
+userDataDir := StrReplace(userDataDir, "\", "\\")
+this.RemoveArg("--user-data-dir=","in")
+this.RemoveArg("--profile-directory=","in")
+this.addArg("--user-data-dir=" userDataDir)
+this.addArg("--profile-directory=" profileName)
+If !FileExist( userDataDir "\" profileName )
+{
+Prompt := "Warning: Following Profile is Directory does not exist`n"
+. chr(34) userDataDir "\" profileName  chr(34) "`n"
+. "`n`nRufaydium is going to create profile directory Manually ExitApp"
+. "`nPress OK to continue / Manually ExitApp"
+MsgBox 0x40030,Rufaydium Capabilities, % Prompt
+FileCreateDir, % userDataDir "\" profileName
+}
+}
+InPrivate[]
+{
+set
+{
+If value
+this.IncognitoMode := true
+Else
+this.IncognitoMode := false
+}
+get
+{
+Return this.IncognitoMode
+}
+}
+IncognitoMode[]
+{
+set
+{
+If value
+{
+Capabilities.olduser.push(this.RemoveArg("--user-data-dir=","in"))
+Capabilities.olduser.push(this.RemoveArg("--profile-directory=","in"))
+this.addArg("--InPrivate")
+capabilities._incog := true
+}
+Else
+{
+capabilities._incog := false
+For i, arg in this.cap.capabilities.alwaysMatch[this.Options].args
+If (arg = "--InPrivate")
+this.RemoveArg(arg)
+For i, arg in Capabilities.olduser
+this.addArg(arg)
+Capabilities.olduser := {}
+}
+}
+get
+{
+Return capabilities._incog
+}
+}
+Addextensions(crxlocation)
+{
+}
+}
+class BraveCapabilities extends ChromeCapabilities
+{
+setUserProfile(profileName:="Default", userDataDir:="")
+{
+If this.IncognitoMode
+Return
+If !userDataDir
+userDataDir := StrReplace(A_AppData, "\Roaming") "\Local\BraveSoftware\Brave-Browser\User Data\"
+userDataDir := StrReplace(userDataDir, "\", "/")
+this.RemoveArg("--user-data-dir=","in")
+this.RemoveArg("--profile-directory=","in")
+this.addArg("--user-data-dir=" userDataDir)
+this.addArg("--profile-directory=" profileName)
+If !FileExist( userDataDir "\" profileName )
+{
+Prompt := "Warning: Following Profile is Directory does not exist`n"
+. chr(34) userDataDir "\" profileName  chr(34) "`n"
+. "`n`nRufaydium is going to create profile directory Manually ExitApp"
+. "`nPress OK to continue / Manually ExitApp"
+MsgBox 0x40030,Rufaydium Capabilities, % Prompt
+FileCreateDir, % userDataDir "\" profileName
+}
+}
+}
+class OperaCapabilities extends ChromeCapabilities
+{
+setUserProfile(profileName:="Opera stable", userDataDir:="")
+{
+If this.IncognitoMode
+Return
+If !userDataDir
+userDataDir := A_AppData "\opera software"
+userDataDir := StrReplace(userDataDir, "\", "/")
+this.RemoveArg("--user-data-dir=","in")
+this.RemoveArg("--profile-directory=","in")
+this.addArg("--user-data-dir=" userDataDir)
+this.addArg("--profile-directory=" profileName)
+If !FileExist( userDataDir "\" profileName )
+{
+Prompt := "Warning: Following Profile is Directory does not exist`n"
+. chr(34) userDataDir "\" profileName  chr(34) "`n"
+. "`n`nRufaydium is going to create profile directory Manually ExitApp"
+. "`nPress OK to continue / Manually ExitApp"
+MsgBox 0x40030,Rufaydium Capabilities, % Prompt
+FileCreateDir, % userDataDir "\" profileName
+}
+}
+Addextensions(crxlocation)
+{
+}
+}
+Class Keyboard extends Actions
+{
+__new()
+{
+this.Act := {}
+this.Act.actions := []
+this.Act.id := "keyboard"
+this.Act.type := "key"
+}
+__Delete()
+{
+}
+SendKey(keys)
+{
+For n, k in StrSplit(keys)
+{
+this.keyDown(k)
+this.keyUp(k)
+}
+}
+keyUp(key)
+{
+this.insert({"type": "keyUp","value":Key})
+}
+keyDown(key)
+{
+this.insert({"type": "keyDown","value":Key})
+}
+}
+Class Mouse extends Actions
+{
+__new(pointerType:="mouse")
+{
+this.Act := {}
+this.Act.actions := []
+this.Act.id := "mouse"
+this.Act.type := "pointer"
+this.Parameters(pointerType)
+}
+__Delete()
+{
+}
+click(button:=0,x:=0,y:=0,duration:=500)
+{
+this.move(x,y,0)
+this.press(button,duration)
+this.Pause(500)
+this.release(button,duration)
+}
+Press(button:=0)
+{
+i := {"type":"pointerDown","button":button}
+this.insert(i)
+}
+Release(button:=0)
+{
+i := {"type":"pointerUp","button":button}
+this.insert(i)
+}
+Move(x:=0,y:=0,duration:=10,width:=0,height:=0,pressure:=0,tangentialPressure:=0,tiltX:=0,tiltY:= 0,twist:=0,altitudeAngle:=0,azimuthAngle:=0,origin:="viewport")
+{
+i := {"type": "pointerMove"
+,"duration": duration, "x": x, "y": y
+,"origin": origin
+,"width":width,"height":height
+,"pressure":pressure,"tangentialPressure":tangentialPressure
+,"tiltX":tiltX,"tiltY":tiltY, "twist" :twist
+,"altitudeAngle":altitudeAngle, "azimuthAngle":azimuthAngle}
+this.insert(i)
+}
+}
+Class Scroll extends Actions
+{
+__new(pointerType:="mouse")
+{
+this.Act := {}
+this.Act.actions := []
+this.Act.id := "Scroll1"
+this.Act.type := "wheel"
+}
+__Delete()
+{
+}
+ScrollUP(s:=50)
+{
+this.Scroll(0,-(s))
+}
+ScrollDown(s:=50)
+{
+this.Scroll(0,s)
+}
+ScrollLeft(s:=50)
+{
+this.Scroll(-(s),0)
+}
+ScrollRight(s:=50)
+{
+this.Scroll(s,0)
+}
+Scroll( deltaX:=0, deltaY:=0, x:=0, y:=0, duration:=0,origin:="viewport")
+{
+i := {"type": "scroll"
+,"duration": duration, "x": x, "y": y
+,"deltaX": deltaX, "deltaY": deltaY
+,"origin": origin}
+this.insert(i)
+}
+}
+Class Actions
+{
+__Delete()
+{
+}
+Parameters(Pointer)
+{
+this.Act.parameters := {"pointerType": Pointer }
+}
+perform()
+{
+Return this.Act
+}
+Clear()
+{
+this.Act.Actions := []
+}
+insert(i)
+{
+this.Act.Actions.Push(i)
+}
+Pause(duration:=100)
+{
+this.insert({"type": "pause","duration":duration})
+}
+cancel()
+{
+this.insert({"type": "pointerCancel"})
+}
+}
+Class Rufaydium
+{
+static WebRequest := ComObjCreate("WinHttp.WinHttpRequest.5.1")
+__new(DriverName:="chromedriver.exe",Parameters:="--port=0")
+{
+this.Driver := new RunDriver(DriverName,Parameters)
+this.DriverUrl := "http://127.0.0.1:" This.Driver.Port
+Switch this.Driver.Name
+{
+case "chromedriver" :
+this.capabilities := new ChromeCapabilities(this.Driver.browser,this.Driver.Options)
+case "msedgedriver" :
+this.capabilities := new EdgeCapabilities(this.Driver.browser,this.Driver.Options)
+case "geckodriver" :
+this.capabilities := new FireFoxCapabilities(this.Driver.browser,this.Driver.Options)
+case "operadriver" :
+this.capabilities := new OperaCapabilities(this.Driver.browser,this.Driver.Options)
+case "BraveDriver" :
+this.capabilities := new BraveCapabilities(this.Driver.browser,this.Driver.Options)
+this.capabilities.Setbinary("C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe")
+}
+this.Driver.Location := this.Driver.GetPath()
+If !isobject(cap := this.capabilities.cap)
+this.capabilities := capabilities.Simple
+RegExMatch(this.Driver.Version := this.Version(),"\d+",Build)
+this.Build := Build
+this.verifyDriver()
+}
+__Delete()
+{
+}
+Exit()
+{
+this.Driver.Exit()
+}
+Send(url,Method,Payload:= 0,WaitForResponse:=1)
+{
+If !InStr(url,"HTTP")
+url := this.address "/" url
+If !Payload and (Method = "POST")
+Payload := Json.null
+try r := Json.load(this.Request(url,Method,Payload,WaitForResponse)).value
+If(r.error = "chrome not reachable")
+this.quit()
+If r
+Return r
+}
+Request(url,Method,p:=0,w:=0)
+{
+Rufaydium.WebRequest.Open(Method, url, false)
+Rufaydium.WebRequest.SetRequestHeader("Content-Type","application/json")
+If p
+{
+p := StrReplace(json.dump(p),"[[]]","[{}]")
+p := RegExReplace(p,"\\\\uE(\d+)","\uE$1")
+Rufaydium.WebRequest.Send(p)
+}
+Else
+Rufaydium.WebRequest.Send()
+If w
+Rufaydium.WebRequest.WaitForResponse()
+Return Rufaydium.WebRequest.responseText
+}
+SetTimeouts(ResolveTimeout:=3000,ConnectTimeout:=3000,SendTimeout:=3000,ReceiveTimeout:=3000)
+{
+Rufaydium.WebRequest.SetTimeouts(ResolveTimeout,ConnectTimeout,SendTimeout,ReceiveTimeout)
+}
+NewSession(Binary:="")
+{
+If !this.capabilities.options
+{
+MsgBox 0x40040,Rufaydium WebDriver Support, % "Unknown Driver Loaded`n.Please read readme and manually set capabilities For " this.Driver.Name ".exe"
+Return
+}
+If Binary
+this.capabilities.Setbinary(Binary)
+this.Driver.Options := this.capabilities.options
+k := this.Send( this.DriverUrl "/session","POST",this.capabilities.cap,1)
+If !k
+{
+MsgBox 0x40030,Rufaydium WebDriver Error, % This.driver.Name " Error`nRufaydium is unable to access Driver Session`n as No response received against New Session request`n`nMake sure you have driver version supported with browser version"
+Return
+}
+If k.error
+{
+If(k.message = "binary is not a Firefox executable")
+{
+ffbinary := A_ProgramFiles "\Mozilla Firefox\firefox.exe"
+If !FileExist(ffbinary)
+ffbinary := RegExReplace(ffbinary, " (x86)")
+Else If !FileExist(ffbinary)
+ffbinary := A_ProgramFiles " (x86)\Mozilla Firefox\firefox.exe"
+Else
+{
+MsgBox 0x40030,Rufaydium WebDriver Support,% k.message "`n`nDriver is unable to locate Firefox binary and, Rufaydium is also unable to detect Firefox default location.`n`nIf you see this message repeatedly please file a bug report."
+Return
+}
+this.capabilities.Setbinary(ffbinary)
+Return This.NewSession()
+}
+Else If RegExMatch(k.message,"version ([\d.]+).*\n.*version is (\d+.\d+.\d+)")
+{
+MsgBox 0x40034,Rufaydium WebDriver Support,% k.message "`n`nPlease press Yes to download latest driver"
+IfMsgBox Yes
+{
+this.driver.exit()
+i := this.driver.GetDriver(k.message)
+If !FileExist(i)
+{
+MsgBox 0x40040,Rufaydium WebDriver Support,Unable to download driver`nRufaydium exiting.
+ExitApp
+}
+This.Driver := new RunDriver(i,This.Driver.Param)
+Return This.NewSession()
+}
+}
+Else
+{
+MsgBox 0x40030,Rufaydium WebDriver Support Error,% k.error "`n`n" k.message
+Return k
+}
+}
+window := []
+window.Name := This.driver.Name
+window.DriverPID := This.driver.PID
+If window.Name = "geckodriver"
+{
+window.debuggerAddress := "http://" k.capabilities["moz:debuggerAddress"]
+IniWrite, % window.debuggerAddress, % this.driver.dir "/ActiveSessions.ini", % This.driver.Name, % k.SessionId
+}
+Else
+window.debuggerAddress := StrReplace(k.capabilities[This.driver.options].debuggerAddress,"localhost","http://127.0.0.1")
+window.address := this.DriverUrl "/session/" k.SessionId
+window.id := k.SessionId
+If k.capabilities.websocketurl
+window.websocketurl := k.capabilities.websocketurl
+window.Build := this.Build
+Return new Session(window)
+}
+Sessions()
+{
+Return this.send(this.DriverUrl "/sessions","GET")
+}
+getSessions()
+{
+If !this.capabilities.options
+{
+MsgBox 0x40040,Rufaydium WebDriver Support, % "Unknown Driver Loaded.`nPlease read readme and manually set capabilities For " this.Driver.Name ".exe"
+Return
+}
+this.Driver.Options := this.capabilities.options
+i := 0
+If This.driver.Name = "geckodriver"
+{
+IniRead, SessionList, % this.driver.dir "/ActiveSessions.ini", % This.driver.Name
+Windows := []
+For k, se in StrSplit(SessionList,"`n")
+{
+If !RegExMatch(se, "(.*)=(.*)", $)
+{
+IniDelete, % this.driver.dir "/ActiveSessions.ini", % This.driver.Name, % se
+continue
+}
+r :=  this.Send(this.DriverUrl "/session/" $1 "/url","GET")
+If r.error
+IniDelete, % this.driver.dir "/ActiveSessions.ini", % This.driver.Name, % $1
+Else
+{
+s := []
+s.id := $1
+s.DriverPID := This.driver.PID
+s.Name := This.driver.Name
+s.address := this.DriverUrl "/session/" s.id
+s.debuggerAddress := $2
+windows[++i] := new Session(s)
+}
+}
+Return windows
+}
+windows := []
+For k, se in this.Sessions()
+{
+chromeOptions := Se["capabilities",This.driver.options]
+s := []
+s.id := Se.id
+s.DriverPID := This.driver.PID
+s.Name := This.driver.Name
+s.Build := this.Build
+s.debuggerAddress := StrReplace(chromeOptions.debuggerAddress,"localhost","http://127.0.0.1")
+s.address := this.DriverUrl "/session/" s.id
+If se.capabilities.websocketurl
+s.websocketurl := se.capabilities.websocketurl
+windows[k] := new Session(s)
+}
+Return windows
+}
+getSession(i:=0,t:=0)
+{
+If i
+{
+S := this.getSessions()[i]
+If t
+{
+S.SwitchTab(t)
+}
+Else
+S.ActiveTab()
+Return S
+}
+}
+getSessionByUrl(URL)
+{
+For k, w in this.getSessions()
+{
+w.SwitchbyURL(URL)
+If InStr(w.URL,URL)
+Return w
+}
+}
+getSessionByTitle(Title)
+{
+For k, s in this.getSessions()
+{
+s.SwitchbyTitle(Title)
+If InStr(s.title,Title)
+Return s
+}
+}
+QuitAllSessions()
+{
+For k, s in this.getSessions()
+s.Quit()
+}
+Status()
+{
+Return Rufaydium.Request( this.DriverUrl "/status","GET")
+}
+__Get(n)
+{
+Return this.Send( this.DriverUrl "/status","GET")[n]
+}
+Version()
+{
+If RegExMatch(this.build.version,"(\d+\.\d+\.\d+.\d+)",d)
+Return d
+}
+verifyDriver()
+{
+Return
+}
+}
+Class Session
+{
+__new(i)
+{
+this.id := i.id
+this.Address := i.address
+this.debuggerAddress := i.debuggerAddress
+this.Build := i.Build
+this.name := i.name
+If i.websocketurl
+this.websocketurl := i.websocketurl
+this.currentTab := this.Send("window","GET")
+switch i.name
+{
+case "chromedriver" :
+this.CDP := new CDP(this.Address)
+case "msedgedriver" :
+this.CDP := new CDP(this.Address)
+case "operadriver" :
+this.CDP := new CDP(this.Address)
+case "geckodriver" :
+For proc in ComObjGet("winmgmts:").ExecQuery("Select * from Win32_Process WHERE Name = 'firefox.exe'")
+If ( proc.ParentProcessId = i.DriverPID)
+For proc2 in ComObjGet("winmgmts:").ExecQuery("Select * from Win32_Process WHERE Name = 'firefox.exe'")
+If ( proc2.ParentProcessId = proc.processid)
+{
+this.BroswerPID := proc2.processid
+Break
+}
+}
+}
+__Delete()
+{
+}
+Quit()
+{
+this.Send(this.address ,"DELETE")
+}
+close()
+{
+Tabs := this.Send("window","DELETE")
+this.Switch(this.currentTab := tabs[tabs.Length()])
+}
+send(url,Method,Payload:= 0,WaitForResponse:=1)
+{
+If !InStr(url,"HTTP")
+url := this.address "/" url
+If (Payload = 0) and (Method = "POST")
+Payload := Json.null
+try r := Json.load(Rufaydium.Request(url,Method,Payload,WaitForResponse)).value
+If(r.error = "chrome not reachable")
+this.quit()
+If r
+Return r
+}
+NewTab(i:=1)
+{
+This.currentTab := this.Send("window/new","POST",{"type":"tab"}).handle
+If i
+This.Switch(This.currentTab)
+}
+NewWindow(i:=1)
+{
+This.currentTab := this.Send("window/new","POST",{"type":"window"}).handle
+If i
+This.Switch(This.currentTab)
+}
+Detail()
+{
+Return Json.load(Rufaydium.Request(this.debuggerAddress "/json/list","GET"))
+}
+GetTabs()
+{
+Return this.Send("window/handles","GET")
+}
+Switch(Tabid)
+{
+this.currentTab := Tabid
+this.Send("window","POST",{"handle":Tabid})
+}
+Title
+{
+get
+{
+Return this.Send("title","GET")
+}
+}
+ActiveTab()
+{
+If this.Build < 110.1
+CDwindow := "CDwindow-"
+If( this.name != "geckodriver" )
+this.Switch(CDwindow this.Detail()[1].id )
+Else
+{
+WinGetTitle, title, % "ahk_pid " this.BroswerPID
+this.SwitchbyTitle(strreplace(title," — Mozilla Firefox"))
+}
+}
+SwitchTab(i:=0)
+{
+Return this.Switch(This.currentTab := this.GetTabs()[i])
+}
+SwitchbyTitle(Title:="")
+{
+handles := this.GetTabs()
+try pages := this.Detail()
+If !pages
+this.quit()
+For k , handle in handles
+{
+For i, t in pages
+{
+If InStr(Handle,t.id)
+{
+If !t.HasKey("Title")
+{
+phandle := This.currentTab
+this.Switch(handle)
+If InStr(this.title,Title)
+Return
+Else
+continue
+}
+If InStr(t.Title, Title)
+{
+This.currentTab := handle
+this.Switch(This.currentTab )
+Return
+}
+}
+}
+}
+If pHandle
+this.Switch(handle)
+}
+SwitchbyURL(url:="",Silent:=1)
+{
+handles := this.GetTabs()
+try pages := this.Detail()
+If !pages
+this.quit()
+For k , handle in handles
+{
+For i, t in pages
+{
+If InStr(Handle,t.id)
+{
+If InStr(t.url, url)
+{
+This.currentTab := Handle
+this.Switch(This.currentTab )
+Return
+}
+}
+}
+}
+}
+url
+{
+get
+{
+Return this.Send("url","GET")
+}
+set
+{
+Return this.Send("url","POST",{"url":RegExReplace(Value,"^(?!\w+[:\/])(.*)","https://$1",,1)})
+}
+}
+Refresh()
+{
+Return this.Send("refresh","POST")
+}
+IsLoading
+{
+get
+{
+Return this.Send("is_loading","GET")
+}
+}
+timeouts()
+{
+Return this.Send("timeouts","GET")
+}
+Navigate(urls*)
+{
+For i, url in urls
+{
+If a_index != 1
+this.NewTab(i:=1)
+this.URL := url
+}
+}
+Forward()
+{
+Return this.Send("forward","POST")
+}
+Back()
+{
+Return this.Send("back","POST")
+}
+GetRect()
+{
+Return this.Send("window/rect","GET")
+}
+SetRect(x:=1,y:=1,w:=0,h:=0)
+{
+If !w
+w := A_ScreenWidth - 0
+If !h
+h := A_ScreenHeight - (A_ScreenHeight * 5 / 100)
+Return this.Send("window/rect","POST",{"x":x,"y":y,"width":w,"height":h})
+}
+X
+{
+get
+{
+rect := this.GetRect()
+Return rect.x
+}
+Set
+{
+MsgBox 0x40040, , % value
+Return this.Send("window/rect","POST",{"x":value})
+}
+}
+Y
+{
+get
+{
+rect := this.GetRect()
+Return rect.y
+}
+Set
+{
+Return this.Send("window/rect","POST",{"y":value})
+}
+}
+width
+{
+get
+{
+rect := this.GetRect()
+Return rect.width
+}
+Set
+{
+Return this.Send("window/rect","POST",{"width":value})
+}
+}
+height
+{
+get
+{
+rect := this.GetRect()
+Return rect.height
+}
+Set
+{
+Return this.Send("window/rect","POST",{"height":value})
+}
+}
+Maximize()
+{
+Return this.Send("window/maximize","POST",json.null)
+}
+Minimize()
+{
+Return this.Send("window/minimize","POST",json.null)
+}
+FullScreen()
+{
+Return this.Send("window/fullscreen","POST",json.null)
+}
+FramesLength()
+{
+Return this.ExecuteSync("Return window.length")
+}
+Frame(i)
+{
+Return this.Send("frame","POST",{"id":i})
+}
+ParentFrame()
+{
+Return this.Send("frame/parent","POST",json.null)
+}
+HTML
+{
+get
+{
+Return this.Send("source","GET",0,1)
+}
+}
+ActiveElement()
+{
+For i, elementid in this.Send("element/active","GET")
+{
+address := RegExReplace(this.address "/element/" elementid,"(\/shadow\/.*)\/element","/element")
+address := RegExReplace(address "/element/" elementid,"(\/element\/.*)\/element","/element")
+Return New WDElement(address,i)
+}
+}
+findelement(u,v)
+{
+r := this.Send("element","POST",{"using":u,"value":v},1)
+For i, elementid in r
+{
+If InStr(elementid,"no such")
+Return 0
+address := RegExReplace(this.address "/element/" elementid,"(\/shadow\/.*)\/element","/element")
+address := RegExReplace(address "/element/" elementid,"(\/element\/.*)\/element","/element")
+Return New WDElement(address,i)
+}
+}
+findelements(u,v)
+{
+e := []
+For k, element in this.Send("elements","POST",{"using":u,"value":v},1)
+{
+For i, elementid in element
+{
+address := RegExReplace(this.address "/element/" elementid,"(\/shadow\/.*)\/element","/element")
+address := RegExReplace(address "/element/" elementid,"(\/element\/.*)\/element","/element")
+e[k-1] := New WDElement(address,i)
+}
+}
+If e.count() > 0
+Return e
+Return 0
+}
+shadow()
+{
+For i,  elementid in this.Send("shadow","GET")
+{
+address := RegExReplace(this.address "/element/" elementid,"(\/element\/.*)\/element","/shadow")
+Return new ShadowElement(address)
+}
+}
+getElementByID(id)
+{
+Return this.findelement(by.selector,"#" id)
+}
+QuerySelector(Path)
+{
+Return this.findelement(by.selector,Path)
+}
+QuerySelectorAll(Path)
+{
+Return this.findelements(by.selector,Path)
+}
+getElementsbyClassName(Class)
+{
+Return this.findelements(by.selector,"[class='" Class "']")
+}
+getElementsbyTagName(Name)
+{
+Return this.findelements(by.TagName,Name)
+}
+getElementsbyName(Name)
+{
+Return this.findelements(by.selector,"[Name='" Name "']")
+}
+getElementsbyXpath(xPath)
+{
+Return this.findelements(by.xPath,xPath)
+}
+ExecuteSync(Script,Args*)
+{
+Return this.Send("execute/sync","POST", { "script":Script,"args":[Args*]},1)
+}
+ExecuteAsync(Script,Callback,Args*)
+{
+Return this.Send("execute/async","POST", { "script":Script,"Callback":Callback,"args":[Args*]},1)
+}
+GetCookies()
+{
+Return this.Send("cookie","GET")
+}
+GetCookieName(Name)
+{
+Return this.Send("cookie/" Name,"GET")
+}
+AddCookie(CookieObj)
+{
+Return this.Send("cookie","POST",CookieObj)
+}
+Alert(Action,Text:=0)
+{
+switch Action
+{
+case "accept": i := "/alert/accept", m := "POST"
+case "dismiss": i := "/alert/dismiss", m := "POST"
+case "GET": i := "/alert/text", m := "GET"
+case "Send": i := "/alert/text", m := "POST"
+}
+If Text
+Return this.Send(this.address i,m,{"text":Text})
+Else
+Return this.Send(this.address i,m)
+}
+Screenshot(location:=0)
+{
+Base64Canvas :=  this.Send("screenshot","GET")
+If Base64Canvas
+{
+nBytes := Base64Dec( Base64Canvas, Bin )
+File := FileOpen(location, "w")
+File.RawWrite(Bin, nBytes)
+File.Close()
+}
+}
+CaptureFullSizeScreenShot(location)
+{
+If !isobject(this.CDP)
+{
+MsgBox 0x40040, ,Rufaydium, Unable to Capture Full Size ScreenShot`nThis Chromium limited method
+Return
+}
+JSOP := {"width":this.Getrect().width,"height":this.ExecuteSync("Return document.documentElement.scrollHeight")+0,"deviceScaleFactor":1,"mobile":json.false}
+this.CDP.Call("Emulation.setDeviceMetricsOverride",JSOP)
+this.Screenshot(location)
+this.CDP.Call("Emulation.clearDeviceMetricsOverride")
+}
+Print(PDFLocation,Options:=0)
+{
+If !InStr(PDFLocation,".pdf")
+{
+MsgBox, ,Rufaydium, error: File location be ".pdf"
+Return
+}
+If this.Capabilities.HeadlessMode
+{
+Base64pdfData := this.Send("print","POST",Options)
+If !Base64pdfData.error
+{
+nBytes := Base64Dec( Base64pdfData, Bin )
+File := FileOpen(PDFLocation, "w")
+File.RawWrite(Bin, nBytes)
+File.Close()
+}
+Else
+MsgBox 0x40010,Rufaydium, % "Fail to save PDF`nError : " json.Dump(Base64pdfData) "`nPlease define Print Options or use print profiles from PrintOptions.class`nSince Chrome Printing is not available in Headful mode you can try 'wkhtmltopdf' printing"
+}
+Else
+{
+If isProgInstalled("wkhtmltox") or isProgInstalled("wkhtmltopdf")
+{
+wkhtmltopdf(this.HtML,PDFLocation,options)
+}
+Else
+{
+MsgBox 0x40024,Rufaydium, User is required to install "wkhtmltopdf" In order to enable pdf printing without Headless mode`n`nPress Yes to navigate to download page of "wkhtmltox" tool
+IfMsgBox Yes
+{
+this.NewTab()
+this.url := "https://wkhtmltopdf.org/downloads.html"
+MsgBox 0x40040,Rufaydium,Please Download and install "wkhtmltox" now, according to Windows Version then Restart Rufaydium.
+}
+}
+}
+}
+click(i:=0)
+{
+MouseEvent := new mouse()
+MouseEvent.Release(i)
+MouseEvent.Pause(100)
+MouseEvent.Release(i)
+Return this.Actions(MouseEvent)
+}
+DoubleClick(i:=0)
+{
+MouseEvent := new mouse()
+MouseEvent.Release(i)
+MouseEvent.Pause(100)
+MouseEvent.Release(i)
+MouseEvent.Pause(500)
+MouseEvent.Release(i)
+MouseEvent.Pause(100)
+MouseEvent.Release(i)
+Return this.Actions(MouseEvent)
+}
+MBDown(i:=0)
+{
+MouseEvent := new mouse()
+MouseEvent.Press(i)
+Return this.Actions(MouseEvent)
+}
+MBup(i:=0)
+{
+MouseEvent := new mouse()
+MouseEvent.Release(i)
+Return this.Actions(MouseEvent)
+}
+Move(x,y)
+{
+MouseEvent := new mouse()
+MouseEvent.move(x,y,0)
+Return this.Actions(MouseEvent)
+}
+ScrollUP(s:=50)
+{
+WheelEvent := new Scroll()
+WheelEvent.ScrollUP(s)
+r := this.Actions(WheelEvent)
+WheelEvent := ""
+Return r
+}
+ScrollDown(s:=50)
+{
+WheelEvent := new Scroll()
+WheelEvent.ScrollDown(s)
+Return this.Actions(WheelEvent)
+}
+ScrollLeft(s:=50)
+{
+WheelEvent := new Scroll()
+WheelEvent.ScrollLeft(s)
+Return this.Actions(WheelEvent)
+}
+ScrollRight(s:=50)
+{
+WheelEvent := new Scroll()
+WheelEvent.ScrollRight(s)
+Return this.Actions(WheelEvent)
+}
+SendKey(Chars)
+{
+KeyboardEvent := new Keyboard()
+KeyboardEvent.SendKey(Chars)
+Return this.Actions(KeyboardEvent)
+}
+Actions(Interactions*)
+{
+If Interactions.count()
+{
+ActionArray := []
+For i, interaction in Interactions
+{
+ActionArray.push(interaction.perform())
+Interactions.clear()
+Interaction := ""
+}
+Return this.Send("actions","POST",{"actions":ActionArray})
+}
+Else
+Return this.Send("actions","DELETE")
+}
+execute_sql()
+{
+Return this.Send("execute_sql","POST",{"":""})
+}
+}
+Class by
+{
+static selector := "css selector"
+static Linktext := "link text"
+static Plinktext := "partial link text"
+static TagName := "tag name"
+static XPath	:= "xpath"
+}
+Class PrintOptions
+{
+static A4_Default =
+	( LTrim Join
 	{
-		static Type := Func("Type")
-		if Type ? (Type.Call(obj) != "Object") : (ObjGetCapacity(obj) == "")
-			throw Exception("Object type not supported.", -1, Format("<Object at 0x{:p}>", &obj))
-
-		prefix := SubStr(A_ThisFunc, 1, InStr(A_ThisFunc, ".",, 0))
-		fn_t := prefix "Jxon_True",  obj_t := this ? %fn_t%(this) : %fn_t%()
-		fn_f := prefix "Jxon_False", obj_f := this ? %fn_f%(this) : %fn_f%()
-
-		if (&obj == &obj_t)
-			return "true"
-		else if (&obj == &obj_f)
-			return "false"
-
-		is_array := 0
-		for k in obj
-			is_array := k == A_Index
-		until !is_array
-
-		static integer := "integer"
-		if indent is %integer%
-		{
-			if (indent < 0)
-				throw Exception("Indent parameter must be a postive integer.", -1, indent)
-			spaces := indent, indent := ""
-			Loop % spaces
-				indent .= " "
-		}
-		indt := ""
-		Loop, % indent ? lvl : 0
-			indt .= indent
-
-		this_fn := this ? Func(A_ThisFunc).Bind(this) : A_ThisFunc
-		lvl += 1, out := "" ; Make #Warn happy
-		for k, v in obj
-		{
-			if IsObject(k) || (k == "")
-				throw Exception("Invalid object key.", -1, k ? Format("<Object at 0x{:p}>", &obj) : "<blank>")
-
-			if !is_array
-				out .= ( ObjGetCapacity([k], 1) ? %this_fn%(k) : q . k . q ) ;// key
-				    .  ( indent ? ": " : ":" ) ; token + padding
-			out .= %this_fn%(v, indent, lvl) ; value
-			    .  ( indent ? ",`n" . indt : "," ) ; token + indent
-		}
-
-		if (out != "")
-		{
-			out := Trim(out, ",`n" . indent)
-			if (indent != "")
-				out := "`n" . indt . out . "`n" . SubStr(indt, StrLen(indent)+1)
-		}
-
-		return is_array ? "[" . out . "]" : "{" . out . "}"
+ 	"page":{
+ 		"width": 50,
+ 		"height": 60
+	},
+ 	"margin":{
+ 		"top": 2,
+ 		"bottom": 2,
+ 		"left": 2,
+ 		"right": 2
+	},
+ 	"scale": 1,
+ 	"orientation":"portrait",
+	"shrinkToFit": json.true,
+ 	"background": json.true
 	}
-
-	; Number
-	else if (ObjGetCapacity([obj], 1) == "")
-		return obj
-
-	; String (null -> not supported by AHK)
-	if (obj != "")
-	{
-		  obj := StrReplace(obj,  "\",    "\\")
-		, obj := StrReplace(obj,  "/",    "\/")
-		, obj := StrReplace(obj,    q, "\" . q)
-		, obj := StrReplace(obj, "`b",    "\b")
-		, obj := StrReplace(obj, "`f",    "\f")
-		, obj := StrReplace(obj, "`n",    "\n")
-		, obj := StrReplace(obj, "`r",    "\r")
-		, obj := StrReplace(obj, "`t",    "\t")
-
-		static needle := (A_AhkVersion<"2" ? "O)" : "") . "[^\x20-\x7e]"
-		while RegExMatch(obj, needle, m)
-			obj := StrReplace(obj, m[0], Format("\u{:04X}", Ord(m[0])))
-	}
-
-	return q . obj . q
+)
 }
-
-Jxon_True()
+Base64Str(byref bin, Text)
 {
-	static obj := {}
-	return obj
+VarSetCapacity(Bin, StrPut(Text, "UTF-8"))
+Return StrPut(Text, &Bin, "UTF-8")-1
 }
-
-Jxon_False()
+Base64Dec( ByRef B64, ByRef Bin ) {
+Local Rqd := 0, BLen := StrLen(B64)
+DllCall( "Crypt32.dll\CryptStringToBinary", "Str",B64, "UInt",BLen, "UInt",0x1
+, "UInt",0, "UIntP",Rqd, "Int",0, "Int",0 )
+VarSetCapacity( Bin, 128 ), VarSetCapacity( Bin, 0 ),  VarSetCapacity( Bin, Rqd, 0 )
+DllCall( "Crypt32.dll\CryptStringToBinary", "Str",B64, "UInt",BLen, "UInt",0x1
+, "Ptr",&Bin, "UIntP",Rqd, "Int",0, "Int",0 )
+Return Rqd
+}
+Base64Enc( ByRef Bin, nBytes, LineLength := 64, LeadingSpaces := 0 ) {
+Local Rqd := 0, B64, B := "", N := 0 - LineLength + 1
+DllCall( "Crypt32.dll\CryptBinaryToString", "Ptr",&Bin ,"UInt",nBytes, "UInt",0x1, "Ptr",0,   "UIntP",Rqd )
+VarSetCapacity( B64, Rqd * ( A_Isunicode ? 2 : 1 ), 0 )
+DllCall( "Crypt32.dll\CryptBinaryToString", "Ptr",&Bin, "UInt",nBytes, "UInt",0x1, "Str",B64, "UIntP",Rqd )
+If ( LineLength = 64 and ! LeadingSpaces )
+Return B64
+B64 := StrReplace( B64, "`r`n" )
+Loop % Ceil( StrLen(B64) / LineLength )
+B .= Format("{1:" LeadingSpaces "s}","" ) . SubStr( B64, N += LineLength, LineLength ) . "`n"
+Return RTrim( B,"`n" )
+}
+isProgInstalled(Prog)
 {
-	static obj := {}
-	return obj
+shell := ComObjCreate("Shell.Application")
+programsFolder := shell.NameSpace("::{26EE0668-A00A-44D7-9371-BEB064C98683}\8\::{7B81BE6A-CE2B-4676-A29E-EB907A5126C5}")
+items := programsFolder.Items()
+For k in items
+If InStr(k.name,prog)
+Return true
+Return false
 }
+wkhtmltopdf(HtML,pdf,options)
+{
+htmlloc := StrReplace(pdf, ".pdf",".html")
+While FileExist(pdf)
+FileDelete, % pdf
+While FileExist(htmlloc)
+FileDelete, % htmlloc
+FileAppend, % HtML, % htmlloc
+While !FileExist(htmlloc)
+sleep, 200
+RegRead, wkhtmltopdf, HKLM, Software\wkhtmltopdf, PdfPath
+If !FileExist(wkhtmltopdf)
+{
+wkhtmltopdf := "C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe"
+If !FileExist(exe)
+{
+wkhtmltopdf := "C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+If !FileExist(wkhtmltopdf)
+{
+msg := "Error:`tunable to print pdf using 'wkhtmltopdf'"
+msg .= "`nReason:`tUnable to read registry or Default location for`n`t" wkhtmltopdf
+msg .= "`n`nPlease Run program as administrator or at least with registry reading privilages,"
+msg .= "`n`nPress OK to conitnue"
+MsgBox 0x40040, ,Rufaydium, % msg
+Return
+}
+}
+}
+If IsObject(options)
+{
+cmd := wkhtmltopdf " --zoom " options.scale
+cmd .= " --margin-bottom "	options.margin.bottom
+cmd .= " --margin-left "	options.margin.left
+cmd .= " --margin-right "	options.margin.right
+cmd .= " --margin-top "		options.margin.top
+cmd .= " --page-height "	options.page.height
+cmd .= " --page-width " 	options.page.height
+cmd .= " --orientation " chr(34) options.orientation chr(34)
+If options.background
+cmd .= " --enable-smart-shrinking "
+Else
+cmd .= " --disable-smart-shrinking "
+If options.background
+cmd .= " --background "
+Else
+cmd .= " --no-background "
+cmd .= " " chr(34) htmlloc chr(34) " " chr(34) pdf chr(34)
+RunWait, %  cmd,,Hide
+}
+Else If IsObject(options)
+RunWait, % wkhtmltopdf " " options " " chr(34) htmlloc chr(34) " " chr(34) pdf chr(34),,Hide
+Else
+RunWait, % wkhtmltopdf " --background " chr(34) htmlloc chr(34) " " chr(34) pdf chr(34),,Hide
+FileDelete, % htmlloc
+}
+GetNXPState() {
+local DetectHiddenWindows := A_DetectHiddenWindows
+local ProcessList := ""
+local ProcessInfo := ""
+local PID := ""
+local WinHandle := ""
+local WindowState := 0
+local Style := 0
+local ExStyle := 0
+local state := ""
+local PIDMatch := ""
+DetectHiddenWindows, On
+For Process in ComObjGet("winmgmts:\\.\root\CIMV2").ExecQuery("Select * from Win32_Process")
+{
+If (Process.Name = "NexonPlug.exe")
+{
+ProcessList .= "Name: " Process.Name " | PID: " Process.ProcessId "`n"
+Break
+}
+}
+If (ProcessList = "") {
+Return "NOT_RUNNING"
+}
+RegExMatch(ProcessList, "PID: (\d+)", PIDMatch)
+PID := SubStr(PIDMatch, InStr(PIDMatch, ":") + 2)
+WinGet, WindowState, MinMax, ahk_pid %PID%
+WinGet, Style, Style, ahk_pid %PID%
+WinGet, ExStyle, ExStyle, ahk_pid %PID%
+isVisible := (Style & 0x10000000) ? true : false
+If (WindowState = 1 && Style = 0x05CF0000 && ExStyle = 0x00000100 && !isVisible)
+state := "TRAY"
+Else If (WindowState != 0 && (Style = 0x14CF0000 or Style = 0x34CF0000) && ExStyle = 0x00000100 && isVisible)
+state := "MINIMIZED"
+Else If (WindowState = 1 && Style = 0x15CF0000 && ExStyle = 0x00000100 && isVisible)
+state := "MAXIMIZED"
+Else If (isVisible)
+state := "NORMAL"
+Else
+state := "UNKNOWN"
+DetectHiddenWindows, %DetectHiddenWindows%
+Return state
 }
 
 텔레그램메시지보내기:
@@ -747,14 +2990,14 @@ DllCall( "shlwapi.dll\StrFormatByteSize64A", Int64,TotalPhys, Str,PhysMem, UInt,
 
 filePath := A_ScriptDir . "\NPCOID.ini"
 DllCall("psapi.dll\EmptyWorkingSet", "Ptr", -1)
-;IfNotExist,%A_ScriptDir%\CashMemory.exe
-;{
-;FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
-;Loop, %A_ScriptDir%\CashMemory.exe
-;{
-;break
-;}
-;}
+IfNotExist,%A_ScriptDir%\CashMemory.exe
+{
+FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
+Loop, %A_ScriptDir%\CashMemory.exe
+{
+break
+}
+}
 class _ClassMemory
 {
 static baseAddress, hProcess, PID, currentProgram
@@ -2834,7 +5077,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 1.00[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 1.1[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -5431,12 +7674,12 @@ return
 
 RL:
 Gui, Submit, NoHide
-;Run, *RunAs %A_ScriptDir%\CashMemory.exe
-;Sleep,300
+Run, *RunAs %A_ScriptDir%\CashMemory.exe
+Sleep,300
 loady = 2
 IfWinExist,ahk_pid %jPID%
 {
-WinKill, ahk_pid Jelancia.exe
+;WinKill, ahk_pid Jelancia.exe
 WinKill, ahk_pid %jPID%
 WinKill, ahk_exe MRMsph.exe
 }
@@ -8203,82 +10446,109 @@ if (Gui_Login = "인터넷")
 {
 if (Step = 1)
 {
+RegWriteEdit()
+global Chrome := ""
+   SB_SetText("윈도우 최적화",2)
     GUICONTROL, , 로그인상태정보, [로그인] - 접속 중
-    FileCreateDir, ChromeProfile
-    ProfilePath := A_ScriptDir . "\ChromeProfile"
-    ChromeInst := new Chrome(ProfilePath, , , , , False)
-
-    Sleep, 100
-    PageInst := ChromeInst.GetPage()
-    Sleep, 100
-
-    PageInst.Call("Page.navigate", {"url": "https://elancia.nexon.com/"})
-    SB_SetText("홈페이지 접속중")
-
-    while (PageInst.Evaluate("document.readyState").value != "complete")
-        Sleep, 100
-
-    PageInst.Evaluate("PS.game.startGame({ gameCode:74276 });")
-    Sleep, 4000
-
-    LoginURL := PageInst.Evaluate("window.location.href").value
-    if (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
-    {
-        reason := "접속불량"
-        Gosub, TryLoginFail
-        step = 0
-        return
-    }
-
-    ; ID, PW 입력
-    PageInst.Evaluate("document.querySelector('#txtNexonID').value = '" Gui_NexonID "';")
-    PageInst.Evaluate("document.querySelector('#txtPWD').value = '" Gui_NexonPassWord "';")
-    PageInst.Evaluate("document.querySelector('.button01').click();")
-
-    Sleep, 1000
-    while (PageInst.Evaluate("document.readyState").value != "complete")
-        Sleep, 100
-
-    SB_SetText("넥슨 로그인 체크")
-    LoginURL := PageInst.Evaluate("window.location.href").value
-
-    if (LoginURL != "https://nxlogin.nexon.com/common/login.aspx?redirect=https%3A%2F%2Felancia.nexon.com%2F")
-    {
-        IfInString, LoginURL, errorcode=1
-        {
-            reason := "ID,비번 틀림"
-            Gosub, TryLoginFail
-            return
-        }
-    }
-
-    TryCount := 0
-    while !PageInst.Evaluate("document.querySelector('.game_start')")
-    {
-        Sleep, 300
-        TryCount++
-        if (TryCount > 100)
-        {
-            reason := "게임 시작 버튼 없음"
-            Gosub, TryLoginFail
-            return
-        }
-    }
-
-    Sleep, 2000
-    PageInst.Evaluate("document.querySelector('.game_start').click();")
-
-    ; 엘랜시아 실행 대기
-    CDP := ChromeInst.CDP
-    ;CDP.Call("Page.enable")
-    ;CDP.On("Page.javascriptDialogOpening", "HandleDialog")
-
-    WinWait, ahk_exe jElancia.exe, , 15
-
-    Gosub, CleanChrome
-
-    Step = 2
-    return
+chromeUserDataPath := A_LocalAppData "\Google\Chrome\User Data\Default"
+filesToDelete := ["Cookies", "Cookies-journal", "History", "History-journal"]
+foldersToDelete := ["Cache", "Code Cache", "GPUCache"]
+folder := "C:\Program Files (x86)"
+SB_SetText("Chrome 잔여물 삭제",3)
+Loop, Files, %folder%\scoped_dir*, D
+{
+try {
+FileRemoveDir, %A_LoopFilePath%, 1
+} catch e {
+If A_IsAdmin
+continue
+}
+}
+SB_SetText("쿠키 및 히스토리 삭제",3)
+Loop, % filesToDelete.MaxIndex()
+{
+filePath := chromeUserDataPath "\" filesToDelete[A_Index]
+If FileExist(filePath)
+{
+FileDelete, %filePath%
+}
+}
+SB_SetText("캐시 폴더 삭제",3)
+Loop, % foldersToDelete.MaxIndex()
+{
+folderPath := chromeUserDataPath "\" foldersToDelete[A_Index]
+If FileExist(folderPath)
+{
+FileRemoveDir, %folderPath%, 1
+}
+}
+SB_SetText("chrome 종료",3)
+Chrome.QuitAllSessions()
+Chrome.Driver.Exit()
+Process,close, chromedriver.exe
+Process,WaitClose, chromedriver.exe
+WinGet, chrome_ids, List, ahk_exe chrome.exe
+Loop, %chrome_ids%
+{
+this_id := chrome_ids%A_Index%
+WinKill, ahk_id %this_id%
+}
+Loop, 10
+{
+Run, taskkill /F /IM chrome.exe,, hide
+Run, taskkill /F /IM chromedriver.exe,, hide
+}
+sleep, 3000
+    Chrome := new Rufaydium(A_ScriptDir "\chromedriver.exe")
+    Chrome.capabilities.HeadlessMode := true
+    Chrome.capabilities.IncognitoMode := true
+    NexonUrl := "https://nxlogin.nexon.com/common/login.aspx?accesscode=1&redirect=https%3A%2F%2Fsignin.nexon.com%2Fsso%2Fnxlogin%3Fredirect_uri%3DaHR0cHMlM0ElMkYlMkZlbGFuY2lhLm5leG9uLmNvbSUyRg%3D%3D"
+    Page := Chrome.getSessionByUrl(NexonUrl)
+    SB_SetText("URL 연결시도",3)
+If !isobject(page)
+{
+Page := Chrome.NewSession()
+Page.Navigate(NexonUrl)
+While(CheckHTML(page,"일회용 로그인") = "")
+{
+sleep, 300
+}
+}
+SB_SetText("로그인창 발견",3)
+Page.cdp.QuerySelector("#txtNexonID").sendkey(Gui_NexonID)
+Page.getElementsbyClassName("input01")[0].SendKey(key.tab)
+Page.cdp.QuerySelector("#txtPWD").sendkey(Gui_NexonPassWord)
+Page.getElementsbyClassName("button01")[0].SendKey(key.enter)
+SB_SetText("로그인 시도",3)
+While(CheckHTML(page,"마이페이지") = "")
+{
+sleep, 300
+}
+SB_SetText("로그인 완료",3)
+sleep, 500
+SB_SetText("GameStart 시도",3)
+Loop
+{
+Page.getElementsbyClassName("gnbFullBannerBtToday")[0].SendKey(key.enter)
+Page.getElementsbyClassName("game_start")[0].SendKey(key.enter)
+WinWait, Elancia, , 10
+If ErrorLevel = 0
+{
+SB_SetText("클라이언트 발견",3)
+Break
+}
+SB_SetText("GameStart 재시도",3)
+}
+SB_SetText("Chrome 닫기", 3)
+Page_exit(Chrome)
+Chrome := ""
+sleep, 1000
+Loop, 10
+{
+Run, taskkill /F /IM chrome.exe,, hide
+Run, taskkill /F /IM chromedriver.exe,, hide
+}
+Step = 2
 }
 }
 if(Gui_Login = "넥슨플러그")
@@ -8338,6 +10608,9 @@ if( Gui_Login = "홈페이지클릭[구글]" )
 if(Step = 1)
 {
 GUICONTROL, , 로그인상태정보, [로그인] - 접속 중
+PageInst.Call("Browser.close")
+PageInst.Disconnect()
+sleep,300
 FileCreateDir, ChromeProfile
 ProfilePath := A_ScriptDir . "\ChromeProfile" ; 사용자 프로파일 경로 지정
 ChromeInst := new Chrome(ProfilePath, , , , , False) ; Headless 모드를 끔(False)
@@ -8756,6 +11029,7 @@ Loop,5
 {
 ControlSend, , {Enter}, Elancia
 }
+ControlSend, , {Enter}, Elancia
 Step = 4
 }
 }
@@ -9277,20 +11551,13 @@ Sleep, 100
 Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
-
-if (아이템갯수["엘의축복포션(30일)"] = 0 && 아이템갯수["엘의축복포션(7일)"] = 0 && 아이템갯수["엘의축복포션(1일)"] = 0)
-{
-    TMessage := "[ Helancia_Log ]>>" jTitle "<<: 엘의축복포션이 없습니다. 채워주세요."
-    텔레그램메시지보내기(TMessage)
-    sleep,10
-}
-
 Step = 8
 }
 if(Step = 8)
 {
 GuiControl, , Gui_NowState, 인식한 어빌에 맞춰 체잠 초기 장소 세팅 중...
 SB_SetText("체작장소 세팅")
+Sleep,300
 if(Gui_CheckUseMagic = 1)
 {
 SEND, {F17 Down}
@@ -11654,6 +13921,7 @@ if (Gui_KON = 0 || 차원이동감응 = 1)
             }
             else
             {
+            SB_SetText("포남 서파 감응 실패.")
             Keyclick("tab")
             ParasCount:=3
             step = 8
@@ -18933,6 +21201,7 @@ jelan.write(0x00527b54, A길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . A길잃파 "-길잃은 수색대", 2)
 Sleep, 500
 RunMemory("NPC호출")
+Sleep, 500
 }
 IfInString,Location,[베타차원]
 {
@@ -18943,6 +21212,7 @@ jelan.write(0x00527b54, B길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . B길잃파 "-길잃은 수색대", 2)
 Sleep, 500
 RunMemory("NPC호출")
+Sleep, 500
 }
 IfInString,Location,[감마차원]
 {
@@ -18953,6 +21223,7 @@ jelan.write(0x00527b54, G길잃파, "UInt", aOffset*)
 SB_SETTEXT(차원 . G길잃파 "-길잃은 수색대", 2)
 Sleep, 500
 RunMemory("NPC호출")
+Sleep, 500
 }
 ServerMsg := jelan.readString(0x0017E574, 40, "UTF-16", aOffsets*)
 IfInString,ServerMsg,서버와의 연결이
@@ -19146,10 +21417,6 @@ Step = 1014
 if(Step = 1014)
 {
 SB_SetText("움직임 체크 중")
-IfWinNotActive, ahk_pid %jPID%
-{
-WinActivate, ahk_pid %jPID%
-}
 Check_Moving()
 Get_Pos()
 Get_MovePos()
@@ -21948,11 +24215,11 @@ return
 
 Set_MoveSpeed()
 {
-jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x9C)
-jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x98)
-;jelan.write(0x0058FFE0,45,"UInt", aOffsets*)
-;jelan.write(0x0058DAD4, 2300, "UInt", 0x178, 0x9C)
-;jelan.write(0x0058DAD4, 2300, "UInt", 0x178, 0x98)
+;jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x9C)
+;jelan.write(0x0058DAD4, 750, "UInt", 0x178, 0x98)
+jelan.write(0x0058FFE0,45,"UInt", aOffsets*)
+jelan.write(0x0058DAD4, 2300, "UInt", 0x178, 0x9C)
+jelan.write(0x0058DAD4, 2300, "UInt", 0x178, 0x98)
 }
 return
 Check_Moving()
@@ -35307,20 +37574,78 @@ CleanChrome:
     ChromeInst := ""
 return
 
-; ▼ 크롬 인스턴스 정리 루틴
-CleanChrome(ByRef page, ByRef chrome)
+ClearChromeData()
 {
-    Try {
-        page.Evaluate("inface.auth.gotoSignOut();")
-        Sleep, 1000
-        page.WaitForLoad()
-        page.Evaluate(removeCookiesScript)
-        page.Call("Browser.close")
-        page.Disconnect()
-    } Catch e {
-        ; 무시
-    }
-    page := ""
-    Try chrome.Close()
-    chrome := ""
+chromeUserDataPath := A_LocalAppData "\Google\Chrome\User Data\Default"
+filesToDelete := ["Cookies", "Cookies-journal", "History", "History-journal"]
+foldersToDelete := ["Cache", "Code Cache", "GPUCache"]
+SB_SetText("Chrome 잔여물 삭제",3)
+Loop, Files, %folder%\scoped_dir*, D
+{
+try {
+FileRemoveDir, %A_LoopFilePath%, 1
+} catch e {
+If A_IsAdmin
+continue
+}
+}
+SB_SetText("쿠키 및 히스토리 삭제",3)
+Loop, % filesToDelete.MaxIndex()
+{
+filePath := chromeUserDataPath "\" filesToDelete[A_Index]
+If FileExist(filePath)
+{
+FileDelete, %filePath%
+}
+}
+SB_SetText("캐시 폴더 삭제",3)
+Loop, % foldersToDelete.MaxIndex()
+{
+folderPath := chromeUserDataPath "\" foldersToDelete[A_Index]
+If FileExist(folderPath)
+{
+FileRemoveDir, %folderPath%, 1
+}
+}
+SB_SetText("chrome 종료",3)
+Chrome.QuitAllSessions()
+Chrome.Driver.Exit()
+Process,close, chromedriver.exe
+Process,WaitClose, chromedriver.exe
+WinGet, chrome_ids, List, ahk_exe chrome.exe
+Loop, %chrome_ids%
+{
+this_id := chrome_ids%A_Index%
+WinKill, ahk_id %this_id%
+}
+Loop, 10
+{
+Run, taskkill /F /IM chrome.exe,, hide
+Run, taskkill /F /IM chromedriver.exe,, hide
+}
+sleep, 3000
+}
+
+CheckHTML(page, Text)
+{
+Data := Page.html
+RegExMatch(Data,Text,Check_ver)
+Return Check_ver
+}
+Page_exit(_Chrome)
+{
+Page.close()
+Page.exit()
+_Chrome.QuitAllSessions()
+_Chrome.Quit()
+_Chrome.Driver.Exit()
+ObjRelease(_Chrome)
+}
+
+RegWriteEdit()
+{
+SB_SetText("레지스트리",2)
+SB_SetText("편집중",3)
+RegWrite, REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Policies\Google\Chrome, AutoLaunchProtocolsFromOrigins, [{"allowed_origins": ["*"], "protocol": "ngm"}, {"allowed_origins": ["*"], "protocol": "neople"}, {"allowed_origins": ["*"], "protocol": "daumgamestarter"}, {"allowed_origins": ["*"], "protocol": "hangame"}, {"allowed_origins": ["*"], "protocol": "uplay"}, {"allowed_origins": ["*"], "protocol": "pmanglauncher"}, {"allowed_origins": ["*"], "protocol": "nmstarter"}, {"allowed_origins": ["*"], "protocol": "freestyle2"}, {"allowed_origins": ["*"], "protocol": "xlr"}, {"allowed_origins": ["*"], "protocol": "ff14kr"}, {"allowed_origins": ["*"], "protocol": "sgup"}]
+SB_SetText("추가중",3)
 }
