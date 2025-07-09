@@ -2990,14 +2990,14 @@ DllCall( "shlwapi.dll\StrFormatByteSize64A", Int64,TotalPhys, Str,PhysMem, UInt,
 
 filePath := A_ScriptDir . "\NPCOID.ini"
 DllCall("psapi.dll\EmptyWorkingSet", "Ptr", -1)
-IfNotExist,%A_ScriptDir%\CashMemory.exe
-{
-FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
-Loop, %A_ScriptDir%\CashMemory.exe
-{
-break
-}
-}
+;IfNotExist,%A_ScriptDir%\CashMemory.exe
+;{
+;FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
+;Loop, %A_ScriptDir%\CashMemory.exe
+;{
+;break
+;}
+;}
 class _ClassMemory
 {
 static baseAddress, hProcess, PID, currentProgram
@@ -7674,8 +7674,8 @@ return
 
 RL:
 Gui, Submit, NoHide
-Run, *RunAs %A_ScriptDir%\CashMemory.exe
-Sleep,300
+;Run, *RunAs %A_ScriptDir%\CashMemory.exe
+;Sleep,300
 loady = 2
 IfWinExist,ahk_pid %jPID%
 {
