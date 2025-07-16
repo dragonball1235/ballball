@@ -15146,7 +15146,7 @@ if(Step = 32) ;포남 무바 중 감응 파트
     텔레그램메시지보내기(TMessage)
     sleep,200
     PNnewTime = %A_Now%
-    EnvAdd, PNnewTime, 9, Minutes
+    EnvAdd, PNnewTime, 19, Minutes
     FormatTime, PNnewTime1, %PNnewTime%, yyyyMMddHHmm
     CheckPN := 1
     step = 24
@@ -21491,7 +21491,7 @@ return
 }
 }
 CharMovePobuk()
-sleep,500
+sleep,1000
 Step = 1014
 }
 if(Step = 1014)
@@ -21892,6 +21892,7 @@ if(Step = 1030)
 SB_SetText("피부 버프 받는 중")
 CheckPB = 0
 RepairWeaponCount = 0
+Keyclick("AltR")
 Sleep, 500
 Keyclick("tab")
 Sleep, 300
