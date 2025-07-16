@@ -14240,19 +14240,19 @@ Get_Pos()
 Get_MovePos()
 if(Gui_MoveLoute1 = 1)
 {
-거리범위 := 3
+거리범위 := 5
 }
 if(Gui_MoveLoute2 = 1) ;구석구석만 돌아다니는 방향
 {
-거리범위 := 5
+거리범위 := 10
 }
 if(Gui_MoveLoute3 = 1) ; 세로 지그재그 방향
 {
-거리범위 := 3
+거리범위 := 6
 }
 if(Gui_MoveLoute4 = 1) ; 아래쪽만 공략하는 방향
 {
-거리범위 := 5
+거리범위 := 10
 }
 if(Moving = 0)
 {
@@ -15060,14 +15060,93 @@ if(Step = 32) ;포남 무바 중 감응 파트
     {
     WINACTIVATE, ahk_pid %jPID%
     }
-    gosub, 감응
+    countsignal := 0
+    if (Gui_KON = 1) {
+        if InStr(Location, "[알파차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, A동파, "UInt")
+                jelan.write(0x00527B1C, A동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal := 1
+                호출대상 := "알파 - 동쪽파수꾼"
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, A서파, "UInt")
+                jelan.write(0x00527B1C, A서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "알파 - 서쪽파수꾼"
+            }
+        }
+
+        if InStr(Location, "[베타차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, B동파, "UInt")
+                jelan.write(0x00527B1C, B동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal := 1
+                호출대상 := "베타 - 동쪽파수꾼"
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, B서파, "UInt")
+                jelan.write(0x00527B1C, B서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "베타 - 서쪽파수꾼"
+            }
+        }
+
+        if InStr(Location, "[감마차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, G동파, "UInt")
+                jelan.write(0x00527B1C, G동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal := 1
+                호출대상 := "감마 - 동쪽파수꾼"
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, G서파, "UInt")
+                jelan.write(0x00527B1C, G서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "감마 - 서쪽파수꾼"
+            }
+        }
+    }
     sleep,500
     감응 += 1
     TMessage := "[ Helancia_Log ]>>" jTitle "<<:" 감응 "회차 [원격] 감응 성공.[" 호출대상 ":" countsignal "]"  Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
     텔레그램메시지보내기(TMessage)
     sleep,200
     PNnewTime = %A_Now%
-    EnvAdd, PNnewTime, 18, Minutes
+    EnvAdd, PNnewTime, 9, Minutes
     FormatTime, PNnewTime1, %PNnewTime%, yyyyMMddHHmm
     CheckPN := 1
     step = 24
@@ -32063,107 +32142,105 @@ VarSetCapacity(Var, Len, 0)
 Return, StrPut(Str, &Var, Enc)
 }
 return
-감응:
-Gui, Submit, Nohide
-if(Gui_KON = 1)
-{
-IfInString,Location,[알파차원] 포프레스네 마을
-{
-Sleep, 100
-포남입장시간 := A_TickCount
-countsignal := 0
+감응() {
+    ; 전역 변수 사용 선언
+    Gui, Submit, Nohide
+
+    if (Gui_KON = 1) {
+        if InStr(Location, "[알파차원] 포프레스네 마을") {
+            Sleep, 100
+            포남입장시간 := A_TickCount
+            countsignal := 0
+            return
+        }
+
+        if InStr(Location, "[알파차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, A동파, "UInt")
+                jelan.write(0x00527B1C, A동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal += 1
+                호출대상 := "알파 - 동쪽파수꾼"
+                return
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, A서파, "UInt")
+                jelan.write(0x00527B1C, A서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "알파 - 서쪽파수꾼"
+                return
+            }
+        }
+
+        if InStr(Location, "[베타차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, B동파, "UInt")
+                jelan.write(0x00527B1C, B동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal += 1
+                호출대상 := "베타 - 동쪽파수꾼"
+                return
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, B서파, "UInt")
+                jelan.write(0x00527B1C, B서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "베타 - 서쪽파수꾼"
+                return
+            }
+        }
+
+        if InStr(Location, "[감마차원] 포프레스네 남쪽") {
+            if (countsignal = 0) {
+                jelan.write(0x00527B1C, G동파, "UInt")
+                jelan.write(0x00527B1C, G동파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                countsignal := 1
+                호출대상 := "감마 - 동쪽파수꾼"
+                return
+            }
+            if (countsignal = 1) {
+                jelan.write(0x00527B1C, G서파, "UInt")
+                jelan.write(0x00527B1C, G서파, "UInt")
+                Sleep, 30
+                Send, {F14}
+                Sleep, 100
+                Send, {F14}
+                Sleep, 100
+                포남입장시간 := A_TickCount
+                countsignal := 0
+                호출대상 := "감마 - 서쪽파수꾼"
+                return
+            }
+        }
+    }
 }
-IfInString,Location,[알파차원] 포프레스네 남쪽
-{
-if (countsignal = 0)
-{
-value := jelan.write(0x00527B1C, A동파, "UInt")
-value := jelan.write(0x00527B1C, A동파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-countsignal += 1
-호출대상 := "알파 - 동쪽파수꾼"
-return
-}
-if (countsignal = 1)
-{
-value := jelan.write(0x00527B1C, A서파, "UInt")
-value := jelan.write(0x00527B1C, A서파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-포남입장시간 := A_TickCount
-countsignal := 0
-호출대상 := "알파 - 서쪽파수꾼"
-return
-}
-}
-IfInString,Location,[베타차원] 포프레스네 남쪽
-{
-if (countsignal = 0)
-{
-value := jelan.write(0x00527B1C, B동파, "UInt")
-value := jelan.write(0x00527B1C, B동파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-countsignal += 1
-호출대상 := "베타 - 동쪽파수꾼"
-return
-}
-if (countsignal = 1)
-{
-value := jelan.write(0x00527B1C, B서파, "UInt")
-value := jelan.write(0x00527B1C, B서파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-포남입장시간 := A_TickCount
-countsignal := 0
-호출대상 := "베타 - 서쪽파수꾼"
-return
-}
-}
-IfInString,Location,[감마차원] 포프레스네 남쪽
-{
-if (countsignal = 0)
-{
-value := jelan.write(0x00527B1C, G동파, "UInt")
-value := jelan.write(0x00527B1C, G동파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-countsignal := 1
-호출대상 := "감마 - 동쪽파수꾼"
-return
-}
-if (countsignal = 1)
-{
-value := jelan.write(0x00527B1C, G서파, "UInt")
-value := jelan.write(0x00527B1C, G서파, "UInt")
-Sleep, 30
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
-포남입장시간 := A_TickCount
-countsignal := 0
-호출대상 := "감마 - 서쪽파수꾼"
-return
-}
-}
-}
+
+
 return
 checktxt()
 {
