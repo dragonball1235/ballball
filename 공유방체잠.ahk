@@ -12981,6 +12981,7 @@ if (RepairWeaponCount >= 150)
 RepairWeaponCount = 0
 MapNumber = 1
 Keyclick("tab")
+sleep,1000
 step = 300
 return
 }
@@ -14996,11 +14997,11 @@ else
 {
   RepairWeaponCount := 0
 }
-if (RepairWeaponCount >= 200)
+if (RepairWeaponCount >= 150)
 {
 CheckPN := 0
 keyclick("tab")
-sleep,400
+sleep,1000
 RepairWeaponCount = 0
 MapNumber = 1
 step = 300
@@ -21879,8 +21880,10 @@ else
 {
   RepairWeaponCount := 0
 }
-if (RepairWeaponCount >= 300)
+if (RepairWeaponCount >= 150)
 {
+keyclick("tab")
+sleep,1000
 RepairWeaponCount = 0
 MapNumber = 1
 step = 300
