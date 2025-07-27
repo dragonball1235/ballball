@@ -5077,7 +5077,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 1.1[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 1.3[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -15017,7 +15017,7 @@ countsignal := 0
 Keyclick("AltR")
 Sleep, 400
 Keyclick("tab")
-Sleep, 1000
+Sleep, 500
 Step = 31
 }
 if(step = 31)
@@ -15062,9 +15062,11 @@ if(Step = 32) ;포남 무바 중 감응 파트
     WINACTIVATE, ahk_pid %jPID%
     }
     countsignal := 0
+    sleep,300
     if (Gui_KON = 1) {
         if InStr(Location, "[알파차원] 포프레스네 남쪽") {
-            if (countsignal = 0) {
+            if (countsignal = 0)
+            {
                 jelan.write(0x00527B1C, A동파, "UInt")
                 jelan.write(0x00527B1C, A동파, "UInt")
                 Sleep, 30
@@ -15074,8 +15076,9 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 Sleep, 100
                 countsignal := 1
                 호출대상 := "알파 - 동쪽파수꾼"
-            }
-            if (countsignal = 1) {
+                sleep,1000
+            if (countsignal = 1)
+            {
                 jelan.write(0x00527B1C, A서파, "UInt")
                 jelan.write(0x00527B1C, A서파, "UInt")
                 Sleep, 30
@@ -15086,6 +15089,7 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 포남입장시간 := A_TickCount
                 countsignal := 0
                 호출대상 := "알파 - 서쪽파수꾼"
+            }
             }
         }
 
@@ -15100,8 +15104,9 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 Sleep, 100
                 countsignal := 1
                 호출대상 := "베타 - 동쪽파수꾼"
-            }
-            if (countsignal = 1) {
+                sleep,1000
+            if (countsignal = 1)
+            {
                 jelan.write(0x00527B1C, B서파, "UInt")
                 jelan.write(0x00527B1C, B서파, "UInt")
                 Sleep, 30
@@ -15112,6 +15117,7 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 포남입장시간 := A_TickCount
                 countsignal := 0
                 호출대상 := "베타 - 서쪽파수꾼"
+            }
             }
         }
 
@@ -15126,7 +15132,7 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 Sleep, 100
                 countsignal := 1
                 호출대상 := "감마 - 동쪽파수꾼"
-            }
+            sleep,1000
             if (countsignal = 1) {
                 jelan.write(0x00527B1C, G서파, "UInt")
                 jelan.write(0x00527B1C, G서파, "UInt")
@@ -15139,15 +15145,15 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 countsignal := 0
                 호출대상 := "감마 - 서쪽파수꾼"
             }
+            }
         }
     }
     sleep,500
     감응 += 1
     TMessage := "[ Helancia_Log ]>>" jTitle "<<:" 감응 "회차 [원격] 감응 성공.[" 호출대상 ":" countsignal "]"  Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
     텔레그램메시지보내기(TMessage)
-    sleep,200
     PNnewTime = %A_Now%
-    EnvAdd, PNnewTime, 19, Minutes
+    EnvAdd, PNnewTime, 5, Minutes
     FormatTime, PNnewTime1, %PNnewTime%, yyyyMMddHHmm
     CheckPN := 1
     step = 24
