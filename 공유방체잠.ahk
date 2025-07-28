@@ -4396,7 +4396,7 @@ Gui, Add, Radio, x400 y123 h15 vGui_MobMagic gCheckMob, 마법
 Gui, Add, Radio, x500 y123 h15 vGui_AllMobAND gCheckMob, 전체AND
 Gui, Add, Radio, x570 y123 h15 vGui_AllMobOR gCheckMob, 전체OR
 Gui, Add, Text, x370 y155 +Left, 전체 몬스터 선택시 어빌
-Gui, Add, Edit, x495 y152 w35 +Right Limit4 number Disabled vGui_AllMobLimit, 9200
+Gui, Add, Edit, x495 y152 w35 +Right Limit4 number Disabled vGui_AllMobLimit, 9100
 Gui, Add, Text, x535 y155 +Left v포남설정, 이상이면 만드만 공격
 
 Gui, Font
@@ -10348,7 +10348,7 @@ IfWinNotExist,ahk_pid %jPID%
 if(Step >= 5 and Step < 10000)
 {
 GUICONTROL, , Gui_NowState, 오류로 인해 재접속 합니다.
-Step = 10000
+Step = 0
 }
 }
 if(Step = 0)
