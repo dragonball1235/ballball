@@ -7628,8 +7628,6 @@ GuiControl, Disable, Gui_CHP
 GuiControl, Disable, Gui_Weapon1
 GuiControl, Disable, Gui_Weapon2
 GuiControl, Disable, Gui_Weapon3
-GuiControl, Disable, Gui_jjON
-GuiControl, Disable, Gui_jjOFF
 GuiControl, Disable, Gui_LimitAbility0
 GuiControl, Disable, Gui_LimitAbility1
 GuiControl, Disable, Gui_LimitAbility2
@@ -8661,8 +8659,6 @@ incineration: ;줍줍 제어 용
 Gui, Submit, Nohide
 if((Step >= 19 and Step < 90) || (Step >= 1013 and Step < 1030) || (Step >= 3023 and Step < 3031)) ; 포남 포북 머미면
 {
-if(jjc = 1)
-{
 IfInString,Location,포프레스네
 {
 Gui, listview, 포프레스네소각
@@ -8709,7 +8705,6 @@ inciNumber += 1
 if(inciNumber > LastRowNum)
 {
 inciNumber = 1
-}
 }
 }
 }
@@ -8771,6 +8766,7 @@ PNnowtime = %A_Now%
 FormatTime, PNnowtime1, %PNnowtime%, yyyyMMddHHmm
 if(PNnowtime1 > PNnewTime1)
 {
+keyclick("tab")
 MobNumber = 1
 SplashImage, 1: off
 SplashImage, 2: off
@@ -11548,7 +11544,7 @@ PostMessage, 0x100, 56, 589825, , ahk_pid %jPID%
 PostMessage, 0x101, 56, 589825, , ahk_pid %jPID%
 Sleep, 100
 }
-Send, {F13 Down}
+Send, {F13 Down} ;NPC대화
 Sleep, 30
 Send, {F13 Up}
 Step = 8
@@ -11560,10 +11556,12 @@ SB_SetText("체작장소 세팅")
 Sleep,300
 if(Gui_CheckUseMagic = 1)
 {
-SEND, {F17 Down}
-SLEEP, 50
-SEND, {F17 UP}
-SLEEP, 50
+Send, {F17 Down}
+Sleep, 200
+Send, {F17 UP}
+Send, {F17 Down}
+Sleep, 200
+Send, {F17 UP}
 value := jelan.write(0x00527A4C, 3, "UInt")
 Stack_MN()
 CritHP := Gui_CHP
@@ -13001,10 +12999,10 @@ countsignal := 0
 CheckPB = 0
 jjc := 0
 랜덤감응 = 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 Get_Location()
 if(Gui_huntPonam = 1 || Gui_HuntAuto = 1)
 {
@@ -13027,21 +13025,21 @@ if(Step = 9 and gui_Startmap = 4)
 {
 GuiControl, , Gui_NowState, [포남] 사냥터로 가기.
 sleep,100
-;value := jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
-;value := jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
-;value := jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
-;value := jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
-;value := jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
+value := jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
+value := jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
+value := jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
+value := jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
+value := jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
 ;포북캐릭()
 CheckPN := 0
 countsignal := 0
 CheckPB = 0
 jjc := 0
 랜덤감응 = 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 차원체크()
 Check_Map()
 sleep,500
@@ -13114,28 +13112,11 @@ Send, {F17 UP}
 Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
-Get_Location()
-IfInString,Location,[알파차원] 포프레스네 마을
-{
+Sleep, 30
 Send, {F13 Down}
 Sleep, 30
 Send, {F13 Up}
-Step = 11
-}
-Send, {F13 Down}
-Sleep, 30
-Send, {F13 Up}
-IfInString,Location,[베타차원] 포프레스네 마을
-{
-Step = 11
-}
-Send, {F13 Down}
-Sleep, 30
-Send, {F13 Up}
-IfInString,Location,[감마차원] 포프레스네 마을
-{
-Step = 11
-}
+STEP := 11
 }
 if(Step = 11)
 {
@@ -13695,10 +13676,10 @@ Sleep, 300
 Get_Location()
 IfInString,Location,남쪽
 {
-Send, {F14}
-Sleep, 100
-Send, {F14}
-Sleep, 100
+;Send, {F14}
+;Sleep, 100
+;Send, {F14}
+;Sleep, 100
 SB_SetText("좌표 이동")
 XX := 127
 YY := 27
@@ -15014,8 +14995,8 @@ SB_SetText("감응 버프 받는 중")
 CheckPN := 0
 RepairWeaponCount := 0
 countsignal := 0
-Keyclick("AltR")
-Sleep, 400
+keyclick("AltR")
+sleep,200
 Keyclick("tab")
 Sleep, 500
 Step = 31
@@ -15061,12 +15042,13 @@ if(Step = 32) ;포남 무바 중 감응 파트
     {
     WINACTIVATE, ahk_pid %jPID%
     }
-    countsignal := 0
-    sleep,300
+    loop,2
+    {
     if (Gui_KON = 1) {
         if InStr(Location, "[알파차원] 포프레스네 남쪽") {
             if (countsignal = 0)
             {
+                SB_SetText("동쪽파수꾼 버프 받는 중")
                 jelan.write(0x00527B1C, A동파, "UInt")
                 jelan.write(0x00527B1C, A동파, "UInt")
                 Sleep, 30
@@ -15076,9 +15058,10 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 Sleep, 100
                 countsignal := 1
                 호출대상 := "알파 - 동쪽파수꾼"
-                sleep,1000
+            }
             if (countsignal = 1)
             {
+                SB_SetText("서쪽파수꾼 버프 받는 중")
                 jelan.write(0x00527B1C, A서파, "UInt")
                 jelan.write(0x00527B1C, A서파, "UInt")
                 Sleep, 30
@@ -15090,11 +15073,11 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 countsignal := 0
                 호출대상 := "알파 - 서쪽파수꾼"
             }
-            }
         }
 
         if InStr(Location, "[베타차원] 포프레스네 남쪽") {
             if (countsignal = 0) {
+                SB_SetText("동쪽파수꾼 버프 받는 중")
                 jelan.write(0x00527B1C, B동파, "UInt")
                 jelan.write(0x00527B1C, B동파, "UInt")
                 Sleep, 30
@@ -15104,9 +15087,10 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 Sleep, 100
                 countsignal := 1
                 호출대상 := "베타 - 동쪽파수꾼"
-                sleep,1000
+            }
             if (countsignal = 1)
             {
+                SB_SetText("서쪽파수꾼 버프 받는 중")
                 jelan.write(0x00527B1C, B서파, "UInt")
                 jelan.write(0x00527B1C, B서파, "UInt")
                 Sleep, 30
@@ -15118,11 +15102,11 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 countsignal := 0
                 호출대상 := "베타 - 서쪽파수꾼"
             }
-            }
         }
 
         if InStr(Location, "[감마차원] 포프레스네 남쪽") {
             if (countsignal = 0) {
+                SB_SetText("동쪽파수꾼 버프 받는 중")
                 jelan.write(0x00527B1C, G동파, "UInt")
                 jelan.write(0x00527B1C, G동파, "UInt")
                 Sleep, 30
@@ -15132,8 +15116,9 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 Sleep, 100
                 countsignal := 1
                 호출대상 := "감마 - 동쪽파수꾼"
-            sleep,1000
+            }
             if (countsignal = 1) {
+                SB_SetText("서쪽파수꾼 버프 받는 중")
                 jelan.write(0x00527B1C, G서파, "UInt")
                 jelan.write(0x00527B1C, G서파, "UInt")
                 Sleep, 30
@@ -15145,8 +15130,8 @@ if(Step = 32) ;포남 무바 중 감응 파트
                 countsignal := 0
                 호출대상 := "감마 - 서쪽파수꾼"
             }
-            }
         }
+    }
     }
     sleep,500
     감응 += 1
@@ -15825,10 +15810,10 @@ CheckPB = 0
 CheckPN := 0
 jjc := 0
 countsignal := 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -16409,10 +16394,10 @@ CheckPB = 0
 CheckPN := 0
 jjc := 0
 countsignal := 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -16989,10 +16974,10 @@ CheckPB = 0
 CheckPN := 0
 countsignal := 0
 jjc := 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -17301,10 +17286,10 @@ CheckPB = 0
 CheckPN := 0
 countsignal := 0
 jjc := 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -17611,10 +17596,10 @@ CheckPB = 0
 CheckPN := 0
 jjc := 0
 countsignal := 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -17905,10 +17890,10 @@ CheckPB = 0
 CheckPN := 0
 countsignal := 0
 jjc := 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -19728,10 +19713,10 @@ CheckPB = 0
 CheckPN := 0
 countsignal := 0
 jjc := 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -20248,10 +20233,10 @@ CheckPB = 0
 CheckPN := 0
 countsignal := 0
 jjc := 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 Check_Map()
 if(Map = 1)
 {
@@ -20534,10 +20519,10 @@ CheckPB = 0
 CheckPN := 0
 jjc := 0
 countsignal := 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 Step = 1001
 gui_Startmap := 4
 MapNumber := 1
@@ -20548,10 +20533,10 @@ GuiControl, , Gui_NowState, [포북] 사냥터로 가기.
 CheckPB = 0
 CheckPN := 0
 jjc := 0
-;Send, {F16 Down}
-;Send, {F16 Up}
-;Send, {F16 Down}
-;Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
+Send, {F16 Down}
+Send, {F16 Up}
 if( 랜덤차원 = 1 )
 {
 if(Gui_CheckUseParty = 0)
@@ -21052,6 +21037,7 @@ MoveWaitCount += 1
 }
 if(Step = 1010)
 {
+차원체크()
 정수체크()
 Get_Location()
 IfInString,Location,[알파차원]
@@ -21246,6 +21232,7 @@ if( GUI_KON = 1 )
 {
 if(Step = 1007)
 {
+차원체크()
 정수체크()
 Move_NPCTalkForm()
 GuiControl, , Gui_NowState, [포북] 사냥터 도착.
