@@ -2990,14 +2990,14 @@ DllCall( "shlwapi.dll\StrFormatByteSize64A", Int64,TotalPhys, Str,PhysMem, UInt,
 
 filePath := A_ScriptDir . "\NPCOID.ini"
 DllCall("psapi.dll\EmptyWorkingSet", "Ptr", -1)
-;IfNotExist,%A_ScriptDir%\CashMemory.exe
-;{
-;FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
-;Loop, %A_ScriptDir%\CashMemory.exe
-;{
-;break
-;}
-;}
+IfNotExist,%A_ScriptDir%\CashMemory.exe
+{
+FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
+Loop, %A_ScriptDir%\CashMemory.exe
+{
+break
+}
+}
 class _ClassMemory
 {
 static baseAddress, hProcess, PID, currentProgram
@@ -7672,8 +7672,8 @@ return
 
 RL:
 Gui, Submit, NoHide
-;Run, *RunAs %A_ScriptDir%\CashMemory.exe
-;Sleep,300
+Run, *RunAs %A_ScriptDir%\CashMemory.exe
+Sleep,300
 loady = 2
 IfWinExist,ahk_pid %jPID%
 {
@@ -8922,40 +8922,12 @@ SLEEP, 500
 }
 IfInString,NPCMsg,인연
 {
-SLEEP, 500
-SetFormat, Integer, H
-startAddress := 0x00100000
-endAddress := 0x00200000
-SetFormat, Integer, D
-NPC_MSG_ADR := Check_NPCMsg_address()
-FormNumber := jelan.read(0x0058DAD0, "UInt", 0xC, 0x10, 0x8, 0xA0)
-NPCMsg := jelan.readString(NPC_MSG_ADR, 52, "UTF-16", aOffsets*)
-TMessage := "[ Helancia_Log ]>>" jTitle FormNumber "<<: 애미뒤진 인연버그 발생. " Location "/" "발생 메시지 전문 : " NPCMsg
+TMessage := "[ Helancia_Log ]>>" jTitle FormNumber "<<: 애미뒤진 인연버그 발생. "
 텔레그램메시지보내기(TMessage)
 sleep,10
 keyclick("프로세스종료")
 이전스텝 := step
 이유 := 인연벅
-step = 10000
-return
-}
-IfInString,NPCMsg,렉스
-{
-SLEEP, 500
-SetFormat, Integer, H
-startAddress := 0x00100000
-endAddress := 0x00200000
-SetFormat, Integer, D
-NPC_MSG_ADR := Check_NPCMsg_address()
-FormNumber := jelan.read(0x0058DAD0, "UInt", 0xC, 0x10, 0x8, 0xA0)
-NPCMsg := jelan.readString(NPC_MSG_ADR, 52, "UTF-16", aOffsets*)
-GuiControl, , jTitle, %jTitle%
-TMessage := "[ Helancia_Log ]>>" jTitle FormNumber "<<: 애미뒤진 길드버그 발생. " Location "/" "발생 메시지 전문 : " NPCMsg
-텔레그램메시지보내기(TMessage)
-sleep,10
-keyclick("프로세스종료")
-이전스텝 := step
-이유 := 길드벅
 step = 10000
 return
 }
@@ -10507,6 +10479,9 @@ Page := Chrome.NewSession()
 Page.Navigate(NexonUrl)
 While(CheckHTML(page,"일회용 로그인") = "")
 {
+    if (A_TickCount - CheckHTMLstart > timeout) {
+        break
+    }
 sleep, 300
 }
 }
@@ -10516,9 +10491,14 @@ Page.getElementsbyClassName("input01")[0].SendKey(key.tab)
 Page.cdp.QuerySelector("#txtPWD").sendkey(Gui_NexonPassWord)
 Page.getElementsbyClassName("button01")[0].SendKey(key.enter)
 SB_SetText("로그인 시도",3)
+timeout := 10000  ; 최대 대기 시간 (ms)
+CheckHTMLstart := A_TickCount
 While(CheckHTML(page,"마이페이지") = "")
 {
 sleep, 300
+    if (A_TickCount - CheckHTMLstart > timeout) {
+        break
+    }
 }
 SB_SetText("로그인 완료",3)
 sleep, 500
