@@ -10477,9 +10477,12 @@ If !isobject(page)
 {
 Page := Chrome.NewSession()
 Page.Navigate(NexonUrl)
+CheckHTMLstart := A_TickCount
+timeout := 10000  ; 최대 대기 시간 (ms)
 While(CheckHTML(page,"일회용 로그인") = "")
 {
     if (A_TickCount - CheckHTMLstart > timeout) {
+        CheckHTMLstart := A_TickCount
         break
     }
 sleep, 300
@@ -10491,12 +10494,12 @@ Page.getElementsbyClassName("input01")[0].SendKey(key.tab)
 Page.cdp.QuerySelector("#txtPWD").sendkey(Gui_NexonPassWord)
 Page.getElementsbyClassName("button01")[0].SendKey(key.enter)
 SB_SetText("로그인 시도",3)
-timeout := 10000  ; 최대 대기 시간 (ms)
 CheckHTMLstart := A_TickCount
 While(CheckHTML(page,"마이페이지") = "")
 {
 sleep, 300
     if (A_TickCount - CheckHTMLstart > timeout) {
+        CheckHTMLstart := A_TickCount
         break
     }
 }
