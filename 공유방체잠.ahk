@@ -2990,14 +2990,14 @@ DllCall( "shlwapi.dll\StrFormatByteSize64A", Int64,TotalPhys, Str,PhysMem, UInt,
 
 filePath := A_ScriptDir . "\NPCOID.ini"
 DllCall("psapi.dll\EmptyWorkingSet", "Ptr", -1)
-IfNotExist,%A_ScriptDir%\CashMemory.exe
-{
-FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
-Loop, %A_ScriptDir%\CashMemory.exe
-{
-break
-}
-}
+;IfNotExist,%A_ScriptDir%\CashMemory.exe
+;{
+;FileInstall,CashMemory.exe, %A_ScriptDir%\CashMemory.exe
+;Loop, %A_ScriptDir%\CashMemory.exe
+;{
+;break
+;}
+;}
 class _ClassMemory
 {
 static baseAddress, hProcess, PID, currentProgram
@@ -7666,13 +7666,13 @@ SetTimer, Hunt, 50
 SetTimer, AttackCheck, 50
 SetTimer, AttackMGB, 5000
 SetTimer, 타겟팅, 100
-SetTimer, RL, 18000000
+SetTimer, RL, 15000000
 시작탭사이즈 := 1
 return
 
 RL:
 Gui, Submit, NoHide
-Run, *RunAs %A_ScriptDir%\CashMemory.exe
+;Run, *RunAs %A_ScriptDir%\CashMemory.exe
 Sleep,300
 loady = 2
 IfWinExist,ahk_pid %jPID%
@@ -10481,10 +10481,6 @@ CheckHTMLstart := A_TickCount
 timeout := 10000  ; 최대 대기 시간 (ms)
 While(CheckHTML(page,"일회용 로그인") = "")
 {
-    if (A_TickCount - CheckHTMLstart > timeout) {
-        CheckHTMLstart := A_TickCount
-        break
-    }
 sleep, 300
 }
 }
@@ -10498,10 +10494,6 @@ CheckHTMLstart := A_TickCount
 While(CheckHTML(page,"마이페이지") = "")
 {
 sleep, 300
-    if (A_TickCount - CheckHTMLstart > timeout) {
-        CheckHTMLstart := A_TickCount
-        break
-    }
 }
 SB_SetText("로그인 완료",3)
 sleep, 500
@@ -18024,13 +18016,33 @@ if(Step = 605)
 {
 GuiControl, , Gui_NowState, [신전/성당] 도착.
 SB_SetText("현재소지 갈리드 체크 중")
-Get_Gold()
-if(Gold < 1000000)
+아이템읽어오기()
+if( Gui_Grade = 1 )
 {
-if(Gui_Grade = 1)
+if( Gold <= 1000000 )
 {
-Grade = 1
+if(아이템갯수["골드바"] = ""  || 아이템갯수["정령의보석"] = "")
+{
+GuiControl, , Gui_NowState, [자동그렐]골드바 or 정보 부족
+MsgBox,48,자동정지, "골드바 or 정보를 채운 후 재시작 버튼을 눌러주세요." ,
+SB_SetText("자동그레이드 [ 골드바 or 정보를 채워주세요. ]")
+gosub, 일시정지
+return
+}
 Step = 500
+return
+}
+if( Gold > 1000000 )
+{
+if(아이템갯수["정령의보석"] = "")
+{
+GuiControl, , Gui_NowState, [자동그렐]정령의보석 부족
+MsgBox,48,자동정지, "정령의보석을 채운 후 재시작 버튼을 눌러주세요." ,
+SB_SetText("자동그레이드 [ 정령의보석을 채워주세요. ]")
+gosub, 일시정지
+return
+}
+}
 }
 if(Gui_Grade = 0)
 {
@@ -18057,7 +18069,6 @@ CheckPB = 0
 CheckPN := 0
 countsignal := 0
 Pause
-}
 }
 if(Gold >= 1000000)
 {
@@ -23044,6 +23055,7 @@ if (Step >= 7 && Step < 10000)
 }
 if(Step = 27 or Step = 1026 or step = 3030)
 {
+gosub, 어빌리티탭확인
 AttackLoopCount += 1
 Check_Attack()
 if(Attack = 0)
