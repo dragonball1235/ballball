@@ -4970,6 +4970,7 @@ LV_Add("", "25.02.28/AM08:07", "베이커리 이동중 시 멈추는 부분 수�
 LV_Add("", "25.03.14/PM10:25", "자주 팅기는 부분 수정")
 LV_Add("", "25.04.11/PM10:25", "그레이드오류, 로그인 오류 약간 조정")
 LV_Add("", "25.06.22/AM01:48", "넥슨플러그 및 자주 팅기는거 1차수정")
+LV_Add("", "25.08.14/AM01:48", "포남 줍줍되게 수정, 포남 감응 수정, 소각수정")
 x_coord := 320
 Gui, Font, s8  Bold,Arial
 Gui, Font, s8 cGreen Bold
@@ -5077,7 +5078,7 @@ LV_ModifyCol(10,0)
 ; GUI 창을 생성하고 배경 색상을 흰색으로 설정
 Gui, Color, FFFFFF  ; 화면을 흰색(#FFFFFF)으로 설정
 ; GUI 창의 위치와 크기를 설정하고 표시
-Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 1.4[공개용]
+Gui, Show, x0 y0 w710 h655, 공유방 체잠 Ver 2025 ver 1.5[공개용]
 GuiControl, , Name1, 파티원
 GuiControl, , Name2, 파티원
 GuiControl, , Name3, 파티원
@@ -8655,59 +8656,96 @@ SelectRowNum := RowNumber
 }
 Lv_Delete(SelectRowNum)
 return
-incineration: ;줍줍 제어 용
+incineration: ; 줍줍 제어 용
 Gui, Submit, Nohide
 if((Step >= 19 and Step < 90) || (Step >= 1013 and Step < 1030) || (Step >= 3023 and Step < 3031)) ; 포남 포북 머미면
 {
-IfInString,Location,포프레스네
-{
-Gui, listview, 포프레스네소각
-IfInString,Location,필드
-{
-Loop % LV_GetCount()
-{
-LastRowNum := A_index
-}
-LV_Modify(inciNumber,"Select")
-LV_Modify(inciNumber, "Vis")
-LV_GetText(inciItem, inciNumber)
-incinerate_item()
-Sleep, 10
-incinerate_item()
-Sleep, 10
-incinerate()
+    IfInString,Location,포프레스네
+    {
+        Gui, listview, 포프레스네소각
+        IfInString,Location,필드
+        {
+            Loop % LV_GetCount()
+            {
+                LastRowNum := A_index
+            }
+            LV_Modify(inciNumber,"Select")
+            LV_Modify(inciNumber, "Vis")
+            LV_GetText(inciItem, inciNumber)
 
-inciNumber += 1
-if(inciNumber > LastRowNum)
-{
-inciNumber = 1
-}
-}
-}
-else IfInString,Location,크로노시스
-{
-Gui, listview, 포프레스네소각
-IfInString,Location,1F
-{
-Loop % LV_GetCount()
-{
-LastRowNum := A_index
-}
-LV_Modify(inciNumber,"Select")
-LV_Modify(inciNumber, "Vis")
-LV_GetText(inciItem, inciNumber)
-Sleep, 10
-incinerate_item()
-Sleep, 10
-incinerate()
-Sleep, 10
-inciNumber += 1
-if(inciNumber > LastRowNum)
-{
-inciNumber = 1
-}
-}
-}
+            ; ✅ 검증
+            found := false
+            Loop % LV_GetCount()
+            {
+                LV_GetText(checkItem, A_Index)
+                if (checkItem = inciItem) {
+                    found := true
+                    break
+                }
+            }
+            if (!found) {
+                inciNumber += 1
+                if (inciNumber > LastRowNum)
+                    inciNumber = 1
+                return
+            }
+
+            incinerate_item()
+            Sleep, 10
+            incinerate_item()
+            Sleep, 10
+            incinerate()
+
+            inciNumber += 1
+            if(inciNumber > LastRowNum)
+            {
+                inciNumber = 1
+            }
+        }
+    }
+    else IfInString,Location,크로노시스
+    {
+        Gui, listview, 포프레스네소각
+        IfInString,Location,1F
+        {
+            Loop % LV_GetCount()
+            {
+                LastRowNum := A_index
+            }
+            LV_Modify(inciNumber,"Select")
+            LV_Modify(inciNumber, "Vis")
+            LV_GetText(inciItem, inciNumber)
+
+            ; ✅ 검증
+            found := false
+            Loop % LV_GetCount()
+            {
+                LV_GetText(checkItem, A_Index)
+                if (checkItem = inciItem) {
+                    found := true
+                    break
+                }
+            }
+            if (!found) {
+                inciNumber += 1
+                if (inciNumber > LastRowNum)
+                    inciNumber = 1
+                return
+            }
+
+            Sleep, 10
+            incinerate_item()
+            Sleep, 10
+            incinerate()
+            Sleep, 10
+
+            inciNumber += 1
+            if(inciNumber > LastRowNum)
+            {
+                inciNumber = 1
+            }
+        }
+    }
 }
 return
 if(Step >= 7 and Step < 10000)
@@ -8753,6 +8791,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 invenError = 0
@@ -8872,6 +8911,7 @@ SetTimer, AttackMGB, off
 SetTimer, incineration, off
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 invenError = 0
@@ -9521,6 +9561,7 @@ SetTimer, 타겟팅, OFF
 
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 Pause
@@ -9665,6 +9706,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 Pause
@@ -9882,6 +9924,7 @@ TMessage :="[ Helancia_Log ]>>" jTitle "<<: 체력:" NowHP "입니다. 차원이
 텔레그램메시지보내기(TMessage)
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 Step = 9
@@ -9891,6 +9934,7 @@ if(HuntPlace = 3)
 {
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 타겟number := 0
@@ -9925,6 +9969,7 @@ if(HuntPlace = 2)
 {
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 타겟number := 0
@@ -9963,6 +10008,7 @@ if(Gui_Grade = 1)
 {
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 keyclick("tab")
@@ -9975,6 +10021,7 @@ if(Gui_Grade = 1)
 {
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 keyclick("tab")
@@ -9991,6 +10038,7 @@ keyclick("tab")
 FPcount := 0
 CheckPB := 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 MapNumber = 1
@@ -10027,6 +10075,7 @@ if(NowHP <= Gui_HPHospital and NowHP != "")
 keyclick("tab")
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 MapNumber = 1
@@ -10326,6 +10375,7 @@ settimer, 감응,off
 SetTimer, incineration, off
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 WinKill, ahk_pid %jPID%
@@ -10546,6 +10596,7 @@ SetTimer, GetMemory, OFF
 SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPN := 0
+감응 = 0
 CheckPB = 0
 countsignal := 0
 랜덤감응 = 0
@@ -11822,6 +11873,7 @@ GuiControl,,시작체력,%CheckFirstHP%
 GuiControl,,상승체력,%CheckUPHP% (%상승체력평균값%)
 GuiControl,,경과시간,%RunningTime%
 CheckPN := 0
+감응 = 0
 countsignal := 0
 CheckPB = 0
 MapNumber := 1
@@ -12964,12 +13016,13 @@ if(Step = 9 and gui_Startmap = 3)
 GuiControl, , Gui_NowState, [포남] 사냥터로 가기.
 sleep,100
 ;포북캐릭()
-;value := jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
-;value := jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
-;value := jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
-;value := jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
-;value := jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
+value := jelan.write(0x0045D28F, 0xE9, "Char", aOffsets*)
+value := jelan.write(0x0045D290, 0x8A, "Char", aOffsets*)
+value := jelan.write(0x0045D291, 0x0A, "Char", aOffsets*)
+value := jelan.write(0x0045D292, 0x00, "Char", aOffsets*)
+value := jelan.write(0x0045D293, 0x00, "Char", aOffsets*)
 CheckPN := 0
+감응 = 0
 countsignal := 0
 CheckPB = 0
 jjc := 0
@@ -13635,13 +13688,13 @@ JoinTime := A_TickCount
 Sleep, 400
 if(Gui_jjOn = 1)
 {
-Send, {F18 Down}
+Send, {F15 Down}
 Sleep, 40
-Send, {F18 Up}
+Send, {F15 Up}
 Sleep, 10
-Send, {F18 Down}
+Send, {F15 Down}
 Sleep, 40
-Send, {F18 Up}
+Send, {F15 Up}
 PickUp_itemsetPS()
 }
 Step = 19
@@ -14681,6 +14734,7 @@ PixelSearch, MobX, MobY, 0, 0, 775, 460, 0x4A044A, 10, *fast
 if(ErrorLevel = 0)
 {
 PostClick(MobX,MobY)
+;Gosub, 감응
 Monster_OID()
 WinGetPos, ElanciaClientX, ElanciaClientY, Width, Height, ahk_pid %jPID%
 SplashX := MobX + ElanciaClientX - 30
@@ -14970,10 +15024,6 @@ SB_SetText("감응 버프 받는 중")
 CheckPN := 0
 RepairWeaponCount := 0
 countsignal := 0
-keyclick("AltR")
-sleep,200
-Keyclick("tab")
-Sleep, 500
 Step = 31
 }
 if(step = 31)
@@ -15013,37 +15063,54 @@ step = 32
 if(Step = 32) ;포남 무바 중 감응 파트
 {
     SB_SetText("감응 버프 받는 중")
-    IfWinNotActive, ahk_pid %jPID%
-    {
-    WINACTIVATE, ahk_pid %jPID%
-    }
-    loop,2
-    {
+    Get_Location()
     if (Gui_KON = 1) {
-        if InStr(Location, "[알파차원] 포프레스네 남쪽") {
+    IfInString,Location,[알파차원] 포프레스네 마을
+    {
+    Sleep, 1000
+    }
+    Keyclick("tab")
+    sleep,100
+    keyclick("AltR")
+    if InStr(Location, "[알파차원] 포프레스네 남쪽") {
             if (countsignal = 0)
             {
                 SB_SetText("동쪽파수꾼 버프 받는 중")
-                jelan.write(0x00527B1C, A동파, "UInt")
-                jelan.write(0x00527B1C, A동파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
-                countsignal := 1
+                ;jelan.write(0x00527B1C, A동파, "UInt")
+               ; jelan.write(0x00527B1C, A동파, "UInt")
+               ; Sleep, 30
+              ;  Send, {F14}
+              ;  Sleep, 100
+              ;  Send, {F14}
+              ;  sleep, 500
+            loop,3
+            {
+            WriteExecutableMemory("NPC호출용1")
+            WriteExecutableMemory("NPC호출용2")
+            차원 := "알파"
+            jelan.write(0x00527b54, A동파, "UInt", aOffset*)
+            SB_SETTEXT(차원 . A동파 "호출", 2)
+            Sleep, 500
+            RunMemory("NPC호출")
+            Sleep, 500
+            }
+                countsignal += 1
                 호출대상 := "알파 - 동쪽파수꾼"
             }
             if (countsignal = 1)
             {
                 SB_SetText("서쪽파수꾼 버프 받는 중")
-                jelan.write(0x00527B1C, A서파, "UInt")
-                jelan.write(0x00527B1C, A서파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
+            loop,3
+            {
+            WriteExecutableMemory("NPC호출용1")
+            WriteExecutableMemory("NPC호출용2")
+            차원 := "알파"
+            jelan.write(0x00527b54, A서파, "UInt", aOffset*)
+            SB_SETTEXT(차원 . A서파 "호출", 2)
+            Sleep, 500
+            RunMemory("NPC호출")
+            Sleep, 500
+            }
                 포남입장시간 := A_TickCount
                 countsignal := 0
                 호출대상 := "알파 - 서쪽파수꾼"
@@ -15053,26 +15120,51 @@ if(Step = 32) ;포남 무바 중 감응 파트
         if InStr(Location, "[베타차원] 포프레스네 남쪽") {
             if (countsignal = 0) {
                 SB_SetText("동쪽파수꾼 버프 받는 중")
-                jelan.write(0x00527B1C, B동파, "UInt")
-                jelan.write(0x00527B1C, B동파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
-                countsignal := 1
+                ;jelan.write(0x00527B1C, B동파, "UInt")
+                ;jelan.write(0x00527B1C, B동파, "UInt")
+                ;Sleep, 30
+                ;Send, {F14}
+               ;Sleep, 100
+                ;Send, {F14}
+                ;Sleep, 100
+                loop,3
+                {
+                WriteExecutableMemory("NPC호출용1")
+                WriteExecutableMemory("NPC호출용2")
+                차원 := "알파"
+                jelan.write(0x00527b54, B동파, "UInt", aOffset*)
+                SB_SETTEXT(차원 . B동파 "호출", 2)
+                Sleep, 500
+                RunMemory("NPC호출")
+                Sleep, 500
+                }
+                countsignal += 1
                 호출대상 := "베타 - 동쪽파수꾼"
             }
             if (countsignal = 1)
             {
                 SB_SetText("서쪽파수꾼 버프 받는 중")
-                jelan.write(0x00527B1C, B서파, "UInt")
-                jelan.write(0x00527B1C, B서파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
+                ;loop,3
+                ;{
+                ;jelan.write(0x00527B1C, B서파, "UInt")
+                ;jelan.write(0x00527B1C, B서파, "UInt")
+                ;Sleep, 30
+                ;Send, {F14}
+                ;Sleep, 100
+                ;Send, {F14}
+                ;Sleep, 100
+                ;}
+                loop,3
+                {
+                WriteExecutableMemory("NPC호출용1")
+                WriteExecutableMemory("NPC호출용2")
+                차원 := "알파"
+                jelan.write(0x00527b54, B서파, "UInt", aOffset*)
+                SB_SETTEXT(차원 . B서파 "호출", 2)
+                Sleep, 500
+                RunMemory("NPC호출")
+                Sleep, 500
+                }
                 포남입장시간 := A_TickCount
                 countsignal := 0
                 호출대상 := "베타 - 서쪽파수꾼"
@@ -15082,38 +15174,64 @@ if(Step = 32) ;포남 무바 중 감응 파트
         if InStr(Location, "[감마차원] 포프레스네 남쪽") {
             if (countsignal = 0) {
                 SB_SetText("동쪽파수꾼 버프 받는 중")
-                jelan.write(0x00527B1C, G동파, "UInt")
-                jelan.write(0x00527B1C, G동파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
+;                loop,3
+;                {
+;                jelan.write(0x00527B1C, G동파, "UInt")
+;                jelan.write(0x00527B1C, G동파, "UInt")
+;;                Sleep, 30
+;;                Send, {F14}
+;                Sleep, 100
+;                Send, {F14}
+;                Sleep, 100
+;                }
+                loop,3
+                {
+                WriteExecutableMemory("NPC호출용1")
+                WriteExecutableMemory("NPC호출용2")
+                차원 := "알파"
+                jelan.write(0x00527b54, G동파, "UInt", aOffset*)
+                SB_SETTEXT(차원 . G동파 "호출", 2)
+                Sleep, 500
+                RunMemory("NPC호출")
+                Sleep, 500
+                }
                 countsignal := 1
                 호출대상 := "감마 - 동쪽파수꾼"
             }
-            if (countsignal = 1) {
+           if (countsignal = 1) {
                 SB_SetText("서쪽파수꾼 버프 받는 중")
-                jelan.write(0x00527B1C, G서파, "UInt")
-                jelan.write(0x00527B1C, G서파, "UInt")
-                Sleep, 30
-                Send, {F14}
-                Sleep, 100
-                Send, {F14}
-                Sleep, 100
+ ;               loop,3
+;                {
+;                jelan.write(0x00527B1C, G서파, "UInt")
+;                jelan.write(0x00527B1C, G서파, "UInt")
+;                Sleep, 30
+;                Send, {F14}
+;                Sleep, 100
+;                Send, {F14}
+;                Sleep, 100
+;                }
+                loop,3
+                {
+                WriteExecutableMemory("NPC호출용1")
+                WriteExecutableMemory("NPC호출용2")
+                차원 := "알파"
+                jelan.write(0x00527b54, G서파, "UInt", aOffset*)
+                SB_SETTEXT(차원 . G서파 "호출", 2)
+                Sleep, 500
+                RunMemory("NPC호출")
+                Sleep, 500
+                }
                 포남입장시간 := A_TickCount
                 countsignal := 0
                 호출대상 := "감마 - 서쪽파수꾼"
             }
         }
     }
-    }
-    sleep,500
     감응 += 1
     TMessage := "[ Helancia_Log ]>>" jTitle "<<:" 감응 "회차 [원격] 감응 성공.[" 호출대상 ":" countsignal "]"  Location "시작 체력 : " . CheckFirstHP . " / 상승 체력 : " . CheckUPHP . " ( " . 상승체력평균값 . " ) " . " / 경과 시간 : " . RunningTime
     텔레그램메시지보내기(TMessage)
     PNnewTime = %A_Now%
-    EnvAdd, PNnewTime, 5, Minutes
+    EnvAdd, PNnewTime, 9, Minutes
     FormatTime, PNnewTime1, %PNnewTime%, yyyyMMddHHmm
     CheckPN := 1
     step = 24
@@ -15865,6 +15983,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 Pause
 }
@@ -16368,6 +16487,7 @@ SB_SetText("무기수리 - 수리점으로 이동 중")
 CheckPB = 0
 CheckPN := 0
 jjc := 0
+감응 = 0
 countsignal := 0
 Send, {F16 Down}
 Send, {F16 Up}
@@ -16449,6 +16569,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 Pause
 }
@@ -16947,6 +17068,7 @@ GuiControl, , Gui_NowState, [은행] 상점으로 이동 중.
 SB_SetText("골드바 > 갈리드로 변경하러 가는 중")
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 jjc := 0
 Send, {F16 Down}
@@ -17011,6 +17133,7 @@ SetTimer, 타겟팅, OFF
 SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 Pause
 }
@@ -17170,6 +17293,7 @@ SetTimer, 타겟팅, OFF
 SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 return
 }
@@ -17259,6 +17383,7 @@ GuiControl, , Gui_NowState, [은행] 상점으로 이동 중.
 SB_SetText("골드바 > 갈리드로 변경하러 가는 중")
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 jjc := 0
 Send, {F16 Down}
@@ -17322,6 +17447,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 Pause
 }
@@ -17480,6 +17606,7 @@ SetTimer, 타겟팅, OFF
 SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 return
 }
@@ -17569,6 +17696,7 @@ GuiControl, , Gui_NowState, [은행] 상점으로 이동 중.
 SB_SetText("강제그렐 골드바 > 갈리드 이동중")
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 jjc := 0
 countsignal := 0
 Send, {F16 Down}
@@ -17632,6 +17760,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 Pause
 }
@@ -17790,6 +17919,7 @@ SetTimer, 타겟팅, OFF
 SetTimer, RL, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 return
 }
@@ -17863,6 +17993,7 @@ GuiControl, , Gui_NowState, [신전/성당] 기도하러 가는 중
 SB_SetText("그레이드 하러 가는 중")
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 jjc := 0
 Send, {F16 Down}
@@ -17945,6 +18076,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 Pause
 }
@@ -18067,6 +18199,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 Pause
 }
@@ -19705,6 +19838,7 @@ GuiControl, , Gui_NowState, [신전/성당] 기도하러 가는 중.
 SB_SetText("스펠 그레이드 하러 가는 중")
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 jjc := 0
 Send, {F16 Down}
@@ -19787,6 +19921,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 Pause
 }
@@ -19887,6 +20022,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 return
 }
@@ -20225,6 +20361,7 @@ GuiControl, , Gui_NowState, [신전/성당] 기도하러 가는 중.
 SB_SetText("강제그레이드 - 신전으로 이동 중")
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 jjc := 0
 Send, {F16 Down}
@@ -20307,6 +20444,7 @@ SetTimer, ClearMem, OFF
 SetTimer, 타겟팅, OFF
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 Pause
 }
@@ -20511,6 +20649,7 @@ GuiControl,,상승체력,%CheckUPHP% (%상승체력평균값%)
 GuiControl,,경과시간,%RunningTime%
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 jjc := 0
 countsignal := 0
 Send, {F16 Down}
@@ -20526,6 +20665,7 @@ if(Step = 1000 and gui_Startmap = 4)
 GuiControl, , Gui_NowState, [포북] 사냥터로 가기.
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 jjc := 0
 Send, {F16 Down}
 Send, {F16 Up}
@@ -27443,6 +27583,7 @@ Step = 1014
 }
 CharMovePonam(Loute1,Loute2,Loute3,Loute4)
 {
+;Gosub, 감응
 if (Loute1 = 1) ; 시계
 {
 if(랜덤감응 = 0)
@@ -34437,6 +34578,7 @@ settimer, 파라스대기, off
 파라스방해감지 := 0
 CheckPB = 0
 CheckPN := 0
+감응 = 0
 countsignal := 0
 랜덤감응 = 0
 MapNumber = 1
@@ -37486,7 +37628,103 @@ Sleep,10
 Step = 3025
 }
 }
-
+감응:
+Gui, Submit, Nohide
+if(Gui_KON = 1)
+{
+IfInString,Location,[알파차원] 포프레스네 마을
+{
+Sleep, 1000
+}
+IfInString,Location,[알파차원] 포프레스네 남쪽
+{
+if (countsignal = 0)
+{
+value := jelan.write(0x00527B1C, A동파, "UInt")
+value := jelan.write(0x00527B1C, A동파, "UInt")
+Sleep, 30
+Send, {F14}
+Sleep, 100
+Send, {F14}
+Sleep, 100
+countsignal += 1
+호출대상 := "알파 - 동쪽파수꾼"
+return
+}
+if (countsignal = 1)
+{
+value := jelan.write(0x00527B1C, A서파, "UInt")
+value := jelan.write(0x00527B1C, A서파, "UInt")
+Sleep, 30
+Send, {F14}
+Sleep, 100
+Send, {F14}
+Sleep, 100
+countsignal = 0
+호출대상 := "알파 - 서쪽파수꾼"
+return
+}
+}
+IfInString,Location,[베타차원] 포프레스네 남쪽
+{
+if (countsignal = 0)
+{
+value := jelan.write(0x00527B1C, B동파, "UInt")
+value := jelan.write(0x00527B1C, B동파, "UInt")
+Sleep, 30
+Send, {F14}
+Sleep, 100
+Send, {F14}
+Sleep, 100
+countsignal += 1
+호출대상 := "베타 - 동쪽파수꾼"
+return
+}
+if (countsignal = 1)
+{
+value := jelan.write(0x00527B1C, B서파, "UInt")
+value := jelan.write(0x00527B1C, B서파, "UInt")
+Sleep, 30
+Send, {F14}
+Sleep, 100
+Send, {F14}
+Sleep, 100
+countsignal = 0
+호출대상 := "베타 - 서쪽파수꾼"
+return
+}
+}
+IfInString,Location,[감마차원] 포프레스네 남쪽
+{
+if (countsignal = 0)
+{
+value := jelan.write(0x00527B1C, G동파, "UInt")
+value := jelan.write(0x00527B1C, G동파, "UInt")
+Sleep, 30
+Send, {F14}
+Sleep, 100
+Send, {F14}
+Sleep, 100
+countsignal += 1
+호출대상 := "감마 - 동쪽파수꾼"
+return
+}
+if (countsignal = 1)
+{
+value := jelan.write(0x00527B1C, G서파, "UInt")
+value := jelan.write(0x00527B1C, G서파, "UInt")
+Sleep, 30
+Send, {F14}
+Sleep, 100
+Send, {F14}
+Sleep, 100
+countsignal = 0
+호출대상 := "감마 - 서쪽파수꾼"
+return
+}
+}
+}
+return
 ClearChromeHistory()
 {
     ; Chrome의 쿠키, 캐시, 기록 파일이 있는 폴더 경로 (사용자마다 다를 수 있음)
@@ -37625,6 +37863,7 @@ TryLoginFail:
     SetTimer, 타겟팅, Off
 
     CheckPN := 0
+    감응 = 0
     CheckPB := 0
     countsignal := 0
     랜덤감응 := 0
