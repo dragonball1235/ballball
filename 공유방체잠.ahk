@@ -10519,7 +10519,7 @@ Run, taskkill /F /IM chromedriver.exe,, hide
 }
 sleep, 3000
     Chrome := new Rufaydium(A_ScriptDir "\chromedriver.exe")
-    Chrome.capabilities.HeadlessMode := false
+    Chrome.capabilities.HeadlessMode := true
     Chrome.capabilities.IncognitoMode := true
     NexonUrl := "https://nxlogin.nexon.com/common/login.aspx?accesscode=1&redirect=https%3A%2F%2Fsignin.nexon.com%2Fsso%2Fnxlogin%3Fredirect_uri%3DaHR0cHMlM0ElMkYlMkZlbGFuY2lhLm5leG9uLmNvbSUyRg%3D%3D"
     Page := Chrome.getSessionByUrl(NexonUrl)
@@ -21631,7 +21631,6 @@ return
 }
 }
 CharMovePobuk()
-sleep,1000
 Step = 1014
 }
 if(Step = 1014)
