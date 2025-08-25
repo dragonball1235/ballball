@@ -9650,6 +9650,7 @@ GuiControl,,Gui_huntpobuk,1
 if(Step = 17 or step = 18)
 {
 Entrance += 1
+OID리셋()
 }
 if(Entrance > 2)
 {
@@ -10518,7 +10519,7 @@ Run, taskkill /F /IM chromedriver.exe,, hide
 }
 sleep, 3000
     Chrome := new Rufaydium(A_ScriptDir "\chromedriver.exe")
-    Chrome.capabilities.HeadlessMode := true
+    Chrome.capabilities.HeadlessMode := false
     Chrome.capabilities.IncognitoMode := true
     NexonUrl := "https://nxlogin.nexon.com/common/login.aspx?accesscode=1&redirect=https%3A%2F%2Fsignin.nexon.com%2Fsso%2Fnxlogin%3Fredirect_uri%3DaHR0cHMlM0ElMkYlMkZlbGFuY2lhLm5leG9uLmNvbSUyRg%3D%3D"
     Page := Chrome.getSessionByUrl(NexonUrl)
@@ -10543,11 +10544,18 @@ SB_SetText("로그인 시도",3)
 CheckHTMLstart := A_TickCount
 While(CheckHTML(page,"마이페이지") = "")
 {
+SB_SetText("마이페이지 확인 중",3)
 sleep, 300
+    if (A_TickCount - CheckHTMLstart > 5000) ; 5초 초과 시
+    {
+        SB_SetText("마이페이지 확인 실패 - Timeout",3)
+        break
+    }
 }
 SB_SetText("로그인 완료",3)
 sleep, 500
 SB_SetText("GameStart 시도",3)
+CheckHTMLstart := A_TickCount
 Loop
 {
 Page.getElementsbyClassName("gnbFullBannerBtToday")[0].SendKey(key.enter)
@@ -10559,6 +10567,11 @@ SB_SetText("클라이언트 발견",3)
 Break
 }
 SB_SetText("GameStart 재시도",3)
+if (A_TickCount - CheckHTMLstart > 5000) ; 5초 초과 시
+{
+    SB_SetText("GameStart 확인 실패 - Timeout",3)
+    break
+}
 }
 SB_SetText("Chrome 닫기", 3)
 Page_exit(Chrome)
@@ -10766,7 +10779,7 @@ Step = 3
 }
 if(Step = 3)
 {
-Loop, 30  ; 최대 30초까지 대기
+Loop, 10  ; 최대 30초까지 대기
 {
     ControlGetText, Patch, Static2, Elancia
     sb_settext("패치 찾는 중 : " . Patch, 2)
@@ -13613,7 +13626,7 @@ if(ipmak >= 5)
 {
 GUICONTROL, , Gui_NowState, 리노아 호출오류 감응 OFF
 SLEEP, 500
-        TMessage := "[ Helancia_Log ]>>" jTitle "<<:알파 리노아 호출 오류"
+        TMessage := "[ Helancia_Log ]>>" jTitle "<<:리노아 호출 오류"
         텔레그램메시지보내기(TMessage)
 OID리셋()
 GUICONTROL, , Gui_KOFF, 1
@@ -14237,7 +14250,6 @@ return
 }
 }
 CharMovePonam(Gui_MoveLoute1,Gui_MoveLoute2,Gui_MoveLoute3,Gui_MoveLoute4)
-sleep,1000
 Step = 20
 }
 if(Step = 20)
